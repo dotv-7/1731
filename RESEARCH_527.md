@@ -457,3 +457,33 @@ For a self-hosted public deployment (the motivating case for this fork):
 - Usability targets (verifiable): token streaming, keyboard-first input with history and slash-command
   completion, Ctrl+C to interrupt, code/table rendering, auto-reconnect and session persistence across
   refresh, mobile layout.
+
+## 7. Fork maintenance (dotv-io deployment)
+
+Policy: the fork's base is always the latest official Hermes release tag; our features are a thin layer on
+top, rebased on every upstream release.
+
+- Image: `ghcr.io/dotv-io/hermes-agent:<upstream tag>-dotv.<N>` (e.g. `v0.22.2-dotv.1`) plus
+  `sha-<short>`; tags are immutable, no `latest`. Production pulls a pinned tag; rollback = previous tag
+  (+ data backup restore if the newer version migrated `config.yaml` / `state.db`).
+- One feature = one commit (or a small, self-contained series), never mixed with upstream code changes.
+- Prefer hooks, plugins and config; touch upstream files only when unavoidable, minimally, and register
+  each touch below.
+- On each upstream release: rebase, run the tests, then tag. If upstream now covers one of our features,
+  drop ours and use upstream's.
+
+Upgrade prerequisites (before the first start of any new version):
+
+1. `sessions.auto_prune: false` in `config.yaml` — the owner keeps all session history. Verified in
+   v0.22.2: both the gateway startup sweep (`gateway/run.py`) and CLI maintenance
+   (`hermes_cli/cli_auto_maintenance.py`) skip pruning entirely when it is false (VACUUM-after-prune is
+   skipped with it). `sessions.auto_archive` stays false (default).
+2. Back up the data directory (including `state.db`) — `config.yaml` and `state.db` migrations are
+   one-way.
+
+### Upstream change registry
+
+| # | Feature | Upstream file / function | Size | Upstream equivalent? |
+|---|---|---|---|---|
+| 1 | Gemini Google Search grounding alongside function calling, opt-in via `HERMES_GEMINI_GOOGLE_SEARCH` (adds `{"googleSearch": {}}` to `tools` and `toolConfig.includeServerSideToolInvocations = true`) | `agent/gemini_native_adapter.py::build_gemini_request` | ~10 lines | None in v0.22.2 (no `googleSearch` / grounding option anywhere in the tree); candidate for an upstream PR |
+| 2 | Owner/Guest permissions (§4) | see §4.8 | ~300–500 lines + tests | Upstream #527 (open) |
