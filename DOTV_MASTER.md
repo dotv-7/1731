@@ -25,10 +25,10 @@
 
 | # | 成品 | 内容 | 状态 |
 |---|---|---|---|
-| D1 | **上下文隐私功能 + 看板** | (a) 上下文盘点器：扫描所有上下文来源（见 §4），列出每一条内容；(b) 看板：仅 Owner 可用，逐条标记公开或私密，默认私密；(c) 公开投影同步器：把公开条目单向同步到 `public` profile；(d) 帮助 Owner 分类的 skill（只给建议，Owner 确认后才生效） | 设计中 |
-| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 | 设计中 |
-| D3 | **独立 UI** | 终端风格网页聊天（**已定：风格 1“Hermes 同款”**，样稿见 `mockups/hermes-chat-mockups.html`），Owner 口令解锁，后端小服务持有 API key，访客和 Owner 走不同 profile，满足 R9 的指标 | 样稿已出 |
-| D4 | **全局说明文档** | 本文件：要求、成品、工具清单、上下文来源、角色权限矩阵、上游改动清单 | 本文件 |
+| D1 | **上下文隐私功能 + 看板** | (a) 上下文盘点器：扫描所有上下文来源（见 §4），列出每一条内容；(b) 看板：仅 Owner 可用，逐条标记公开或私密，默认私密；(c) 公开投影同步器：把公开条目单向同步到 `public` profile；(d) 帮助 Owner 分类的 skill（只给建议，Owner 确认后才生效） | (a)(b)(c) 已实现（PR #6：`dotv/context/`、`dotv-public-context` 插件、`/board`）；(d) 未做 |
+| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 | Owner/Guest 已实现并在真实 Hermes 上验证（PR #6）；User/Admin、命令权限未做 |
+| D3 | **独立 UI** | 终端风格网页聊天（**已定：风格 1“Hermes 同款”**，样稿见 `mockups/hermes-chat-mockups.html`），Owner 口令解锁，后端小服务持有 API key，访客和 Owner 走不同 profile，满足 R9 的指标 | 已实现（PR #6：`dotv/chat/`）；已用演示后端预览，未接生产 |
+| D4 | **全局说明文档** | 本文件：要求、成品、工具清单、上下文来源、角色权限矩阵、上游改动清单 | 本文件；实现进度见 §9 |
 | D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 待做 |
 
 ## 2. 527 管什么，我们管什么
@@ -156,6 +156,35 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 | 日期 | 变更 |
 |---|---|
+| 2026-10-29 | 加 §9 实现进度：D1/D2/D3 已实现，D2 在真实 Hermes 上端到端验证；访客关闭 tool_search |
 | 2026-10-29 | 定：UI 风格 1；Guest 开放看图、生成图片、语音朗读；公开标记另存清单 |
 | 2026-10-29 | Owner 认证定为口令；加入 UI 样稿 `mockups/` |
 | 2026-10-29 | 初版：要求、成品清单、527 对比、工具清单、上下文来源、权限矩阵草案、架构 |
+
+## 9. 实现进度（随实现更新）
+
+代码在 `dotv/`（PR #6），官方代码不动。
+
+| 项 | 状态 | 验证方式 |
+|---|---|---|
+| 访客 profile 模板（`dotv/profiles/public/`） | ✅ | 真实 Hermes gateway（本仓库 v0.22.2 代码）+ 脚本化假模型 |
+| 工具闸门插件 `dotv-guest-gate` | ✅ | 同上：本地路径看图被拒；名单外工具调不到 |
+| 访客关闭 `tools.tool_search` | ✅ | 实测：开启时访客会拿到 `tool_call` 桥接工具，可间接调用其他工具，所以关掉 |
+| 上下文盘点 + 公开清单 + 投影（`dotv/context/`） | ✅ | 单元测试（金丝雀、改动后退回私密、会话不可公开） |
+| 公开资料插件 `dotv-public-context` | ✅ | 真实 Hermes：公开事实进访客系统提示，`dotv_public_lookup` 可查 |
+| 看板 `/board`（Owner 专用） | ✅ | 演示数据预览 |
+| 独立聊天窗口 `dotv-chat` | ✅ | 演示后端预览；未接生产 Hermes |
+| 同一 gateway 双 profile、key 隔离 | ✅ | 真实 Hermes：`/p/public` 用 Owner key 返回 401 |
+| 帮助分类的 skill（D1-d） | ❌ 未做 | — |
+| User/Admin、群聊混合 | ❌ 第一版不做 | — |
+| Gemini 补丁、GHCR 镜像（D5） | ❌ 未做 | — |
+| 真实模型越狱测试、生产安装 | ❌ 未做 | 需要生产或真实模型 key |
+
+### 真实 Hermes 端到端结果（脚本：`dotv/dev/e2e/`）
+
+| 检查 | 访客 | Owner |
+|---|---|---|
+| Owner 私密金丝雀出现在上下文里 | 否 | 是 |
+| 公开金丝雀出现在系统提示里 | 是 | 否 |
+| 提供给模型的工具 | `clarify`、`dotv_public_lookup`、`text_to_speech`、`vision_analyze`、`web_extract`、`web_search` | 全部工具 |
+| 调用 `read_file`、`terminal`、`execute_code`、`memory`、`session_search`、`skill_view` | 全部报"工具不存在" | 可用 |
