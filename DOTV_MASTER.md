@@ -160,7 +160,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 | 日期 | 变更 |
 |---|---|
-| 2026-10-29 | 加 §10：#527 里每个人的方案逐条整理，与我们的对比 |
+| 2026-10-29 | 加 §10：#527 全部评论、关联 PR/issue 原文逐人整理，按维度和我们对比 |
 | 2026-10-29 | 527 第一版：五级权限、权限看板、邀请码、Owner 模式全局文档链接 |
 | 2026-10-29 | 加 §9 实现进度：D1/D2/D3 已实现，D2 在真实 Hermes 上端到端验证；访客关闭 tool_search |
 | 2026-10-29 | 定：UI 风格 1；Guest 开放看图、生成图片、语音朗读；公开标记另存清单 |
@@ -197,57 +197,190 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 提供给模型的工具 | `clarify`、`dotv_public_lookup`、`text_to_speech`、`vision_analyze`、`web_extract`、`web_search` | 全部工具 |
 | 调用 `read_file`、`terminal`、`execute_code`、`memory`、`session_search`、`skill_view` | 全部报"工具不存在" | 可用 |
 
-## 10. upstream #527 里每个人的方案，与我们的对比
+## 10. upstream #527 里所有人的方案，与我们的完整对比
 
-来源：[NousResearch/hermes-agent#527](https://github.com/NousResearch/hermes-agent/issues/527)（截至 2026-10-29 仍 open，20 条评论）及其中提到的 PR/issue。按出现顺序逐人整理。
+### 10.0 范围：读了哪些原文
 
-### 10.1 逐人方案
+全部原文都逐条读完，没有只看摘要：
 
-| # | 谁 / 在哪 | 方案要点 | 状态 |
-|---|---|---|---|
-| 1 | **teknium1**（维护者）— issue 正文 | 五级 OWNER→ADMIN→USER→GUEST→BLOCKED；改核心：`gateway/permissions.py` 的 `PermissionManager`，`_is_user_authorized()` 改为返回等级；按等级过滤工具（建 `AIAgent` 时）+ 斜杠命令门禁；把当前等级注入会话上下文；`/users list/set/remove`；按等级限流；配置写在 `config.yaml` 的 `permissions:`（`tiers`/`users: "telegram:123": owner`/`default_tier`/`pairing_tier`/`platform_roles`）；Telegram 群管理员、Discord 角色自动映射；三期上线 | 设计稿 |
-| 2 | **teknium1** — 对开放问题的定论 | ① 群聊**按每条消息的发送者**判权（工具全量加载，调用时拦截），不取"最严格"；② `ALLOWED_USERS` 第一个 = owner，其余 = admin，配对用户 = user；③ Guest 不是纯聊天，默认 `web_search/web_extract/vision_analyze/clarify/text_to_speech`，限 10 次/小时；④ 按单个工具配，支持 `@web/@read/@code/@safe…` 组；⑤ MCP 工具低于 admin 默认全禁，可 `mcp:server:tool` 单独授权；⑥ 与 #476 模式系统取交集；附 `/whoami`、`/promote` 申请升级、"被拒时给替代方案"的友好提示 | 设计稿 |
-| 3 | **teknium1** — 与 #531 workspace / #532 upload 的关系 | workspace 清单只注入给有读权限的等级（Guest 看不到）；User 可读不可写；上传按等级限大小/次数；指出系统提示按会话缓存、目前不知道当前用户等级 | 设计稿 |
-| 4 | **ReqX** — [PR #3156](https://github.com/NousResearch/hermes-agent/pull/3156)（+3607/−702） | v1：可选 `permission_tiers` 配置；按等级限 toolset、管理命令、exec 审批、时间窗口；配置错误时 fail-closed、退到最严格等级；共享会话里审批隔离；88 个测试，经两轮审计修了 24 个问题 | 关闭，被 #4443 取代 |
-| 5 | **ReqX** — [PR #4443](https://github.com/NousResearch/hermes-agent/pull/4443)（+16133/−3086） | 完整重写：Owner/Admin/User/Guest 预设、`@group` 展开、按人加减工具、按命令白名单；**在 `run_agent.py` 调度处硬拦截** `allowed_tool_names`；子代理继承父级工具名单；MCP 工具过滤；平台复合身份（`platform:id`）；Telegram `getChatMember`/Discord 角色映射（带缓存）；运行时用户库（SQLite）、`/promote`、`/audit`；审计日志、用量统计、限流、i18n；448 个测试 | 关闭未合并；维护者称其为"完整参考实现" |
-| 6 | **teknium1** — [PR #23373](https://github.com/NousResearch/hermes-agent/pull/23373)（从 #4443 抢救，已合并） | 只做**斜杠命令**两级：各平台 `extra:` 里加 `allow_admin_from`、`user_allowed_commands`（及群聊版）；非 admin 只能跑名单里的命令，`/help`、`/whoami` 永远可用；新增 `/whoami`；不碰工具、memory、上下文 | **已进官方**（文档"Permissions and admin/user split"） |
-| 7 | **yansongwel** — 运维团队场景 | 关键需求是**"发起人不能批准自己"**：User 可触发任何工具但需审批，Admin 才能批，且不能批自己发起的；过渡方案 `approvals.require_separate_approver: true`；或靠 #16475 可插拔审批 hook 在用户侧实现 | 需求 |
-| 8 | **michaeltanyk** | 最简两级：自己 = Owner 全权，其余所有人 = Guest **零工具**纯聊天；希望一个配置就能"只列自己，其余全落到 Guest" | 需求 |
-| 9 | **konsisumer**（自动分诊） | 指出与 [#16017](https://github.com/NousResearch/hermes-agent/issues/16017) 重复：WhatsApp 四级 owner/guest/unknown/banned——不同等级用**不同模型**（Opus/Sonnet/Haiku）、不同迭代上限、限流；工具在建 `AIAgent` 时就不给；陌生人只有 `moderate_user`，代理可自动封禁 | RFC，open |
-| 10 | **pxxs / rodion-m** | +1；rodion-m 认为应列 P0，否则无法用于社区或组织 | — |
-| 11 | **gr3enarr0w** — 企业视角 | RBAC 只是一部分，应建立**统一身份模型**：同一身份驱动会话隔离、session search、MEMORY/USER.md、外部 memory、工具、命令、OAuth 凭据、定时任务、子代理、workspace、上传、审计；支持"个人私有 + 团队共享 + 全组织共享"三层上下文，防止跨用户串 memory | 需求 |
-| 12 | **fuzhyperblue** — 真实多用户部署 | 现在靠 `hermes-webui` 的 profile 锁 + 认证 + 用户→profile 路由（也试过 LibreChat 前端 + 服务端按 profile 转发 API）；提议显式"多用户模式"（单用户不受影响）；身份→角色→**profile**→会话/memory/workspace 范围→工具；接 Authentik 等外部身份源；共享会话按发送者判权、越权变成审批请求、**绝不因共享会话提权**；角色解析本地缓存+失效；有效权限 = 角色 ∩ profile ∩ workspace ∩ 显式授予；强调 UI 隐藏和 SOUL.md 不是权限边界，必须服务端确定性执行 | 需求 + 现成变通方案 |
-| 13 | **fuzhyperblue** — 回应 #23373 | #23373 只回答"能跑哪些命令"，没回答"在哪个上下文、带哪些能力里运行"：哪个 profile 处理、哪份 memory、哪些历史会话、哪些文件、哪些凭据、模型能看到哪些工具 | 需求 |
-| 14 | **FecheLQN** — 运营场景 | 需要**记录级**控制：读结果披露前按请求人角色 + 归属（负责人/区域/客户组合）过滤；敏感结论要求指定数据源和字段；外发收件人身份消歧；"只起草/安全模式"必须真的关掉外发工具；配回归测试 | 需求 |
-| 15 | **GottZ**（AI 分诊） | 总结：#3156 部分实现、#4443 最完整（均关闭）、#23373 是已合并的命令门禁；建议剩余部分从 #4443 拆成小 PR 跟进 | 分诊 |
-| 16 | **mansourMP** | 自研产品：权限范围和花费上限在代理之下执行（代理根本看不到），**按数据库隔离**，代理物理上读不到别人数据；随后推广自己的 empyralis.ai | 闭源产品 |
-| 17 | **marek-commits** — [hermes-whatsapp-gatekeeper](https://github.com/marek-commits/hermes-whatsapp-gatekeeper) | WhatsApp 专用代码级 hook：本人（`fromMe`）全权，其他联系人只能聊天、工具被过滤；两条经验：① 闸门必须 **fail-closed**（他曾在导入失败、未处理异常、配置损坏三处 fail-open）；② 计数/限流只能在闸门真正打开时计数 | 开源，在生产用 |
+- [#527](https://github.com/NousResearch/hermes-agent/issues/527) 正文和全部 20 条评论。截至 2026-10-29 状态为 open。
+- 评论里出现的实现：[PR #3156](https://github.com/NousResearch/hermes-agent/pull/3156)、[PR #4443](https://github.com/NousResearch/hermes-agent/pull/4443)（含它的 `docs/feature-user-permissions.md`）、[PR #23373](https://github.com/NousResearch/hermes-agent/pull/23373)，这三个 PR 的描述和评论都读了；另有 [hermes-whatsapp-gatekeeper](https://github.com/marek-commits/hermes-whatsapp-gatekeeper) 的 README。
+- 评论里提到的相关 issue：[#16017](https://github.com/NousResearch/hermes-agent/issues/16017)、[#16475](https://github.com/NousResearch/hermes-agent/issues/16475)、[#476](https://github.com/NousResearch/hermes-agent/issues/476)、[#531](https://github.com/NousResearch/hermes-agent/issues/531)、[#532](https://github.com/NousResearch/hermes-agent/issues/532)、[#410](https://github.com/NousResearch/hermes-agent/issues/410)、[#129](https://github.com/NousResearch/hermes-agent/issues/129)，正文和评论都读了。
+- 官方已合并代码直接对照我们的 v0.22.2 源码：`gateway/slash_access.py`，以及 `website/docs/user-guide/multi-profile-gateways.md`。
 
-### 10.2 我们的方案和他们比
+本节用标签区分来源：**【原文】** 指 issue/PR 里写的内容，**【dotv 已做】** 指我们代码里已有的功能，**【dotv 未做】** 指我们还没有的功能。
 
-| 维度 | 官方已合并 #23373 | #4443（最完整参考） | fuzhyperblue / gr3enarr0w 思路 | **我们（dotv）** |
-|---|---|---|---|---|
-| 改不改 Hermes 核心 | 改（已在官方） | 大改 18 个文件 | 呼吁原生支持 | **不改**，全在 `dotv/`：profile 模板 + `pre_tool_call` 插件 + 外部聊天服务 |
-| 等级 | admin / user 两级 | Owner/Admin/User/Guest + 自定义 | 角色 + profile 组合 | Owner/Admin/User/访客/封禁 五级 |
-| 管什么 | 只管斜杠命令 | 工具 + 命令 + 审批 + 限流 + 审计 | 工具 + 上下文 + 凭据全套 | 工具（每级 profile + 闸门插件）+ **上下文**（每级独立 profile、Owner 勾选的公开投影） |
-| 工具怎么拦 | 不拦 | 建代理时过滤 + 调度时硬拦 | — | 双层：profile 的 `platform_toolsets` 让模型看不到 + 插件在调用时拦（fail-closed，名单有上限 `CEILING`）；关掉 `tool_search` 桥接 |
-| 上下文 / memory 隔离 | 无 | 无（只管能力） | 核心诉求 | **核心**：每级是独立 profile（等同"按数据库隔离"），Owner 的 memory、会话、文件物理上不在访客那边；只同步 Owner 勾过的内容 |
-| 身份怎么认 | 平台用户 ID | 平台复合 ID + 群角色映射 | 外部身份源 | 只在 dotv-chat 里：口令 = Owner，邀请码 = Admin/User/封禁，不登录 = 访客 |
-| 群聊混合 | 有群聊版配置 | 按发送者判权 | 按发送者 + 审批 | **未做**（第一版定了不做） |
-| 管理界面 | 改 config.yaml | `/users`、`/promote`、`/audit` 命令 | — | **权限看板 `/perm`**：勾选矩阵、🔒 危险工具、成员与邀请码，保存即同步 |
-| 限流 / 花费 / 审计 | 无 | 有 | 有审批 + 审计 | **无** |
-| 审批（发起人≠批准人） | 无 | exec 审批隔离 | 有 | **无**（非 Owner 根本拿不到需要审批的危险工具） |
-| 升级成本 | 跟官方走 | 无法跟进（未合并，冲突大） | — | 低：插件 + 配置，升级后重装 |
+### 10.1 每个人的方案
 
-### 10.3 结论：我们哪里一样、哪里不同、该借鉴什么
+#### ① teknium1（维护者）：issue 正文，2026-03 的原始设计
+- **背景【原文】**：gateway 现在只有"放行/拒绝"两种状态（`gateway/run.py` 中的 `_is_user_authorized()`），一旦放行就拿到全部工具，包括 terminal。
+- **等级**：OWNER → ADMIN → USER → GUEST → BLOCKED。能力矩阵见 §5。User 对 memory 只读，Guest 没有任何工具。
+- **识别身份**：用平台账号 `"telegram:123": owner` 这样的写法；`default_tier` 管没列出的人，`pairing_tier` 管配对进来的人；`platform_roles` 把 Telegram 群管理员、Discord 角色映射到等级。
+- **在哪里拦**：新增 `PermissionManager`，`_is_user_authorized()` 改为返回等级；在命令分发前检查等级；创建 agent 时过滤工具；把等级注入会话上下文。
+- **限流**：按等级设置，User 每小时 60 次，Guest 每小时 10 次。
+- **管理方式**：`config.yaml` 加上 `/users list/set/remove` 命令。
+- **自己列出的风险**：漏改一处就会出现绕过；群里多人共用一个会话怎么办；查平台角色有延迟；MCP 工具；和 #476 的关系。
+- **分三期**：①等级、工具和命令；②限流和 `/users`；③平台原生角色。
 
-- **思路最像 fuzhyperblue 的"身份 → profile → 范围"**，也是 mansourMP 说的"在代理之下执行、物理隔离"。区别是他们在 WebUI/LibreChat 外面做路由，我们自己写了聊天服务，并多了上下文看板这一层"谁能知道什么"——这是 #527 全部讨论里**没有人做的部分**（大家只管"谁能做什么"，gr3enarr0w 和 fuzhyperblue 提了需求但没给实现）。
-- **和 teknium1 的 Guest 定义几乎一致**（web + 看图 + 追问 + 朗读），我们多给了生成图片和查公开资料。
-- **marek-commits 的 fail-closed 教训我们已经做到**：插件出错、等级文件损坏都拒绝，有测试。
-- **值得借鉴、我们还没有的**：
-  1. 按 Telegram/Discord 账号认人（#4443 的复合 ID、#23373 的 `allow_admin_from`）——上 Telegram 时可直接用官方已合并的 #23373 管命令，工具和上下文仍用我们的 profile 隔离。
-  2. 限流 / 花费上限（teknium1 的 10 次/小时、#16017 的按等级换便宜模型）——每级是独立 profile，换模型只需改该 profile 的 `model:`。
-  3. MCP 工具 `mcp:server:tool` 单独授权——目前我们对非 Owner 一律不给 MCP。
-  4. 审计日志（谁在什么时候调用了什么）。
-  5. "发起人不能批准自己"的审批流（yansongwel）——只有将来给非 Owner 开危险工具时才需要。
-- **我们刻意不同的地方**：同级成员共享一个 profile（不按人隔离 memory）；不做群聊混合；不改 Hermes 核心，所以不走 #4443 那种 18 个文件的改法。
+#### ② teknium1：评论 1、2，对开放问题给出的定论（同一内容发了两次）
+1. **群聊**：按**每条消息的发送者**判断权限。agent 加载全部工具，调用时再拦截；不采用"取群里最低权限"。每条消息都注入发送者的等级，被拒时 agent 能主动给出替代方案。
+2. **向后兼容**：`*_ALLOWED_USERS` 里第一个人是 owner，其余是 admin；配对进来的人是 user。
+3. **Guest 要有用**：默认开 `web_search, web_extract, vision_analyze, clarify, text_to_speech`，每小时 10 次。
+4. **工具配置**：按单个工具配，也支持 `@web/@read/@write/@media/@code/@system/@memory/@skills/@safe/@all` 这些工具组。
+5. **MCP**：admin 以下默认全部禁用，可以用 `mcp:server:tool` 或 `mcp:server:*` 单独授权。
+6. **和 #476 模式系统**：实际可用工具 = 等级允许的 ∩ 当前模式允许的。
+- **体验细节**：`/whoami`、`/promote` 申请升级（通知 owner）、被拒时给出能做什么、教对方自己做、或请 admin 代办。
+
+#### ③ teknium1：评论 3，和 #531 workspace、#532 upload 的关系
+- **workspace**：User 可以读、不能写；Guest **连 workspace 清单都不注入系统提示**，以免跨等级泄露。
+- **上传**：按等级限制大小、超时和每天次数，Guest 不能上传。
+- **他自己指出的问题**：系统提示按会话缓存，而会话按聊天划分、不按人划分，所以 `_build_system_prompt()` 拿不到当前用户的等级。他给的折中是"群里只要有人有权限就注入"。这种做法在上下文隐私上是有漏洞的。
+
+#### ④ ReqX：[PR #3156](https://github.com/NousResearch/hermes-agent/pull/3156)，v1，+3607/−702，已关闭
+- **配置**：可选 `permission_tiers` 配置，没配就完全不变。
+- **按等级控制**：允许的 toolset、管理命令（`CommandDef.admin_only`）、能否批准执行、可用时间窗口。
+- **加固**：配置写错、拼错、时间非法时 fail-closed，退到**最严格**的等级，而不是退成 admin；处理 YAML 布尔值和字符串混淆；共享会话里审批隔离，别人不能批你的执行请求。
+- **测试与审计**：88 个测试，经一轮人工审计和一轮 4 个 LLM 交叉审计，修了 24 个问题（2 个严重、6 个高危）。
+- **已知限制**：Mattermost 用的是可修改的用户名，不是稳定 ID，改名后等级映射会失效。
+- 被 #4443 取代。
+
+#### ⑤ ReqX：[PR #4443](https://github.com/NousResearch/hermes-agent/pull/4443)，完整重写，+16133/−3086，关闭未合并
+- **改动面**：新增 `gateway/permissions.py`、`audit.py`、`usage.py`，另改 13 个核心文件，包括 `run.py`、`run_agent.py`、`delegate_tool.py`、`model_tools.py`、各平台适配器。
+- **工具**：`allowed_toolsets` / `allowed_tools`（支持 `@group`），可按人加减工具。**创建 agent 前就把工具从 schema 里删掉**，模型看不到；调度时再拦一次；子代理继承父级的名单；MCP 低于 admin 默认禁用，过滤失败时 fail-closed。
+- **命令**：`allow_admin_commands` 是一个开关，没有按命令的白名单，理由是逐条列太容易漏掉 `/stop`；另有 owner 专用命令，只有 owner 能授予 owner 等级。
+- **身份**：`platform:id` 复合键，同一个数字 ID 在不同平台不会串；能从 `*_ALLOWED_USERS` 和配对自动推等级；`"*"` 兜底；`/users set` 运行时改等级（存 SQLite）。
+- **平台角色**：Telegram 用 `getChatMember` 加 TTL 缓存；Discord 读角色和权限位。
+- **限流**：按等级每小时 N 次，按整点分桶，**只计会触发 agent 的消息**，斜杠命令不计；`0` 等于封禁，但仍能用 `/whoami`。
+- **其他**：时间窗口；`/promote` 申请和审批；`/audit` 审计日志（只追加的 SQLite，会轮转）；按人统计用量；多语言提示。
+- **提示注入**：在系统提示里告诉 agent 当前等级、可用工具数、限制和限流，这是软性的一层。
+- **自述的偏差**：memory 只能整体给或不给，做不到只读；`/model` 只在 CLI 有，不需要拦。
+- **测试与审计**：448 个测试，5 轮审计（含多 LLM），修掉的问题包括 `/promote` 能自己批自己、MCP 过滤 fail-open、admin 能授予 owner。
+- **结局**：维护者认为 16k 行的子系统太大，只把斜杠命令部分抢救进了 #23373。其余部分（工具过滤、审计、用量、限流、`/promote`、MCP 默认禁用）说等"有具体需求时"再分开提 PR。
+
+#### ⑥ teknium1：[PR #23373](https://github.com/NousResearch/hermes-agent/pull/23373)，**已合并，我们的 v0.22.2 里就有**（`gateway/slash_access.py`）
+- **只管斜杠命令**：每个平台的 `extra:` 里配 `allow_admin_from` 和 `user_allowed_commands`；群聊另有 `group_allow_admin_from` 和 `group_user_allowed_commands`，私聊和群聊互相独立。
+- **规则**：admin 能用全部命令；普通人只能用白名单里的命令，加上永远可用的 `/help`、`/whoami`。插件注册的命令也受管。没配 `allow_admin_from` 时不启用。
+- **多 profile**：多 profile gateway 下，由**收到消息的那个 profile** 的配置生效，fail-closed。
+- **不管的东西**：工具、memory、上下文、限流、审计都不管，普通人照样能用全部工具。
+
+#### ⑦ yansongwel：运维团队用 Telegram
+- **问题**：开发者进了 `allowed_chats` 之后，可以自己点按钮批准自己的危险操作，审批形同虚设。
+- **最小需求**：User 能触发工具，但需要审批；Admin 才能批，而且**不能批自己发起的**；Owner 全权。
+- **过渡方案**：`approvals.require_separate_approver: true`；或者用 #16475 的可插拔审批 hook，把发起人 ID 和批准人 ID 都传进去。
+- **后续**：#16475 已被维护者以"审批边界保持固定、不做可配置"为由关闭，这条路走不通了。
+
+#### ⑧ michaeltanyk
+- **需求**：只把自己设为 Owner 全权，其余所有人都落到 Guest，零工具、纯聊天、不能碰文件和终端。
+- **配置期望**：一个配置能显式列出 guest，再加一个兜底把剩下的人都归进去。
+
+#### ⑨ konsisumer（自动分诊，发了 3 次）指向 [#16017](https://github.com/NousResearch/hermes-agent/issues/16017)（LukaLeskovsek 的 WhatsApp 四级 RFC，open）
+- **四级**：Banned（在 bridge 层静默丢弃，不花 token）、Unknown（陌生人：Haiku，只有 `moderate_user`，最多 5 轮，每小时 3 条、每天 10 条）、Guest（白名单号码：Sonnet，工具可配置，最多 15 轮）、Owner（Opus，最多 90 轮）。
+- **工具在创建 agent 时就不给**；**每级可以配不同的模型、提示、skills 和最大轮数**；guest/unknown 的会话加前缀，防止看到 owner 的历史。
+- **自动封禁**：agent 自己可以警告或封禁（`moderate_user`），每次都通知 owner；也有 `hermes whatsapp ban/unban/trust` 命令。
+- 维护者把它标为"#527 在 WhatsApp 上的细化"。mansourMP 在这里也推广了自己的产品。
+
+#### ⑩ pxxs、rodion-m
+- 都是 +1，没有方案。rodion-m 认为应列为 P0：没有这个功能，Hermes 无法用于社区或组织内部。
+
+#### ⑪ gr3enarr0w：企业视角
+- **观点**：RBAC 只是统一的**身份与租户模型**的一部分。同一个已认证身份应同时决定以下各项：会话隔离、session search、MEMORY/USER.md、外部 memory、工具、命令、OAuth 凭据、定时任务、子代理、workspace、上传文件、审计。
+- **上下文要分三层**：个人私有、团队/项目共享、全组织共享，同时防止跨用户串 memory 或串会话。
+- **问维护者**：RBAC 最终只限于工具和命令吗？维护者没有回答。
+
+#### ⑫ fuzhyperblue：评论 12，真实的公司多用户部署
+- **现状**：靠 `nesquena/hermes-webui` 的 profile 锁、认证和"用户 → profile"路由；也试过 LibreChat 认证加服务端按 profile 转发 API，每个 profile 有自己的 SOUL、工具、skills、workspace 和 memory。能用，但他说是"一堆绕路方案"。
+- **角色**：CTO = owner；IT = 高级用户，运维权限广，但碰不到全部密钥和全局配置；员工 = 普通用户。
+- **提议**：
+  - 显式的"多用户模式"，单用户模式不变；
+  - 身份来源支持内置用户/组，也支持 Authentik 这类外部身份源；
+  - 群聊**按发送者判权**，越权请求变成显式审批，**共享会话绝不能成为提权途径**；
+  - 平台角色本地缓存，配置变化时失效，验证不了就对敏感工具 fail-closed；
+  - 身份 → 角色 → **profile** → 会话/memory/workspace 范围 → 工具/命令；
+  - 有效权限 = 角色 ∩ profile ∩ workspace ∩ 显式授予；
+  - 分五期：多用户模式 → 外部身份源 → 审批和审计 → API/WebUI 复用。
+- **强调**：UI 隐藏和 SOUL.md 只是护栏，不是权限边界，必须在服务端确定性地执行。
+
+#### ⑬ teknium1：评论 13
+- 回了一句"实现了一个简单版本"，链接到 #23373 的文档。
+
+#### ⑭ fuzhyperblue：评论 14，回应 ⑬
+- #23373 只回答了"这个人能跑哪些斜杠命令"。
+- 没回答"这个人在哪个上下文、带哪些能力里运行"：由哪个 profile 处理、用哪份 Honcho 或内置 memory、能看哪些历史、能碰哪些文件、凭据和集成、模型能看到哪些工具、哪些定时任务属于他。
+
+#### ⑮ FecheLQN：运营场景
+- **记录级策略**：读结果披露前，按请求人角色和数据归属（负责人、区域、客户组合）过滤。
+- **结论溯源**：说"没有""为零""无关联"之前，必须查过指定的数据源和字段。
+- **外发收件人消歧**：拒绝有歧义的人和号码映射；记录解析过程；区分"本地已发送"和"平台已送达"。
+- **"只起草/安全模式"要真生效**：必须真的收回外发工具，不能只是模型嘴上说。
+- **配回归测试**：覆盖越权、溯源、收件人、安全模式这些场景。
+
+#### ⑯ GottZ：AI 分诊
+- #3156 是部分实现，#4443 是最完整的参考，两者都已关闭；#23373 是已合并的命令门禁。
+- 建议把 #527 剩下的部分从 #4443 拆成小 PR 跟进。
+
+#### ⑰ mansourMP：评论 17、18
+- **自述**：自研产品，权限范围和**花费上限**在代理之下执行，代理"看不到所以绕不过"；**按数据库隔离**，一个代理物理上读不到另一个的数据。
+- **其他**：之后推广自己的 empyralis.ai（基于 Claude SDK）。没有可复用的代码或细节。
+
+#### ⑱ marek-commits：[hermes-whatsapp-gatekeeper](https://github.com/marek-commits/hermes-whatsapp-gatekeeper)
+- **形态**：只针对 WhatsApp，是 `HERMES_HOME/plugins` 下的用户插件，挂在 `pre_gateway_dispatch` 钩子上，**不改核心，升级不受影响**。
+- **身份**：本人（`fromMe`）全权，且本人一回复，AI 立即让出；其他人只能聊天，工具被过滤。
+- **功能**：owner 超时未回复才由 AI 接手；按轮数封顶；拦截非 admin 的全部 `/` 和 `!` 命令。另有一个插件把官方默认放行的 `/help`、`/whoami` 也关掉，因为这两个命令会暴露命令列表。用正则拦截常见注入；拦截"我的资料、笔记是什么"这类打探；通过 Telegram 告警给 owner。
+- **教训**：
+  1. 必须 fail-closed，他曾在导入失败、未处理异常、配置损坏三处 fail-open；
+  2. 计数器只能在闸门真正打开时计数。
+
+### 10.2 横向对比（按维度）
+
+| 维度 | ①② issue 设计 | ⑤ #4443 | ⑥ #23373（官方已合并） | ⑨ #16017 | ⑪⑫⑭ 企业诉求 | ⑱ gatekeeper | **dotv** |
+|---|---|---|---|---|---|---|---|
+| 改核心 | 是 | 是，改 16 个文件 | 是（已在官方） | 是，加 bridge | 要求原生 | **否，插件** | **否**：profile + 插件 + 外部聊天服务【dotv 已做】 |
+| 等级 | 5 级 | 4 级 + 自定义 | admin/user | 4 级 | 角色 × profile | 2 级 | 5 级，后 3 级可配【dotv 已做】 |
+| 身份来源 | 平台 ID | 平台复合 ID，可自动推 | 平台 ID | 手机号 | 内置或外部 IdP | `fromMe` | dotv-chat 口令（Owner）、邀请码（Admin/User/封禁）、不登录（访客）【dotv 已做】；平台账号【dotv 未做】 |
+| 工具过滤位置 | 创建 agent 时 + 调度时 | 删 schema + 调度时 + 子代理继承 | 不过滤 | 创建 agent 时 | 服务端 | 按渠道 toolset | profile 的 `platform_toolsets` 删 schema，加 `pre_tool_call` 插件按 `tier.json` 拦截，名单有 `CEILING` 上限，关掉 `tool_search` 桥接【dotv 已做】 |
+| 命令门禁 | 按等级白名单 | admin/owner 开关 | 按命令白名单 | CLI 命令 | 有 | 全拦 | 非 Owner 走 API 渠道，碰不到 gateway 斜杠命令；聊天窗口只有 `/unlock /lock /whoami` 等本地命令【dotv 已做】。上 Telegram 后可直接用 ⑥【dotv 未做】 |
+| 会话/memory 隔离 | 不涉及（会话按聊天） | 不涉及 | 不涉及 | 会话加前缀 | **核心诉求** | 不涉及 | **每级一个独立 profile**：memory、会话、文件、`.env` 在磁盘上分开，API key 不同【dotv 已做】；同级不按人分【dotv 未做】 |
+| "谁能知道什么" | ③ 只提了 workspace 清单不给 Guest | 无 | 无 | 无 | 提出需求 | 正则拦打探 | **上下文看板 + 公开清单 + 投影**：默认私密，原文变了自动退回私密，访客只能查到勾过的内容【dotv 已做，独有】 |
+| 每级不同模型/人设 | 无 | 无 | 无 | **有** | profile 级 | 无 | 每级有独立 SOUL；可以配不同 `model:`，但看板里还没做【部分】 |
+| 限流/花费 | 每小时 N 次 | 每小时 N 次，按整点分桶 | 无 | 每小时/每天 | 有 | 轮数封顶 | 无【dotv 未做】 |
+| 平台角色 | 有 | Telegram/Discord，带缓存 | 无 | 无 | 缓存 + 失效 | 无 | 无【dotv 未做】 |
+| MCP | 默认禁，可单独授权 | 默认禁，失败时关闭 | 无 | 无 | 有 | 无 | 非 Owner 不给 MCP（不在可配置清单里）【dotv 已做】；单独授权【dotv 未做】 |
+| 审批 | 无 | 共享会话审批隔离 | 无 | 无 | 越权转审批 | 无 | 非 Owner 拿不到需要审批的危险工具，所以没有这个问题【dotv 已做】 |
+| 审计 | 无 | `/audit` | 无 | 封禁通知 | 有 | Telegram 告警 | 无【dotv 未做】 |
+| 管理界面 | `/users` | `/users`、`/promote` | `config.yaml` | CLI | IdP | JSON | **权限看板 `/perm`**：矩阵、🔒 标记、邀请码、封禁和删除即时生效【dotv 已做】 |
+| 群聊混合 | 按发送者判权 | 按发送者判权 | 私聊/群聊分开 | 无 | 按发送者判权 + 审批 | 按发送者 | 无（第一版定了不做）【dotv 未做】 |
+| fail-closed | — | 有 | 有 | — | 要求 | 有（踩过坑） | 插件出错、`tier.json` 损坏、`permissions.json` 损坏都拒绝，有测试【dotv 已做】 |
+| 封禁 | BLOCKED | `requests_per_hour: 0` | 无 | bridge 层丢弃 | — | — | 在聊天服务层 403，请求到不了 Hermes【dotv 已做】 |
+| 被拒时的提示 | 友好替代方案 | 系统提示注入等级 | — | — | — | 转移话题 | 每级 SOUL 写明身份和边界；没有工具时模型自己解释【dotv 已做（较简单）】 |
+| 升级成本 | — | 无法跟进 | 跟官方走 | — | — | 低 | 低：插件 + 配置，升级后重装【dotv 已做】 |
+
+### 10.3 结论
+
+**我们和谁最像。** 最接近 fuzhyperblue 的"身份 → profile → 范围"和 mansourMP 的"在代理之下物理隔离"，形态上也像 marek-commits 的"插件、不改核心"。区别有两点：
+- fuzhyperblue 是在 WebUI/LibreChat 外面做路由，我们是自己写的聊天服务；
+- 我们多了"谁能知道什么"这一层（上下文看板和公开投影）。整个 #527 讨论里，只有 gr3enarr0w 和 fuzhyperblue 提了这个需求，**没有人给出实现**；官方合并的 #23373 也完全不涉及。
+
+**我们比他们强的地方。**
+1. **隐私边界是物理的**：#4443 和 issue 设计都是一个 profile 里删工具。只要 Guest 和 Owner 共用会话或 memory，就有 ③ 里 teknium1 自己承认的泄露风险（系统提示按聊天缓存）。我们是不同 profile、不同磁盘目录，Owner 的数据根本不在访客那边。
+2. **访客不是零工具**：和 teknium1 "Guest 要有用"的思路一致，还多了查公开资料，能回答"他是谁"。
+3. **fail-closed 和关桥接**：⑱ 踩过的坑我们都有测试覆盖；`tool_search` 桥接这个绕过点，#4443 的描述里没有提到。
+
+**我们缺的，按优先级排**（全部是【dotv 未做】）：
+1. **Telegram/Discord 账号识别**。可以写一个 `pre_gateway_dispatch` 插件（⑱ 证明这条路不改核心也行），把平台 ID 映射到等级再转给对应的 profile；命令部分直接用官方 ⑥ 的 `allow_admin_from`。注意：插件能不能把一条消息转到另一个 profile，还需要读代码验证。
+2. **限流和花费上限**（①⑤⑨）：在聊天服务里按身份每小时计数，只计真正发给 Hermes 的请求（⑤⑱ 的教训）。另外在看板上给每级加一个"模型"选项（⑨）。
+3. **审计日志**（⑤⑫）：记录谁、什么时候、哪一级、调用了哪些工具。
+4. **MCP 单独授权**（②⑤）：`mcp:server:tool` 语法。
+5. **同级按人隔离**（⑪⑫）：给每个成员单独建一个 profile。
+6. **群聊混合**（①⑤⑫）：要按发送者判权，同时上下文不能串。这比只管工具难得多，因为同一个会话的上下文已经包含了 Owner 的内容。
+7. **不打算做的**：发起人不能自批的审批流（⑦）。非 Owner 拿不到危险工具，暂时不需要；而且上游已经拒绝了可插拔审批（#16475）。记录级策略和结论溯源（⑮）属于业务数据层，不在我们的范围内。
+
+### 10.4 和相关 issue 的关系
+
+| Issue | 状态 | 和我们的关系 |
+|---|---|---|
+| [#476](https://github.com/NousResearch/hermes-agent/issues/476) 模式系统 | 已关闭 | 可用工具 = 等级 ∩ 模式。它的 allow/deny/ask 三种动作可以借鉴：以后给 Admin 开危险工具时，可以设为 ask |
+| [#531](https://github.com/NousResearch/hermes-agent/issues/531) workspace | open | Guest 不注入 workspace 清单。我们的访客 profile 本来就没有 Owner 的 workspace |
+| [#532](https://github.com/NousResearch/hermes-agent/issues/532) /upload | open | 按等级限上传。我们的聊天窗口第一版没有上传功能 |
+| [#410](https://github.com/NousResearch/hermes-agent/issues/410) 密钥管理、[#129](https://github.com/NousResearch/hermes-agent/issues/129) 外泄威胁 | 已关闭 | 我们靠"每个 profile 有自己的 `.env`"加"非 Owner 没有 terminal/file"，让访客碰不到密钥 |
+| [#16017](https://github.com/NousResearch/hermes-agent/issues/16017) WhatsApp 四级 | open | 见 ⑨；可借鉴"每级不同模型"和"bridge 层封禁" |
+| [#16475](https://github.com/NousResearch/hermes-agent/issues/16475) 可插拔审批 | 已关闭（维护者拒绝） | ⑦ 的过渡方案走不通 |
