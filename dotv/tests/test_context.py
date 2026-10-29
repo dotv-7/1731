@@ -103,3 +103,40 @@ def test_file_items_carry_absolute_path(homes):
     assert by_title(items, "blog").path == str((owner / "memories/MEMORY.md").resolve())
     assert by_title(items, "School").path == str((ws[0] / "bio.md").resolve())
     assert all(Path(i.path).is_absolute() for i in items if i.path)
+
+
+def test_scan_discovers_new_paths_and_skips_secrets(homes):
+    owner, _, ws = homes
+    (owner / ".env").write_text(f"KEY={CANARY}", encoding="utf-8")
+    (owner / "config.yaml").write_text("model: x", encoding="utf-8")
+    (owner / "notes/2026").mkdir(parents=True)
+    (owner / "notes/2026/trip.md").write_text("# Trip\nTokyo", encoding="utf-8")
+    (owner / "photo.png").write_bytes(b"\x89PNG")
+    (ws[0] / "new-dir").mkdir()
+    (ws[0] / "new-dir/draft.txt").write_text("draft", encoding="utf-8")
+    items = core.scan(owner, ws)
+    paths = {i.path for i in items}
+    assert str((owner / "notes/2026/trip.md").resolve()) in paths
+    assert str((ws[0] / "new-dir/draft.txt").resolve()) in paths
+    png = next(i for i in items if i.path.endswith("photo.png"))
+    assert png.kind == "file" and not png.publishable
+    assert not any(i.path.endswith((".env", "config.yaml")) for i in items)
+
+
+def test_bundled_skills_folded_user_skills_listed(homes):
+    owner, _, ws = homes
+    for name in ("arxiv", "mine"):
+        (owner / f"skills/research/{name}").mkdir(parents=True)
+        (owner / f"skills/research/{name}/SKILL.md").write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
+    (owner / "skills/.bundled_manifest").write_text("arxiv:abc\n", encoding="utf-8")
+    titles = [i.title for i in core.scan(owner, ws) if i.kind == "skill"]
+    assert "mine" in titles and "arxiv" not in titles
+    assert any("1 个" in t for t in titles)
+
+
+def test_workspace_containing_home_does_not_reexpose_excluded_files(homes):
+    owner, _, _ = homes
+    (owner / ".env").write_text(f"KEY={CANARY}", encoding="utf-8")
+    items = core.scan(owner, [owner.parent])
+    assert not any(i.path.endswith(".env") for i in items)
+    assert sum(1 for i in items if i.path.endswith("MEMORY.md")) == 2
