@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>上下文看板 · Hermes</title>
+<style>
+:root{--mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,"Noto Sans Mono CJK SC","PingFang SC",monospace;
+--bg:#101014;--surface:#1a1a2e;--text:#FFF8DC;--dim:#9a9480;--accent:#FFBF00;--border:#CD7F32;--ok:#8FBC8F;--err:#FF6B6B;--warn:#FF8C00;--sel:#3a3a55;--code:#15151f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13.5px/1.6 var(--mono)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 80px}
+.bar{position:sticky;top:0;background:var(--bg);display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border);z-index:3}
+.brand{color:var(--accent);font-weight:700}.sp{flex:1}.dim{color:var(--dim)}
+a,button{font:inherit;color:var(--dim);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 10px;cursor:pointer;text-decoration:none}
+button.primary{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+input[type=search]{font:inherit;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 8px;min-width:200px}
+.stats span{margin-right:12px}.pub{color:var(--ok)}.chg{color:var(--warn)}
+details{border:1px solid var(--border);border-radius:6px;margin:12px 0;background:var(--surface)}
+summary{padding:8px 12px;cursor:pointer;color:var(--accent);display:flex;gap:10px}
+summary .dim{margin-left:auto}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:6px 12px;border-top:1px solid #2a2a40;align-items:start}
+.row:hover{background:#20203a}.row .t{overflow-wrap:anywhere}.row .src{color:var(--dim);font-size:12px}
+.row pre{display:none;white-space:pre-wrap;background:var(--code);padding:8px;border-radius:4px;margin:6px 0 0;max-height:300px;overflow:auto}
+.row.open pre{display:block}
+.tag{font-size:11.5px;border:1px solid currentColor;border-radius:3px;padding:0 6px;white-space:nowrap}
+.tag.private{color:var(--dim)}.tag.public{color:var(--ok)}.tag.changed{color:var(--warn)}.tag.locked{color:var(--err)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin-top:3px}
+#preview{display:none;white-space:pre-wrap;background:var(--code);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:12px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);padding:6px 14px;border-radius:6px;display:none}
+</style></head><body><div class="wrap">
+<div class="bar"><span class="brand">⚕ 上下文看板</span><span class="dim">默认全部私密，只有勾选的内容会给访客</span><span class="sp"></span>
+  <input id="q" type="search" placeholder="搜索内容…"><a href="/">← 返回聊天</a>
+  <button id="prev">访客能看到什么</button><button id="save" class="primary" disabled>保存并同步</button></div>
+<p class="stats" id="stats"></p><div id="preview"></div><div id="groups"></div></div>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);let items=[],checked=new Set(),initial='';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LABEL={private:'私密',public:'公开',changed:'已变动·需重新确认',locked:'不可公开'};
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2500);}
+async function load(){const r=await fetch('/api/board/items');if(r.status===403)return location.href='/';const j=await r.json();
+  items=j.items;checked=new Set(items.filter(i=>i.status==='public').map(i=>i.id));initial=[...checked].sort().join();draw();}
+function draw(){const q=$('#q').value.toLowerCase(),groups={};
+  for(const it of items){if(q&&!(it.title+it.text+it.source).toLowerCase().includes(q))continue;(groups[it.group]=groups[it.group]||[]).push(it);}
+  const n=items.length,pub=checked.size,chg=items.filter(i=>i.status==='changed').length;
+  $('#stats').innerHTML=`<span>共 ${n} 项</span><span class="pub">公开 ${pub}</span><span>私密 ${n-pub}</span>`+(chg?`<span class="chg">已变动 ${chg}</span>`:'');
+  $('#groups').innerHTML=Object.entries(groups).map(([g,list])=>{const sel=list.filter(i=>checked.has(i.id)).length;
+    return `<details ${q||list.length<40?'open':''}><summary>${esc(g)}<span class="dim">${sel}/${list.length} 公开</span></summary>`+list.map(it=>{
+      const st=!it.publishable?'locked':checked.has(it.id)?'public':it.status==='changed'?'changed':'private';
+      return `<div class="row" data-id="${it.id}"><input type="checkbox" ${checked.has(it.id)?'checked':''} ${it.publishable?'':'disabled'}>
+      <div><div class="t">${esc(it.title)}</div><div class="src">${esc(it.source)}${it.note?' · '+esc(it.note):''}</div><pre>${esc(it.text)}</pre></div>
+      <span class="tag ${st}">${LABEL[st]}</span></div>`}).join('')+'</details>';}).join('');
+  $('#save').disabled=[...checked].sort().join()===initial;}
+document.addEventListener('change',e=>{const row=e.target.closest('.row');if(!row)return;
+  e.target.checked?checked.add(row.dataset.id):checked.delete(row.dataset.id);draw();});
+document.addEventListener('click',e=>{const t=e.target.closest('.row .t');if(t)t.closest('.row').classList.toggle('open');});
+$('#q').addEventListener('input',draw);
+$('#save').onclick=async()=>{const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:[...checked]})});
+  if(!r.ok)return toast('保存失败');const j=await r.json();toast(`已同步：${j.facts} 条 memory，${j.documents} 段文档`);load();if($('#preview').style.display==='block')preview(true);};
+async function preview(keep){const p=$('#preview');if(p.style.display==='block'&&!keep){p.style.display='none';return;}
+  const j=await (await fetch('/api/board/preview')).json();
+  p.textContent='访客会话能拿到的全部内容（已同步版本）：\n\n【memory】\n'+((j.facts||[]).map(f=>'- '+f).join('\n')||'（无）')+
+    '\n\n【文档，访客按需查阅】\n'+((j.documents||[]).map(d=>'### '+d.title+'\n'+d.text).join('\n\n')||'（无）');p.style.display='block';}
+$('#prev').onclick=()=>preview(false);
+load();
+</script></body></html>

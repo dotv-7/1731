@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 DEFAULT_ALLOWED_TOOLS = frozenset({
     "web_search", "web_extract", "clarify", "vision_analyze", "image_generate", "text_to_speech",
+    "dotv_public_lookup",
 })
 ENV_ALLOWED = "DOTV_GUEST_ALLOWED_TOOLS"
 
