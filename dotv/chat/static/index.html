@@ -20,6 +20,7 @@ body{text-shadow:var(--glow)}
 .badge{padding:1px 8px;border:1px solid currentColor;border-radius:4px;font-weight:600}
 .badge.guest{color:var(--ok)}
 .badge.owner{color:var(--warn)}
+.badge.admin{color:#c084fc}.badge.user{color:var(--user)}.badge.blocked{color:var(--err)}
 .conn::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--ok);vertical-align:1px}
 .conn.down::before{background:var(--err);animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.2}}
@@ -72,7 +73,7 @@ textarea::placeholder{color:var(--dim);opacity:.8}
 <body>
 <div class="app">
   <div class="bar"><span class="brand">⚕ HERMES</span><span id="badge" class="badge guest">访客</span>
-    <span id="conn" class="conn">已连接</span><span class="sp"></span><a id="boardLink" href="/board" hidden>上下文看板</a></div>
+    <span id="conn" class="conn">已连接</span><span class="sp"></span><span id="ownerLinks" hidden><a href="/board">上下文看板</a> <a href="/perm">权限看板</a> <a href="/docs" target="_blank">全局文档</a></span></div>
   <div id="log" class="log"></div>
   <div class="dock">
     <div id="menu" class="menu"></div>
@@ -87,7 +88,11 @@ textarea::placeholder{color:var(--dim);opacity:.8}
 const $=s=>document.querySelector(s), log=$('#log'), inp=$('#in'), menu=$('#menu');
 let role='guest', busy=null, hist=JSON.parse(localStorage.getItem('dotv.hist')||'[]'), hi=-1, menuIdx=0;
 const CMDS=[['/help','显示帮助'],['/new','开始新会话'],['/clear','清空屏幕'],['/whoami','当前身份'],
-  ['/unlock','Owner 口令解锁'],['/lock','退回访客'],['/board','打开上下文看板（Owner）']];
+  ['/unlock','口令或邀请码解锁'],['/lock','退回访客'],['/board','上下文看板（Owner）'],['/perm','权限看板（Owner）'],['/docs','全局文档（Owner）']];
+const LABEL={owner:'Owner',admin:'Admin',user:'User',guest:'访客',blocked:'已封禁'};
+const HELLO={owner:'Owner 会话：完整 memory 和工具。',admin:'Admin 会话：工具按权限看板开放。',user:'User 会话：工具按权限看板开放。',
+  blocked:'你已被封禁，不能再和 Hermes 对话。',guest:'你好，我是 dotv 的 Hermes。这是访客会话，可以问我公开信息、让我搜索网页、看图或画图。输入 /help 查看命令。'};
+let who='';
 const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function inline(s){return esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
   .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');}
@@ -121,12 +126,12 @@ function render(e){const d=document.createElement('div');d.className='msg '+e.k;
 function push(e,persist=true){if(persist){transcript.push(e);save();}return render(e);}
 function sys(t,cls='sys'){return push({k:cls,t},false);}
 function restore(){log.innerHTML='';transcript=JSON.parse(localStorage.getItem(key())||'[]');transcript.forEach(render);
-  if(!transcript.length)sys(role==='owner'?'Owner 会话：完整 memory 和工具。':'你好，我是 dotv 的 Hermes。这是访客会话，可以问我公开信息、让我搜索网页、看图或画图。输入 /help 查看命令。');}
-function setRole(r){role=r;const b=$('#badge');b.className='badge '+r;b.textContent=r==='owner'?'Owner':'访客';
-  $('#boardLink').hidden=r!=='owner';restore();}
+  if(!transcript.length)sys(HELLO[role]||HELLO.guest);}
+function setRole(r,name){role=r;who=name||'';const b=$('#badge');b.className='badge '+r;b.textContent=(LABEL[r]||r)+(who?' · '+who:'');
+  $('#ownerLinks').hidden=r!=='owner';restore();}
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
   let j={};try{j=await r.json()}catch{}; if(!r.ok)throw new Error(j.detail||r.status);return j;}
-async function me(){try{const r=await fetch('/api/me');const j=await r.json();online(true);return j.role;}catch{online(false);return null;}}
+async function me(){try{const r=await fetch('/api/me');const j=await r.json();online(true);return j;}catch{online(false);return null;}}
 let retry=0;
 function online(ok){const c=$('#conn');c.className='conn'+(ok?'':' down');c.textContent=ok?'已连接':'重连中…';
   if(ok)retry=0;else setTimeout(me,Math.min(1000*2**retry++,15000));}
@@ -148,11 +153,14 @@ async function command(c){const [name,...rest]=c.trim().split(/\s+/);const arg=r
   if(name==='/help'){sys(CMDS.map(([a,b])=>a.padEnd(10)+b).join('\n'));}
   else if(name==='/clear'){log.innerHTML='';}
   else if(name==='/new'){await api('/api/new');transcript=[];save();restore();sys('已开始新会话。');}
-  else if(name==='/whoami'){sys('当前身份：'+(role==='owner'?'Owner':'访客'));}
-  else if(name==='/unlock'){if(!arg)return sys('用法：/unlock <口令>');
-    try{await api('/api/unlock',{passphrase:arg});setRole('owner');sys('已解锁 Owner。');}catch(e){sys('解锁失败：'+e.message,'err');}}
-  else if(name==='/lock'){await api('/api/lock');setRole('guest');sys('已退回访客。');}
-  else if(name==='/board'){if(role!=='owner')return sys('只有 Owner 能打开看板。','err');location.href='/board';}
+  else if(name==='/whoami'){sys('当前身份：'+LABEL[role]+(who?'（'+who+'）':''));}
+  else if(name==='/unlock'){if(!arg)return sys('用法：/unlock <口令或邀请码>');
+    const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passphrase:arg})});
+    const j=await r.json().catch(()=>({}));
+    if(j.role){setRole(j.role,j.name);sys(j.role==='blocked'?'这个邀请码已被封禁。':'已切换为 '+LABEL[j.role]+'。',j.role==='blocked'?'err':'sys');}
+    else sys('解锁失败：'+(j.detail||r.status),'err');}
+  else if(name==='/lock'){try{const j=await api('/api/lock');setRole(j.role,j.name);sys('已退回访客。');}catch(e){sys('不能退出：'+e.message,'err');}}
+  else if(['/board','/perm','/docs'].includes(name)){if(role!=='owner')return sys('只有 Owner 能打开。','err');location.href=name;}
   else sys('未知命令：'+name,'err');}
 function submit(){const t=inp.value.trim();if(!t||busy)return;inp.value='';fit();hideMenu();
   hist=hist.filter(h=>h!==t);hist.push(t);hist=hist.slice(-100);localStorage.setItem('dotv.hist',JSON.stringify(hist));hi=-1;
@@ -173,5 +181,5 @@ inp.addEventListener('keydown',e=>{const open=menu.classList.contains('show'),m=
   else if(e.key==='ArrowDown'&&hi>=0){e.preventDefault();hi++;if(hi>=hist.length){hi=-1;inp.value='';}else inp.value=hist[hi];fit();}});
 document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='c'&&busy&&!getSelection().toString()){e.preventDefault();busy.abort();}});
 $('#send').addEventListener('click',submit);
-me().then(r=>setRole(r||'guest'));
+me().then(j=>setRole((j&&j.role)||'guest',j&&j.name));
 </script></body></html>

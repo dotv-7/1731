@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from dotv.chat import server  # noqa: E402
+from dotv.chat import server
 
 PASS = "open sesame"
 
@@ -95,3 +95,30 @@ def test_chat_routes_by_role(client, monkeypatch):
     assert g_url.endswith("/p/public/v1/chat/completions") and g_h["Authorization"] == "Bearer pk"
     assert o_url.endswith("/v1/chat/completions") and "/p/" not in o_url and o_h["Authorization"] == "Bearer ok"
     assert g_h["X-Hermes-Session-Id"].startswith("dotv-g-") and o_h["X-Hermes-Session-Id"].startswith("dotv-o-")
+
+
+def test_member_codes_route_to_tier_and_blocked_cannot_chat(client, tmp_path):
+    from dotv.perm import core as perm
+    owner = tmp_path / "owner"
+    m, code = perm.add_member(owner, "小王", "user")
+    r = client.post("/api/unlock", json={"passphrase": code})
+    assert r.json()["role"] == "user" and r.json()["name"] == "小王"
+    assert client.get("/api/board/items").status_code == 403 and client.get("/api/perm").status_code == 403
+    assert client.post("/api/chat", json={"message": "hi"}).status_code == 503  # user tier key not configured
+    perm.update_member(owner, m["id"], tier="blocked")
+    assert client.get("/api/me").json()["role"] == "blocked"
+    assert client.post("/api/chat", json={"message": "hi"}).status_code == 403
+    assert client.post("/api/lock", json={}).status_code == 403
+    perm.update_member(owner, m["id"], delete=True)
+    assert client.get("/api/me").json()["role"] == "guest"
+
+
+def test_perm_board_and_doc_owner_only(client, tmp_path):
+    assert client.get("/api/doc").status_code == 403
+    assert client.get("/perm", follow_redirects=False).status_code in (302, 307)
+    client.post("/api/unlock", json={"passphrase": PASS})
+    st = client.get("/api/perm").json()
+    assert st["policy"]["guest"] and any(r["locked"] for r in st["catalog"])
+    j = client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "admin"}).json()
+    assert j["code"].startswith("inv-") and j["members"][0]["tier"] == "admin" and "code_hash" not in j["members"][0]
+    assert client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "owner"}).status_code == 400

@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from dotv.context import core as ctx  # noqa: E402
+from dotv.context import core as ctx
 
 OWNER_HOME = Path(os.environ["DOTV_OWNER_HOME"])
 PUBLIC_HOME = Path(os.environ["DOTV_PUBLIC_HOME"])
@@ -23,7 +23,7 @@ def answer(role: str, q: str) -> str:
     if role == "owner":
         mem = (OWNER_HOME / "memories" / "MEMORY.md").read_text(encoding="utf-8").split(ctx.ENTRY_DELIMITER)
         return ("**[Owner 会话 · 演示后端]** 你的完整 memory 我都能看到：\n\n" +
-                "\n".join(f"- {m.strip()}" for m in mem) + "\n\n| 来源 | 条数 |\n|---|---|\n| MEMORY.md | %d |" % len(mem))
+                "\n".join(f"- {m.strip()}" for m in mem) + f"\n\n| 来源 | 条数 |\n|---|---|\n| MEMORY.md | {len(mem)} |")
     try:
         proj = json.loads((PUBLIC_HOME / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
     except OSError:
