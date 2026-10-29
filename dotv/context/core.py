@@ -317,7 +317,8 @@ def _home_item(home: Path, path: Path, rel: str) -> list[Item]:
     special = {"state.db": _session_items, "kanban.db": _kanban_items, "response_store.db": _response_items,
                "cron/jobs.json": _cron_items}
     if rel in special:
-        return special[rel](path)
+        return special[rel](path) or [_item("data", _group_for(rel), rel, "", f"{rel} · 暂无记录 · {_size(path)}", "",
+                                            publishable=False, note="有新记录后会自动展开", path=str(path.resolve()))]
     group = "Skills" if rel.startswith("skills/") else _group_for(rel)
     return _generic_items(path, rel, group)
 
