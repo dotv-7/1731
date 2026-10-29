@@ -216,7 +216,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         items = ctx.scan(s.owner_home, s.workspace_roots)
         allow = ctx.load_allowlist(s.owner_home)
         return {"items": [dict(it.to_dict(), status=ctx.status(it, allow)) for it in items],
-                "owner_home": str(s.owner_home), "public_home": str(s.public_home)}
+                "owner_home": str(s.owner_home.resolve()), "public_home": str(s.public_home.resolve()),
+                "workspace_roots": [str(Path(r).resolve()) for r in s.workspace_roots]}
 
     @app.post("/api/board/save")
     async def board_save(request: Request):

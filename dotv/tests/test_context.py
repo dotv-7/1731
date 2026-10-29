@@ -95,3 +95,11 @@ def test_plugin_renders_and_looks_up_projection(homes):
     assert "CS master" in plugin.lookup(proj, "school")
     assert plugin.lookup(proj, "zzz") == "No public document matches that query."
     assert plugin.load_projection(owner) == {}
+
+
+def test_file_items_carry_absolute_path(homes):
+    owner, _, ws = homes
+    items = core.scan(owner, ws)
+    assert by_title(items, "blog").path == str((owner / "memories/MEMORY.md").resolve())
+    assert by_title(items, "School").path == str((ws[0] / "bio.md").resolve())
+    assert all(Path(i.path).is_absolute() for i in items if i.path)
