@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>全局文档 · Hermes</title>
+<style>
+:root{--mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,"Noto Sans Mono CJK SC","PingFang SC",monospace;
+--bg:#101014;--surface:#1a1a2e;--text:#FFF8DC;--dim:#9a9480;--accent:#FFBF00;--border:#CD7F32;--ok:#8FBC8F;--err:#FF6B6B;--warn:#FF8C00;--sel:#3a3a55;--code:#15151f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13.5px/1.6 var(--mono)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 80px}
+.bar{position:sticky;top:0;background:var(--bg);display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border);z-index:3}
+.brand{color:var(--accent);font-weight:700}.sp{flex:1}.dim{color:var(--dim)}
+a,button{font:inherit;color:var(--dim);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 10px;cursor:pointer;text-decoration:none}
+button.primary{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+input[type=search]{font:inherit;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 8px;min-width:200px}
+.stats span{margin-right:12px}.pub{color:var(--ok)}.chg{color:var(--warn)}
+details{border:1px solid var(--border);border-radius:6px;margin:12px 0;background:var(--surface)}
+summary{padding:8px 12px;cursor:pointer;color:var(--accent);display:flex;gap:10px}
+summary .dim{margin-left:auto}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:6px 12px;border-top:1px solid #2a2a40;align-items:start}
+.row:hover{background:#20203a}.row .t{overflow-wrap:anywhere}.row .src{color:var(--dim);font-size:12px}
+.row pre{display:none;white-space:pre-wrap;background:var(--code);padding:8px;border-radius:4px;margin:6px 0 0;max-height:300px;overflow:auto}
+.row.open pre{display:block}
+.tag{font-size:11.5px;border:1px solid currentColor;border-radius:3px;padding:0 6px;white-space:nowrap}
+.tag.private{color:var(--dim)}.tag.public{color:var(--ok)}.tag.changed{color:var(--warn)}.tag.locked{color:var(--err)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin-top:3px}
+#preview{display:none;white-space:pre-wrap;background:var(--code);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:12px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);padding:6px 14px;border-radius:6px;display:none}
+</style>
+<style>
+.doc{max-width:900px}.doc h1,.doc h2,.doc h3,.doc h4{color:var(--accent);margin:22px 0 8px}.doc h1{font-size:20px}.doc h2{font-size:17px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.doc h3{font-size:15px}.doc p{margin:0 0 10px}.doc ul{margin:0 0 10px;padding-left:22px}
+.doc code{background:var(--code);padding:1px 5px;border-radius:3px;color:#FFD700}
+.doc pre{background:var(--code);border:1px solid var(--border);border-radius:6px;padding:10px;overflow-x:auto}.doc pre code{background:none;color:var(--text)}
+.doc table{border-collapse:collapse;margin:8px 0 12px;display:block;overflow-x:auto}.doc th,.doc td{border:1px solid var(--border);padding:4px 10px;text-align:left}
+.doc th{color:var(--accent);background:var(--surface)}.doc blockquote{border-left:3px solid var(--border);margin:0 0 10px;padding-left:12px;color:var(--dim)}
+.doc a{border:0;padding:0;color:#4dabf7}#toc a{display:block;border:0;padding:1px 0}
+</style></head><body><div class="wrap">
+<div class="bar"><span class="brand">⚕ 全局文档</span><span class="dim" id="path"></span><span class="sp"></span>
+  <a href="/perm">权限看板</a><a href="/board">上下文看板</a><a href="/">← 返回聊天</a></div>
+<details><summary>目录</summary><div id="toc" style="padding:8px 12px"></div></details>
+<div class="doc" id="doc">加载中…</div></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const inline=s=>esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+function md(src){const out=[],toc=[],L=src.split('\n');let i=0,n=0;
+  while(i<L.length){const l=L[i];let m;
+    if(m=l.match(/^```/)){const b=[];i++;while(i<L.length&&!L[i].startsWith('```'))b.push(L[i++]);i++;out.push('<pre><code>'+esc(b.join('\n'))+'</code></pre>');continue;}
+    if(/^\|.*\|\s*$/.test(l)&&i+1<L.length&&/^\|[\s:|-]+\|\s*$/.test(L[i+1])){const row=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+      let h='<table><tr>'+row(l).map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr>';i+=2;
+      while(i<L.length&&/^\|.*\|\s*$/.test(L[i]))h+='<tr>'+row(L[i++]).map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>';out.push(h+'</table>');continue;}
+    if(m=l.match(/^(#{1,4})\s+(.*)/)){const id='h'+(n++);out.push(`<h${m[1].length} id="${id}">${inline(m[2])}</h${m[1].length}>`);
+      if(m[1].length<=3)toc.push(`<a href="#${id}" style="padding-left:${(m[1].length-1)*14}px">${inline(m[2])}</a>`);i++;continue;}
+    if(/^>\s?/.test(l)){const b=[];while(i<L.length&&/^>\s?/.test(L[i]))b.push(inline(L[i++].replace(/^>\s?/,'')));out.push('<blockquote>'+b.join('<br>')+'</blockquote>');continue;}
+    if(/^\s*([-*]|\d+\.)\s+/.test(l)){let h='<ul>';while(i<L.length&&/^\s*([-*]|\d+\.)\s+/.test(L[i]))h+='<li>'+inline(L[i++].replace(/^\s*([-*]|\d+\.)\s+/,''))+'</li>';out.push(h+'</ul>');continue;}
+    if(!l.trim()||/^---+\s*$/.test(l)){i++;continue;}
+    const b=[];while(i<L.length&&L[i].trim()&&!/^(```|#|>|\s*[-*]\s|\s*\d+\.\s|\|)/.test(L[i]))b.push(L[i++]);if(!b.length)b.push(L[i++]);
+    out.push('<p>'+b.map(inline).join('<br>')+'</p>');}
+  return [out.join(''),toc.join('')];}
+fetch('/api/doc').then(r=>{if(r.status===403)location.href='/';return r.json();}).then(j=>{
+  if(!j.text){$('#doc').textContent='找不到文档';return;}const [h,t]=md(j.text);$('#doc').innerHTML=h;$('#toc').innerHTML=t;$('#path').textContent=j.path;});
+</script></body></html>

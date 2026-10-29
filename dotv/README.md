@@ -48,6 +48,23 @@ DOTV_OWNER_PASSPHRASE_HASH=... DOTV_SECRET=<random> DOTV_OWNER_HOME=/opt/data \
 DOTV_WORKSPACE_ROOTS=/opt/data/workspace python3 dotv/chat/server.py   # :8780
 ```
 
+## Step 4: permission tiers (#527) + permission board
+
+`dotv/perm/` + `/perm` (owner only). Tiers: Owner (passphrase, default profile, everything) → Admin →
+User → Guest (no login) → Blocked (never reaches Hermes). Admin/User/Guest are each their own profile
+(`DOTV_ADMIN_PROFILE`/`DOTV_USER_PROFILE`, default `dotv-admin`/`dotv-user`; Guest = `public`), set up
+like the public profile, each with its own `API_SERVER_KEY` passed as `DOTV_ADMIN_KEY`/`DOTV_USER_KEY`.
+
+- Policy: `<owner_home>/dotv/permissions.json` (toolsets per tier + members; invite codes stored only
+  as salted hashes). Toolsets that reach the owner's machine (terminal, files, code, browser, cron,
+  delegation, messaging…) are locked for every non-owner tier and cannot be saved.
+- "保存并同步" writes `<profile>/dotv/tier.json` (read by `dotv-guest-gate`, capped by its `CEILING`)
+  and narrows `platform_toolsets.api_server` + `memory.memory_enabled` in the profile's `config.yaml`.
+  New sessions pick it up; restart the gateway after creating a new tier profile.
+- Members get an invite code (`/unlock <code>` in the chat). Tier changes, blocking and deletion take
+  effect on the next request.
+- `/docs` (owner only) renders `DOTV_DOC_PATH` (default: repo `DOTV_MASTER.md`).
+
 Local preview without a model: `dotv/dev/seed_demo.py` (fake data) + `dotv/dev/fake_hermes.py`.
 
 ## Real-Hermes end-to-end check (`dotv/dev/e2e/`)

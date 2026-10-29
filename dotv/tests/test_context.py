@@ -7,7 +7,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from dotv.context import core  # noqa: E402
+from dotv.context import core
 
 CANARY = "CANARY-PRIVATE-7f3a"
 _spec = importlib.util.spec_from_file_location("dpc", ROOT / "dotv/plugins/dotv-public-context/__init__.py")

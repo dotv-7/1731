@@ -1,10 +1,13 @@
 import importlib.util
+import json
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT.parent))
 _spec = importlib.util.spec_from_file_location("dotv_guest_gate", ROOT / "plugins/dotv-guest-gate/__init__.py")
 gate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gate)
@@ -16,8 +19,34 @@ DENIED = ["terminal", "process_manage", "execute_code", "read_file", "write_file
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch, tmp_path):
     monkeypatch.delenv(gate.ENV_ALLOWED, raising=False)
+    monkeypatch.setattr(gate, "_home", lambda: tmp_path)
+
+
+def _tier(tmp_path, tools):
+    (tmp_path / "dotv").mkdir(exist_ok=True)
+    (tmp_path / "dotv/tier.json").write_text(json.dumps({"tier": "user", "allowed_tools": tools}))
+
+
+def test_tier_file_widens_within_ceiling_only(tmp_path):
+    _tier(tmp_path, ["memory", "web_search", "terminal", "read_file"])
+    assert gate.on_pre_tool_call(tool_name="memory", args={}) is None
+    for tool in ("terminal", "read_file", "web_extract"):
+        assert gate.on_pre_tool_call(tool_name=tool, args={})["action"] == "block"
+
+
+def test_corrupt_tier_file_blocks_everything(tmp_path):
+    (tmp_path / "dotv").mkdir()
+    (tmp_path / "dotv/tier.json").write_text("{not json")
+    assert gate.on_pre_tool_call(tool_name="web_search", args={})["action"] == "block"
+
+
+def test_ceiling_excludes_owner_machine_tools():
+    from dotv.perm import core as perm
+    locked = {t for k, v in perm.CATALOG.items() if v[3] for t in v[0]}
+    assert not (gate.CEILING & locked)
+    assert set(perm.tools_for(perm.SAFE_TOOLSETS)) <= gate.CEILING
 
 
 @pytest.mark.parametrize("tool", DENIED)
