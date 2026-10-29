@@ -334,7 +334,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 | 维度 | ①② issue 设计 | ⑤ #4443 | ⑥ #23373（官方已合并） | ⑨ #16017 | ⑪⑫⑭ 企业诉求 | ⑱ gatekeeper | **dotv** |
 |---|---|---|---|---|---|---|---|
-| 改核心 | 是 | 是，改 16 个文件 | 是（已在官方） | 是，加 bridge | 要求原生 | **否，插件** | **否**：profile + 插件 + 外部聊天服务【dotv 已做】 |
+| 改核心 | 是 | 是，新增 5 个、改 13 个文件 | 是（已在官方） | 是，加 bridge | 要求原生 | **否，插件** | **否**：profile + 插件 + 外部聊天服务【dotv 已做】 |
 | 等级 | 5 级 | 4 级 + 自定义 | admin/user | 4 级 | 角色 × profile | 2 级 | 5 级，后 3 级可配【dotv 已做】 |
 | 身份来源 | 平台 ID | 平台复合 ID，可自动推 | 平台 ID | 手机号 | 内置或外部 IdP | `fromMe` | dotv-chat 口令（Owner）、邀请码（Admin/User/封禁）、不登录（访客）【dotv 已做】；平台账号【dotv 未做】 |
 | 工具过滤位置 | 创建 agent 时 + 调度时 | 删 schema + 调度时 + 子代理继承 | 不过滤 | 创建 agent 时 | 服务端 | 按渠道 toolset | profile 的 `platform_toolsets` 删 schema，加 `pre_tool_call` 插件按 `tier.json` 拦截，名单有 `CEILING` 上限，关掉 `tool_search` 桥接【dotv 已做】 |
