@@ -49,3 +49,15 @@ DOTV_WORKSPACE_ROOTS=/opt/data/workspace python3 dotv/chat/server.py   # :8780
 ```
 
 Local preview without a model: `dotv/dev/seed_demo.py` (fake data) + `dotv/dev/fake_hermes.py`.
+
+## Real-Hermes end-to-end check (`dotv/dev/e2e/`)
+
+Runs this checkout's real gateway with an owner home plus a `public` profile, against a scripted
+OpenAI-compatible model that reports what Hermes put in its context and requests forbidden tools.
+
+```bash
+python3 dotv/dev/e2e/fake_llm.py &                 # :8700
+bash dotv/dev/e2e/setup.sh                          # wipes and creates $E2E_ROOT (default ~/hermes-e2e/root)
+HERMES_HOME=~/hermes-e2e/root HERMES_RUNTIME_DIR=~/hermes-e2e/run bash -c 'source ./activate && hermes gateway run' &
+python3 dotv/dev/e2e/probe.py                       # guest: no owner canary, forbidden tools "do not exist"
+```

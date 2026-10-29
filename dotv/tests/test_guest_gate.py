@@ -62,6 +62,7 @@ def test_profile_template_matches_gate():
     assert set(cfg["platform_toolsets"]["api_server"]) == {"web", "vision", "image_gen", "tts", "clarify", "dotv_public"}
     assert cfg["plugins"]["enabled"] == ["dotv-guest-gate", "dotv-public-context"]
     assert cfg["security"]["allow_private_urls"] is False
+    assert cfg["tools"]["tool_search"]["enabled"] == "off"  # no tool_call bridge for guests
     assert cfg["memory"]["provider"] == "" and cfg["memory"]["nudge_interval"] == 0
     manifest = yaml.safe_load((ROOT / "plugins/dotv-guest-gate/plugin.yaml").read_text())
     assert manifest["name"] == "dotv-guest-gate" and "pre_tool_call" in manifest["provides_hooks"]

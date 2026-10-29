@@ -8,6 +8,9 @@ memory:
   user_profile_enabled: false
   provider: ""                # no external memory provider for guests
   nudge_interval: 0           # never review guest chats into memory
+tools:
+  tool_search:
+    enabled: "off"   # all guest tools eager; no tool_call bridge to proxy other tools
 security:
   allow_private_urls: false   # web tools must not reach 127.0.0.1 / LAN
 sessions:
