@@ -140,3 +140,19 @@ def test_workspace_containing_home_does_not_reexpose_excluded_files(homes):
     items = core.scan(owner, [owner.parent])
     assert not any(i.path.endswith(".env") for i in items)
     assert sum(1 for i in items if i.path.endswith("MEMORY.md")) == 2
+
+
+def test_kanban_db_listed_even_when_empty_then_expanded(homes):
+    import sqlite3
+    owner, _, ws = homes
+    con = sqlite3.connect(owner / "kanban.db")
+    con.executescript("CREATE TABLE tasks (id TEXT, title TEXT, body TEXT, status TEXT, created_at INT);"
+                      "CREATE TABLE task_comments (id INTEGER PRIMARY KEY, task_id TEXT, author TEXT, body TEXT);")
+    con.commit()
+    kb = [i for i in core.scan(owner, ws) if i.path.endswith("kanban.db")]
+    assert len(kb) == 1 and "暂无记录" in kb[0].title and not kb[0].publishable
+    con.execute("INSERT INTO tasks VALUES ('t1', '写自传第二章', 'draft', 'todo', 1)")
+    con.commit()
+    con.close()
+    kb = [i for i in core.scan(owner, ws) if i.path.endswith("kanban.db")]
+    assert [i.title for i in kb] == ["写自传第二章 · todo"] and not kb[0].publishable
