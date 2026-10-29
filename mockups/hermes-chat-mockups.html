@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cut">
+<title>Hermes Chat · 三种风格样稿</title>
+<style>
+:root{--mono:ui-monospace,"JetBrains Mono","SF Mono","Cascadia Code",Menlo,Consolas,"Liberation Mono","Noto Sans Mono CJK SC","PingFang SC","Microsoft YaHei",monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{font-family:var(--mono);font-size:14px;line-height:1.6;background:var(--bg);color:var(--text);transition:background .2s,color .2s;-webkit-font-smoothing:antialiased}
+/* ---------- themes ---------- */
+body[data-theme=hermes]{--bg:#101014;--surface:#1a1a2e;--text:#FFF8DC;--dim:#9a9480;--accent:#FFBF00;--accent2:#FFD700;--border:#CD7F32;--ok:#8FBC8F;--err:#FF6B6B;--warn:#FF8C00;--sel:#3a3a55;--code:#15151f;--user:#4dabf7;--glow:none}
+body[data-theme=crt]{--bg:#030803;--surface:#071207;--text:#39ff6a;--dim:#1f9a3e;--accent:#9dff9d;--accent2:#c8ffc8;--border:#1f7a35;--ok:#9dff9d;--err:#ff5f4a;--warn:#e8ff5a;--sel:#0f3a19;--code:#051005;--user:#c8ffc8;--glow:0 0 4px rgba(57,255,106,.55)}
+body[data-theme=light]{--bg:#fbfbf8;--surface:#f1f0ea;--text:#1d1d1b;--dim:#7c7a72;--accent:#2450c7;--accent2:#1d1d1b;--border:#d9d7cf;--ok:#2f7d3a;--err:#b83a36;--warn:#a65a00;--sel:#dfe6fb;--code:#f3f2ec;--user:#2450c7;--glow:none}
+body{text-shadow:var(--glow)}
+::selection{background:var(--sel)}
+/* ---------- page chrome ---------- */
+.switcher{position:fixed;top:10px;right:12px;z-index:20;display:flex;gap:4px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--surface);text-shadow:none}
+.switcher button{font:inherit;font-size:12px;border:0;padding:4px 10px;border-radius:6px;background:transparent;color:var(--dim);cursor:pointer}
+.switcher button.on{background:var(--accent);color:var(--bg)}
+.app{width:100%;min-width:0;height:100dvh;display:flex;flex-direction:column;max-width:980px;margin:0 auto;padding:0 16px}
+/* top status bar */
+.bar{display:flex;align-items:center;gap:14px;padding:12px 0 10px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--dim);padding-right:250px;flex-wrap:wrap}
+.brand{color:var(--accent);font-weight:700;letter-spacing:.5px}
+.badge{padding:1px 8px;border:1px solid currentColor;border-radius:4px;font-weight:600}
+.badge.guest{color:var(--ok)}
+.badge.owner{color:var(--warn)}
+.conn::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--ok);vertical-align:1px}
+.conn.down::before{background:var(--err);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+/* log */
+.log{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;padding:14px 0 8px;scroll-behavior:smooth}
+.log::-webkit-scrollbar{width:8px}.log::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.msg{margin:0 0 14px;white-space:normal;overflow-wrap:anywhere;min-width:0}
+.msg pre{max-width:100%;overflow-x:auto}
+.msg .who{color:var(--dim);font-size:12px;user-select:none}
+.u{color:var(--user)}
+.u .p{color:var(--accent);margin-right:8px;user-select:none}
+.sys{color:var(--dim);font-size:13px}
+.err{color:var(--err)}
+.tool{color:var(--dim);font-size:12.5px;margin:2px 0 6px;border-left:2px solid var(--border);padding-left:10px}
+.tool b{color:var(--accent);font-weight:600}
+.tool .ok{color:var(--ok)}
+.a p{margin:0 0 8px}
+.a h3{margin:6px 0;color:var(--accent);font-size:14px}
+.a ul{margin:0 0 8px;padding-left:20px}
+.a code{background:var(--code);padding:1px 5px;border-radius:3px;color:var(--accent2)}
+.a pre{position:relative;background:var(--code);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0 10px}
+.a pre code{background:none;padding:0;color:var(--text)}
+.a pre .lang{position:absolute;top:2px;right:8px;font-size:11px;color:var(--dim)}
+.a table{border-collapse:collapse;margin:6px 0 10px;font-size:13px;display:block;overflow-x:auto}
+.a th,.a td{border:1px solid var(--border);padding:4px 10px;text-align:left;white-space:nowrap}
+.a th{color:var(--accent);background:var(--surface)}
+.cursor{display:inline-block;width:.55em;height:1.1em;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(2) infinite;margin-left:1px}
+.k{display:inline-block;border:1px solid var(--border);border-radius:3px;padding:0 5px;font-size:11.5px;color:var(--dim);text-shadow:none}
+/* input */
+.dock{position:relative;border-top:1px solid var(--border);padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+.line{display:flex;align-items:flex-start;gap:8px}
+.line .p{color:var(--accent);font-weight:700;padding-top:1px;user-select:none}
+textarea{flex:1;font:inherit;color:var(--text);background:transparent;border:0;outline:0;resize:none;min-height:22px;max-height:160px;padding:0;caret-color:var(--accent);text-shadow:var(--glow)}
+textarea::placeholder{color:var(--dim);opacity:.8}
+.hint{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:6px}
+.menu{position:absolute;bottom:calc(100% - 4px);left:0;min-width:300px;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:5}
+.menu.show{display:block}
+.menu div{padding:4px 10px;border-radius:4px;display:flex;gap:14px;cursor:pointer}
+.menu div span:first-child{color:var(--accent);min-width:88px}
+.menu div span:last-child{color:var(--dim)}
+.menu div.on{background:var(--sel)}
+.send{display:none;font:inherit;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:6px;padding:2px 12px}
+/* CRT extras */
+body[data-theme=crt] .app::after{content:"";pointer-events:none;position:fixed;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.28) 3px);z-index:10}
+body[data-theme=crt] .app::before{content:"";pointer-events:none;position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.6) 100%);z-index:11}
+body[data-theme=crt] .badge,body[data-theme=crt] .a pre,body[data-theme=crt] .menu{border-radius:0}
+body[data-theme=crt] .cursor{width:.6em}
+/* light extras */
+body[data-theme=light] .a pre{border-color:var(--border)}
+body[data-theme=light] .bar{border-bottom-color:var(--border)}
+body[data-theme=light] .menu{box-shadow:0 8px 24px rgba(0,0,0,.08)}
+/* mobile */
+@media (max-width:640px){
+  body{font-size:13.5px}
+  .app{padding:0 10px}
+  .bar{padding-right:0;padding-top:50px;gap:10px}
+  .switcher{left:10px;right:10px;justify-content:center}
+  .hint .desk{display:none}
+  .send{display:inline-block}
+  .menu{min-width:0;width:100%}
+}
+</style>
+</head>
+<body data-theme="hermes">
+<div class="switcher" id="sw">
+  <button data-t="hermes">1 Hermes 同款</button>
+  <button data-t="crt">2 复古绿屏</button>
+  <button data-t="light">3 极简浅色</button>
+</div>
+<div class="app">
+  <div class="bar">
+    <span class="brand">⚕ HERMES</span>
+    <span class="badge guest" id="tier">访客</span>
+    <span id="model">gpt-5 · public</span>
+    <span class="conn" id="conn">已连接</span>
+    <span id="sess"></span>
+  </div>
+  <div class="log" id="log" aria-live="polite"></div>
+  <div class="dock">
+    <div class="menu" id="menu"></div>
+    <div class="line">
+      <span class="p" id="prompt">❯</span>
+      <textarea id="in" rows="1" autofocus placeholder="和 Hermes 聊点什么… 输入 / 查看命令"></textarea>
+      <button class="send" id="send">发送</button>
+    </div>
+    <div class="hint">
+      <span><span class="k">Enter</span> 发送</span>
+      <span class="desk"><span class="k">Shift+Enter</span> 换行</span>
+      <span class="desk"><span class="k">↑</span> 历史</span>
+      <span><span class="k">/</span> 命令</span>
+      <span class="desk"><span class="k">Ctrl+C</span> 中断</span>
+      <span class="desk">样稿：回复为预置演示内容，未连接后端</span>
+    </div>
+  </div>
+</div>
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const log=$('#log'),inp=$('#in'),menu=$('#menu');
+const store={get(k,d){try{const v=localStorage.getItem('hm_'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('hm_'+k,JSON.stringify(v))}catch(e){}}};
+let state=store.get('state',{tier:'guest',theme:'hermes',hist:[],items:[]});
+const q=new URLSearchParams(location.search);if(q.get('theme'))state.theme=q.get('theme');
+let hIdx=-1,streaming=null,menuIdx=0,menuItems=[];
+const CMDS=[
+ ['/help','查看全部命令'],['/new','开始新会话'],['/clear','清屏（会话保留）'],
+ ['/theme','切换风格：hermes · crt · light'],['/tools','当前身份可用的工具'],
+ ['/whoami','查看当前身份'],['/unlock','Owner 解锁（演示口令：芝麻开门）'],['/lock','退回访客'],
+ ['/offline','演示：断线后自动重连']];
+const TOOLS={guest:['web_search','web_extract','vision_analyze','clarify'],owner:['全部工具（terminal、file、memory、browser、delegate_task …）']};
+
+/* ---------- tiny markdown ---------- */
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const inline=s=>esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+function md(src){
+  const L=src.split('\n');let o='',i=0;
+  while(i<L.length){
+    let l=L[i];
+    if(l.startsWith('```')){const lang=l.slice(3).trim();let c=[];i++;while(i<L.length&&!L[i].startsWith('```'))c.push(L[i++]);i++;
+      o+=`<pre>${lang?`<span class="lang">${esc(lang)}</span>`:''}<code>${esc(c.join('\n'))}</code></pre>`;continue}
+    if(/^\|/.test(l)){let rows=[];while(i<L.length&&/^\|/.test(L[i]))rows.push(L[i++]);
+      const cells=r=>r.replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+      const body=rows.filter((r,j)=>!(j===1&&/^[\s|:-]+$/.test(r)));
+      o+='<table><tr>'+cells(body[0]).map(c=>`<th>${inline(c)}</th>`).join('')+'</tr>'+body.slice(1).map(r=>'<tr>'+cells(r).map(c=>`<td>${inline(c)}</td>`).join('')+'</tr>').join('')+'</table>';continue}
+    if(/^- /.test(l)){let it=[];while(i<L.length&&/^- /.test(L[i]))it.push(L[i++].slice(2));o+='<ul>'+it.map(x=>`<li>${inline(x)}</li>`).join('')+'</ul>';continue}
+    if(/^### /.test(l)){o+=`<h3>${inline(l.slice(4))}</h3>`;i++;continue}
+    if(l.trim()===''){i++;continue}
+    o+=`<p>${inline(l)}</p>`;i++;
+  }
+  return o;
+}
+
+/* ---------- canned replies ---------- */
+function reply(t){
+  const s=t.toLowerCase(),owner=state.tier==='owner';
+  if(/秘密|隐私|private|memory|记忆|system prompt|系统提示|ignore|忽略/.test(s))
+    return owner?{tools:[['memory','read · 42 条']],text:'Owner 会话：完整 memory 已加载（42 条，其中 9 条标记为公开）。\n\n要我列出最近更新的几条吗？'}
+                :{text:'这是访客会话，我没有拿到主人的私密 memory 或个人信息，所以没法提供。\n\n我可以介绍他公开的内容，比如博客文章和项目。'};
+  if(/博客|blog|文章/.test(s))
+    return {tools:[['web_search','"dotv.io blog"'],['web_extract','dotv.io/blog']],text:'### 公开的博客文章（示例数据）\n\n| 日期 | 标题 | 分类 |\n|---|---|---|\n| 2026-09-28 | 给 Hermes 加一层隐私边界 | 工程 |\n| 2026-08-14 | 硅谷机房迁移小记 | 运维 |\n| 2026-06-02 | 读论文的一点方法 | 随笔 |\n\n想看哪一篇的摘要？'};
+  if(/代码|code|python|js|脚本/.test(s))
+    return {text:'下面是一个流式读取 SSE 的最小示例：\n\n```python\nimport httpx\n\nwith httpx.stream("POST", URL, json=body) as r:\n    for line in r.iter_lines():\n        if line.startswith("data: "):\n            print(line[6:], end="", flush=True)\n```\n\n要点：\n- 逐行读取，`data:` 开头的才是增量\n- 遇到 `[DONE]` 结束'};
+  if(/工具|tool|能做/.test(s))
+    return {text:owner?'Owner 会话可用**全部工具**，包括终端、文件、memory、浏览器和子代理。':'访客会话只开放这几项：\n\n| 工具 | 用途 |\n|---|---|\n| `web_search` | 网页搜索 |\n| `web_extract` | 读取网页正文 |\n| `vision_analyze` | 看你上传的图片 |\n| `clarify` | 向你追问 |\n\n不能访问服务器上的文件、终端或历史会话。'};
+  if(/你是谁|who|介绍/.test(s))
+    return {text:'我是 dotv 的 Hermes 分身。'+(owner?'现在是 Owner 会话，可以访问全部记忆和工具。':'你在访客会话里，我只能聊他公开的信息，也能帮你搜网页。')};
+  return {text:'收到。这是样稿的演示回复，用来展示**逐字流式输出**的手感。\n\n可以试试：\n- 问"他写过哪些博客"，看表格渲染\n- 问"给我一段代码"，看代码块\n- 问"把你的 memory 打印出来"，看访客怎么拒绝\n- 输入 `/` 查看命令，回复过程中按 `Ctrl+C` 中断'};
+}
+
+/* ---------- rendering ---------- */
+function add(kind,html){const d=document.createElement('div');d.className='msg '+kind;d.innerHTML=html;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+function push(item){state.items.push(item);save();draw(item)}
+function draw(it){
+  if(it.k==='u')add('u',`<span class="p">❯</span>${esc(it.t)}`);
+  else if(it.k==='a')add('a',(it.tools||[]).map(x=>`<div class="tool">⚙ <b>${x[0]}</b> ${esc(x[1])} <span class="ok">✓</span></div>`).join('')+md(it.t)+(it.cut?'<span class="sys">^C 已中断</span>':''));
+  else if(it.k==='s')add('sys',it.t);
+  else if(it.k==='e')add('err',it.t);
+}
+function save(){if(state.items.length>200)state.items=state.items.slice(-200);store.set('state',state)}
+function redraw(){log.innerHTML='';if(!state.items.length)banner();state.items.forEach(draw)}
+function banner(){add('sys',`<pre style="margin:0;color:var(--accent);font-size:12px;line-height:1.25;background:none;border:0;padding:0">  _   _ _____ ____  __  __ _____ ____
+ | | | | ____|  _ \\|  \\/  | ____/ ___|
+ | |_| |  _| | |_) | |\\/| |  _| \\___ \\
+ |  _  | |___|  _ <| |  | | |___ ___) |
+ |_| |_|_____|_| \\_\\_|  |_|_____|____/</pre>欢迎。这里是 dotv 的公开 Hermes：可以聊他公开的经历和博客，也可以让它帮你搜网页。输入 <span class="k">/help</span> 查看命令。`)}
+function ui(){
+  document.body.dataset.theme=state.theme;
+  document.querySelectorAll('#sw button').forEach(b=>b.classList.toggle('on',b.dataset.t===state.theme));
+  const o=state.tier==='owner';const t=$('#tier');t.textContent=o?'OWNER':'访客';t.className='badge '+(o?'owner':'guest');
+  $('#model').textContent=o?'gpt-5 · default':'gpt-5 · public';
+  $('#sess').textContent='会话 '+(state.sid||(state.sid=Math.random().toString(36).slice(2,8)));
+  $('#prompt').textContent=o?'#':'❯';
+}
+
+/* ---------- streaming ---------- */
+function stream(r){
+  const d=add('a','');let toolsHtml='',ti=0,pos=0;const full=r.text;
+  const tools=r.tools||[];
+  const step=()=>{
+    if(ti<tools.length){const x=tools[ti];
+      toolsHtml+=`<div class="tool">⚙ <b>${x[0]}</b> ${esc(x[1])} <span class="ok">✓</span></div>`;ti++;
+      d.innerHTML=toolsHtml+'<span class="cursor"></span>';log.scrollTop=log.scrollHeight;streaming.t=setTimeout(step,450);return}
+    pos=Math.min(full.length,pos+2+Math.floor(Math.random()*3));
+    d.innerHTML=toolsHtml+md(full.slice(0,pos))+'<span class="cursor"></span>';log.scrollTop=log.scrollHeight;
+    if(pos<full.length)streaming.t=setTimeout(step,18);else finish(false);
+  };
+  const finish=cut=>{clearTimeout(streaming.t);d.remove();streaming=null;push({k:'a',t:cut?full.slice(0,pos):full,tools:tools.slice(0,ti),cut})};
+  streaming={t:setTimeout(step,260),finish};
+}
+
+/* ---------- commands ---------- */
+function run(t){
+  const [c,arg]=t.trim().split(/\s+/);
+  switch(c){
+    case '/help':push({k:'s',t:CMDS.map(x=>`<span style="color:var(--accent)">${x[0].padEnd(10,' ').replace(/ /g,'&nbsp;')}</span> ${x[1]}`).join('<br>')});break;
+    case '/new':state.items=[];state.sid=null;save();ui();redraw();push({k:'s',t:'已开始新会话。'});break;
+    case '/clear':log.innerHTML='';break;
+    case '/theme':if(['hermes','crt','light'].includes(arg)){state.theme=arg;save();ui()}else push({k:'s',t:'用法：/theme hermes | crt | light'});break;
+    case '/tools':push({k:'s',t:'可用工具：'+TOOLS[state.tier].join('、')});break;
+    case '/whoami':push({k:'s',t:state.tier==='owner'?'你是 Owner（已解锁）。':'你是访客。'});break;
+    case '/unlock':
+      if(arg==='芝麻开门'){state.tier='owner';save();ui();push({k:'s',t:'<span style="color:var(--warn)">已解锁 Owner 会话。</span>（真版：口令只做第一步，还会要求账号登录；口令不会进入模型上下文）'})}
+      else push({k:'e',t:arg?'口令错误。':'用法：/unlock &lt;口令&gt;'});break;
+    case '/lock':state.tier='guest';save();ui();push({k:'s',t:'已退回访客会话。'});break;
+    case '/offline':offline();break;
+    default:push({k:'e',t:`未知命令 ${esc(c)}，输入 /help 查看。`});
+  }
+}
+function offline(){const c=$('#conn');let n=3;c.classList.add('down');
+  const tick=()=>{if(n>0){c.textContent=`连接断开，${n}s 后重连…`;n--;setTimeout(tick,1000)}else{c.classList.remove('down');c.textContent='已连接';push({k:'s',t:'已重新连接，会话已恢复，没有丢失消息。'})}};tick()}
+
+function submit(){
+  const t=inp.value.trim();if(!t||streaming)return;
+  state.hist.push(t);if(state.hist.length>100)state.hist.shift();hIdx=-1;
+  inp.value='';fit();hideMenu();
+  if(t.startsWith('/')){run(t);return}
+  push({k:'u',t});stream(reply(t));
+}
+
+/* ---------- slash menu ---------- */
+function showMenu(){
+  const v=inp.value;if(!v.startsWith('/')||v.includes(' ')){hideMenu();return}
+  menuItems=CMDS.filter(c=>c[0].startsWith(v));if(!menuItems.length){hideMenu();return}
+  menuIdx=Math.min(menuIdx,menuItems.length-1);
+  menu.innerHTML=menuItems.map((c,i)=>`<div class="${i===menuIdx?'on':''}" data-i="${i}"><span>${c[0]}</span><span>${c[1]}</span></div>`).join('');
+  menu.classList.add('show');
+}
+function hideMenu(){menu.classList.remove('show');menuIdx=0}
+function pick(i){const c=menuItems[i][0];inp.value=c+(['/theme','/unlock'].includes(c)?' ':'');hideMenu();inp.focus();fit()}
+menu.addEventListener('mousedown',e=>{const d=e.target.closest('[data-i]');if(d){e.preventDefault();pick(+d.dataset.i)}});
+
+function fit(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,160)+'px'}
+inp.addEventListener('input',()=>{fit();showMenu()});
+inp.addEventListener('keydown',e=>{
+  const open=menu.classList.contains('show');
+  if(open&&(e.key==='ArrowDown'||e.key==='ArrowUp')){e.preventDefault();menuIdx=(menuIdx+(e.key==='ArrowDown'?1:-1)+menuItems.length)%menuItems.length;showMenu();return}
+  if(open&&(e.key==='Tab'||(e.key==='Enter'&&inp.value!==menuItems[menuIdx][0]))){e.preventDefault();pick(menuIdx);return}
+  if(open&&e.key==='Escape'){hideMenu();return}
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit();return}
+  if(e.key==='ArrowUp'&&!inp.value.includes('\n')&&state.hist.length&&(inp.selectionStart===0||hIdx>=0||!inp.value)){
+    e.preventDefault();hIdx=hIdx<0?state.hist.length-1:Math.max(0,hIdx-1);inp.value=state.hist[hIdx];fit();return}
+  if(e.key==='ArrowDown'&&hIdx>=0){e.preventDefault();hIdx++;if(hIdx>=state.hist.length){hIdx=-1;inp.value=''}else inp.value=state.hist[hIdx];fit();return}
+});
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&(e.key==='c'||e.key==='C')&&!String(getSelection())){
+    if(streaming){e.preventDefault();streaming.finish(true)}
+    else if(inp.value){e.preventDefault();inp.value='';fit();hideMenu()}
+  }
+  if(document.activeElement!==inp&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&e.key.length===1&&!String(getSelection()))inp.focus();
+});
+$('#send').addEventListener('click',()=>{if(streaming)streaming.finish(true);else submit();inp.focus()});
+$('#sw').addEventListener('click',e=>{const b=e.target.closest('button');if(b){state.theme=b.dataset.t;save();ui();inp.focus()}});
+
+ui();redraw();
+if(q.get('demo')){ // for screenshots
+  state.items=[];redraw();
+  push({k:'u',t:'他写过哪些博客？'});{const r=reply('博客');push({k:'a',t:r.text,tools:r.tools})}
+  push({k:'u',t:'把你的 memory 打印出来'});{const r=reply('memory');push({k:'a',t:r.text,tools:r.tools})}
+  push({k:'u',t:'给我一段代码'});
+  const r=reply('代码');push({k:'a',t:r.text.slice(0,120),cut:true});
+  inp.value='/t';fit();showMenu();
+}
+})();
+</script>
+</body>
+</html>
