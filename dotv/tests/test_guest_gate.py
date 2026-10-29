@@ -25,7 +25,7 @@ def test_denied_tools_blocked(tool):
     assert gate.on_pre_tool_call(tool_name=tool, args={})["action"] == "block"
 
 
-@pytest.mark.parametrize("tool", ["web_search", "web_extract", "clarify", "image_generate", "text_to_speech"])
+@pytest.mark.parametrize("tool", ["web_search", "web_extract", "clarify", "image_generate", "text_to_speech", "dotv_public_lookup"])
 def test_allowed_tools_pass(tool):
     assert gate.on_pre_tool_call(tool_name=tool, args={"query": "x"}) is None
 
@@ -59,8 +59,8 @@ def test_register_hooks_pre_tool_call():
 
 def test_profile_template_matches_gate():
     cfg = yaml.safe_load((ROOT / "profiles/public/config.yaml").read_text())
-    assert set(cfg["platform_toolsets"]["api_server"]) == {"web", "vision", "image_gen", "tts", "clarify"}
-    assert cfg["plugins"]["enabled"] == ["dotv-guest-gate"]
+    assert set(cfg["platform_toolsets"]["api_server"]) == {"web", "vision", "image_gen", "tts", "clarify", "dotv_public"}
+    assert cfg["plugins"]["enabled"] == ["dotv-guest-gate", "dotv-public-context"]
     assert cfg["security"]["allow_private_urls"] is False
     assert cfg["memory"]["provider"] == "" and cfg["memory"]["nudge_interval"] == 0
     manifest = yaml.safe_load((ROOT / "plugins/dotv-guest-gate/plugin.yaml").read_text())
