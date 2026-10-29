@@ -1,0 +1,16 @@
+# dotv public (Guest) profile — merge into $HERMES_HOME/profiles/public/config.yaml.
+# Hard isolation comes from the profile itself (own memories/, sessions, SOUL.md, API key);
+# the dotv-guest-gate plugin is the second line of defence.
+platform_toolsets:
+  api_server: [web, vision, image_gen, tts, clarify]
+memory:
+  memory_enabled: true        # MEMORY.md here is the generated public projection (step 2)
+  user_profile_enabled: true  # USER.md here is the generated public projection (step 2)
+  provider: ""                # no external memory provider for guests
+  nudge_interval: 0           # never review guest chats into memory
+security:
+  allow_private_urls: false   # web tools must not reach 127.0.0.1 / LAN
+sessions:
+  auto_prune: false
+plugins:
+  enabled: [dotv-guest-gate]

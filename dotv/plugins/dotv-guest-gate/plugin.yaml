@@ -1,0 +1,6 @@
+name: dotv-guest-gate
+version: "0.1.0"
+description: "Guest tool allowlist for the dotv public profile. Blocks every tool call whose name is not on the allowlist (fail-closed), and restricts vision_analyze to http(s) URLs."
+author: "dotv-io"
+provides_hooks:
+  - pre_tool_call
