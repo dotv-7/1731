@@ -26,7 +26,7 @@
 | # | 成品 | 内容 | 状态 |
 |---|---|---|---|
 | D1 | **上下文隐私功能 + 看板** | (a) 上下文盘点器：扫描所有上下文来源（见 §4），列出每一条内容；(b) 看板：仅 Owner 可用，逐条标记公开或私密，默认私密；(c) 公开投影同步器：把公开条目单向同步到 `public` profile；(d) 帮助 Owner 分类的 skill（只给建议，Owner 确认后才生效） | (a)(b)(c) 已实现（PR #6：`dotv/context/`、`dotv-public-context` 插件、`/board`）；(d) 未做 |
-| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 | Owner/Guest 已实现并在真实 Hermes 上验证（PR #6）；User/Admin、命令权限未做 |
+| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 第一版已实现（PR #6）：五级 Owner/Admin/User/Guest/Blocked、权限看板 `/perm`、邀请码，真实 Hermes 验证；平台账号识别、命令权限、群聊混合未做 |
 | D3 | **独立 UI** | 终端风格网页聊天（**已定：风格 1“Hermes 同款”**，样稿见 `mockups/hermes-chat-mockups.html`），Owner 口令解锁，后端小服务持有 API key，访客和 Owner 走不同 profile，满足 R9 的指标 | 已实现（PR #6：`dotv/chat/`）；已用演示后端预览，未接生产 |
 | D4 | **全局说明文档** | 本文件：要求、成品、工具清单、上下文来源、角色权限矩阵、上游改动清单 | 本文件；实现进度见 §9 |
 | D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 待做 |
@@ -113,14 +113,18 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 **关于“自传”：** 自传放在 workspace 目录里，不在 A2 的固定文件名里，所以不会自动注入。只要 Hermes 有 `read_file`/`search_files`/`terminal`，它随时能读到（B2），聊过的内容也会留在历史会话里（B1/B3）。所以看板不能只扫 memory，还要扫 workspace 文件、历史会话和 skills。
 
-## 5. 角色权限矩阵（草案，第一版只实现 Owner 和 Guest）
+## 5. 角色权限矩阵（第一版已实现，可在权限看板 `/perm` 调整）
 
 | 角色 | 工具 | 上下文 | 状态 |
 |---|---|---|---|
 | **Owner** | 全部（§3） | 全部（§4） | v1 |
 | **Guest** | `web_search`、`web_extract`、`clarify`、`vision_analyze`（仅 URL 或上传文件）、`image_generate`、`text_to_speech`（已定） | A1 公开人设、A5/A6 公开投影、A9 无害化、A10、B1/B8/B9 访客自己的；其余全部不给 | v1，可选项待用户定 |
-| **User** | 527 默认：web、读文件、vision、image_gen、memory 只读 | 公开投影，外加 Owner 授权给 User 的条目（预留 `[visible: user]`） | 留接口 |
-| **Admin** | 527 默认：除 `/update` 外全部 | 全部，或按 Owner 授权 | 留接口 |
+| **Admin** | 默认：Guest 的全部 + X 搜索、看视频、待办、memory、历史会话、skills（均为 Admin 档自己的，不是 Owner 的） | 公开投影 + Admin 档自己的 memory/会话 | v1，邀请码 |
+| **User** | 默认：Guest 的全部 + 待办、memory（User 档自己的） | 公开投影 + User 档自己的 memory | v1，邀请码 |
+| **Blocked** | 无，请求在聊天服务端就被拒，碰不到 Hermes | 无 | v1 |
+
+**非 Owner 一律锁死**（看板里显示 🔒，保存时也会被剔除）：终端、文件读写、执行代码、浏览器、电脑操控、定时任务、子代理、Kanban、账号连接、对外发消息。原因：它们能碰到 Owner 的机器或代表 Owner 行事。
+**同档共享**：Admin/User 各是一个 profile，同档成员共用一份 memory 和会话库，第一版不按人隔离。
 
 两道闸：① **profile 隔离**，访客的 agent 物理上拿不到私密上下文；② **`pre_tool_call` 闸门插件**，不在名单里的工具一律拒绝。
 
@@ -156,6 +160,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 | 日期 | 变更 |
 |---|---|
+| 2026-10-29 | 527 第一版：五级权限、权限看板、邀请码、Owner 模式全局文档链接 |
 | 2026-10-29 | 加 §9 实现进度：D1/D2/D3 已实现，D2 在真实 Hermes 上端到端验证；访客关闭 tool_search |
 | 2026-10-29 | 定：UI 风格 1；Guest 开放看图、生成图片、语音朗读；公开标记另存清单 |
 | 2026-10-29 | Owner 认证定为口令；加入 UI 样稿 `mockups/` |
@@ -176,7 +181,9 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 独立聊天窗口 `dotv-chat` | ✅ | 演示后端预览；未接生产 Hermes |
 | 同一 gateway 双 profile、key 隔离 | ✅ | 真实 Hermes：`/p/public` 用 Owner key 返回 401 |
 | 帮助分类的 skill（D1-d） | ❌ 未做 | — |
-| User/Admin、群聊混合 | ❌ 第一版不做 | — |
+| 527 五级权限 + 权限看板 `/perm`（`dotv/perm/`） | ✅ | 真实 Hermes + DeepSeek：User 能用 memory，terminal/read_file 不存在；看板取消 memory 后新会话里 memory 消失；Blocked 403；User 打不开三个 Owner 页面 |
+| Owner 模式全局文档链接 `/docs` | ✅ | Owner 200，User/访客 403 |
+| 按 Telegram/Discord 账号自动识别等级、群聊混合 | ❌ 未做 | 现在只在 dotv-chat 里用口令/邀请码认人 |
 | Gemini 补丁、GHCR 镜像（D5） | ❌ 未做 | — |
 | 真实模型越狱测试、生产安装 | ❌ 未做 | 需要生产或真实模型 key |
 
