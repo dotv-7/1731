@@ -38,6 +38,7 @@ class Item:
     fingerprint: str
     publishable: bool = True
     note: str = ""
+    path: str = ""        # absolute path of the backing file, "" for non-file sources
     meta: dict = field(default_factory=dict)
 
     def to_dict(self, with_text: bool = True) -> dict:
@@ -73,7 +74,8 @@ def _memory_items(home: Path) -> list[Item]:
             if entry:
                 # Entries have no stable name; their content is their identity (an edited entry is a new one).
                 first = entry.splitlines()[0]
-                items.append(_item(kind, group, f"memories/{name}", fingerprint(entry), first[:80], entry))
+                items.append(_item(kind, group, f"memories/{name}", fingerprint(entry), first[:80], entry,
+                                   path=str((home / "memories" / name).resolve())))
     return items
 
 
@@ -99,12 +101,13 @@ def split_markdown(text: str) -> list[tuple[str, str]]:
     return out
 
 
-def _doc_items(kind: str, group: str, rel: str, text: str) -> list[Item]:
+def _doc_items(kind: str, group: str, rel: str, text: str, path: Path) -> list[Item]:
+    abs_path = str(path.resolve())
     if Path(rel).suffix.lower() in {".md", ".markdown", ".mdc"}:
         parts = split_markdown(text)
         if len(parts) > 1:
-            return [_item(kind, group, rel, h, f"{Path(rel).name} › {h}", body) for h, body in parts]
-    return [_item(kind, group, rel, "", Path(rel).name, text)] if text.strip() else []
+            return [_item(kind, group, rel, h, f"{Path(rel).name} › {h}", body, path=abs_path) for h, body in parts]
+    return [_item(kind, group, rel, "", Path(rel).name, text, path=abs_path)] if text.strip() else []
 
 
 def _iter_text_files(root: Path) -> Iterable[Path]:
@@ -129,7 +132,7 @@ def _workspace_items(roots: list[Path]) -> list[Item]:
             text = _read(p)
             if text:
                 rel = f"{root.name}/{p.relative_to(root).as_posix()}"
-                items += _doc_items("workspace", f"Workspace · {root.name}", rel, text)
+                items += _doc_items("workspace", f"Workspace · {root.name}", rel, text, p)
     return items
 
 
@@ -141,7 +144,7 @@ def _skill_items(home: Path) -> list[Item]:
             text = _read(p)
             if text:
                 rel = p.relative_to(home).as_posix()
-                items.append(_item("skill", "Skills", rel, "", p.parent.name, text))
+                items.append(_item("skill", "Skills", rel, "", p.parent.name, text, path=str(p.resolve())))
     return items
 
 
@@ -164,7 +167,8 @@ def _session_items(home: Path, limit: int = 500) -> list[Item]:
         when = time.strftime("%Y-%m-%d", time.localtime(started or 0))
         label = f"{when} · {t or '(无标题)'} · {src} · {n or 0} 条消息"
         it = _item("session", "历史会话", f"state.db/{sid}", "", label, label,
-                   publishable=False, note="历史会话第一版不能公开（私密与公开内容混在一起）")
+                   publishable=False, note="历史会话第一版不能公开（私密与公开内容混在一起）",
+                   path=str(db.resolve()))
         items.append(it)
     return items
 
@@ -188,7 +192,8 @@ def _runtime_items(home: Path) -> list[Item]:
     if plugins.is_dir():
         for p in sorted(x for x in plugins.iterdir() if x.is_dir() and not x.name.startswith(".")):
             items.append(_item("plugin", "外部 memory / 插件", f"plugins/{p.name}", "", f"插件：{p.name}",
-                               p.name, publishable=False, note="插件动态上下文不会进入访客会话"))
+                               p.name, publishable=False, note="插件动态上下文不会进入访客会话",
+                               path=str(p.resolve())))
     return items
 
 
@@ -197,7 +202,7 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
     items = _memory_items(owner_home)
     soul = _read(owner_home / "SOUL.md")
     if soul:
-        items += _doc_items("soul", "人设 · SOUL.md", "SOUL.md", soul)
+        items += _doc_items("soul", "人设 · SOUL.md", "SOUL.md", soul, owner_home / "SOUL.md")
     items += _workspace_items([Path(r) for r in workspace_roots])
     items += _skill_items(owner_home)
     items += _session_items(owner_home)

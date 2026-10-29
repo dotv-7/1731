@@ -29,7 +29,7 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin-to
 <div class="bar"><span class="brand">⚕ 上下文看板</span><span class="dim">默认全部私密，只有勾选的内容会给访客</span><span class="sp"></span>
   <input id="q" type="search" placeholder="搜索内容…"><a href="/">← 返回聊天</a>
   <button id="prev">访客能看到什么</button><button id="save" class="primary" disabled>保存并同步</button></div>
-<p class="stats" id="stats"></p><div id="preview"></div><div id="groups"></div></div>
+<p class="dim" id="roots"></p><p class="stats" id="stats"></p><div id="preview"></div><div id="groups"></div></div>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s);let items=[],checked=new Set(),initial='';
@@ -37,6 +37,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const LABEL={private:'私密',public:'公开',changed:'已变动·需重新确认',locked:'不可公开'};
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2500);}
 async function load(){const r=await fetch('/api/board/items');if(r.status===403)return location.href='/';const j=await r.json();
+  $('#roots').innerHTML='Hermes 数据目录：<b>'+esc(j.owner_home)+'</b>'+((j.workspace_roots||[]).length?' · 工作区：'+j.workspace_roots.map(esc).join('、'):'');
   items=j.items;checked=new Set(items.filter(i=>i.status==='public').map(i=>i.id));initial=[...checked].sort().join();draw();}
 function draw(){const q=$('#q').value.toLowerCase(),groups={};
   for(const it of items){if(q&&!(it.title+it.text+it.source).toLowerCase().includes(q))continue;(groups[it.group]=groups[it.group]||[]).push(it);}
@@ -46,7 +47,7 @@ function draw(){const q=$('#q').value.toLowerCase(),groups={};
     return `<details ${q||list.length<40?'open':''}><summary>${esc(g)}<span class="dim">${sel}/${list.length} 公开</span></summary>`+list.map(it=>{
       const st=!it.publishable?'locked':checked.has(it.id)?'public':it.status==='changed'?'changed':'private';
       return `<div class="row" data-id="${it.id}"><input type="checkbox" ${checked.has(it.id)?'checked':''} ${it.publishable?'':'disabled'}>
-      <div><div class="t">${esc(it.title)}</div><div class="src">${esc(it.source)}${it.note?' · '+esc(it.note):''}</div><pre>${esc(it.text)}</pre></div>
+      <div><div class="t">${esc(it.title)}</div><div class="src">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><pre>${esc(it.text)}</pre></div>
       <span class="tag ${st}">${LABEL[st]}</span></div>`}).join('')+'</details>';}).join('');
   $('#save').disabled=[...checked].sort().join()===initial;}
 document.addEventListener('change',e=>{const row=e.target.closest('.row');if(!row)return;
