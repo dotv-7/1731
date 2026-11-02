@@ -33,7 +33,7 @@ def test_members_code_lookup_tier_change_and_delete(owner):
 
 
 def test_sync_writes_tier_file_and_narrows_profile_config(owner):
-    yaml = pytest.importorskip("yaml")
+    from dotv import _yaml as yaml
     home = owner / "profiles/dotv-user"
     home.mkdir(parents=True)
     (home / "config.yaml").write_text("model:\n  default: m\nplatform_toolsets:\n  api_server: [web, terminal]\n")
@@ -45,3 +45,65 @@ def test_sync_writes_tier_file_and_narrows_profile_config(owner):
     cfg = yaml.safe_load((home / "config.yaml").read_text())
     assert cfg["platform_toolsets"]["api_server"] == ["web", "memory"] and cfg["model"]["default"] == "m"
     assert cfg["memory"]["memory_enabled"] is True and cfg["tools"]["tool_search"]["enabled"] == "off"
+
+
+def _member_seen(owner, tier="user"):
+    m, _ = perm.add_member(owner, "小李", tier)
+    perm.note_seen(owner, m["id"], "203.0.113.7", "dev-a")
+    return m
+
+
+def test_blocking_covers_seen_devices_and_ips_until_unblocked(owner):
+    m = _member_seen(owner)
+    assert perm.is_blocked(owner, "203.0.113.7", "") is None
+    perm.update_member(owner, m["id"], tier="blocked")
+    assert perm.is_blocked(owner, "203.0.113.7", "other-device")["kind"] == "ip"
+    assert perm.is_blocked(owner, "198.51.100.1", "dev-a")["kind"] == "device"
+    assert perm.is_blocked(owner, "198.51.100.1", "dev-b") is None
+    perm.note_seen(owner, m["id"], "198.51.100.9", "dev-c")
+    assert perm.is_blocked(owner, "198.51.100.9", "")
+    assert perm.unblock(owner, "ip", "203.0.113.7") and not perm.is_blocked(owner, "203.0.113.7", "")
+    perm.update_member(owner, m["id"], tier="user")
+    assert perm.load(owner)["blocklist"] == []
+
+
+def test_only_public_ips_are_blockable():
+    assert perm.blockable_ip("203.0.113.7") and perm.blockable_ip("2001:db8::1")
+    assert not any(perm.blockable_ip(ip) for ip in ("127.0.0.1", "::1", "10.1.2.3", "172.18.0.1", "192.168.1.5",
+                                                    "fd00::1", "testclient", ""))
+
+
+def test_ip_blocks_expire_and_policy_save_keeps_blocks(owner, monkeypatch):
+    m = _member_seen(owner)
+    perm.update_member(owner, m["id"], tier="blocked")
+    perm.save(owner, dict(perm.load(owner), tiers={"admin": [], "user": [], "guest": ["web"]}))
+    assert perm.is_blocked(owner, "203.0.113.7", "")
+    monkeypatch.setattr(perm.time, "time", lambda: 10 ** 11)
+    assert perm.load(owner)["blocklist"] == []
+
+
+def test_sync_isolates_cwd_and_audit_passes(tmp_path, owner):
+    pub = tmp_path / "public"
+    (pub / "plugins/dotv-guest-gate").mkdir(parents=True)
+    (pub / "plugins/dotv-guest-gate/__init__.py").write_text("")
+    (pub / "config.yaml").write_text("platform_toolsets:\n  api_server: [web, terminal]\n", encoding="utf-8")
+    problems = perm.audit(pub)
+    assert any("terminal.cwd" in p for p in problems) and any("tool_search" in p for p in problems)
+    perm.sync(owner, {"guest": pub})
+    assert perm.audit(pub) == []
+    from dotv import _yaml as yaml
+    cfg = yaml.safe_load((pub / "config.yaml").read_text(encoding="utf-8"))
+    assert cfg["terminal"]["cwd"] == str((pub / "dotv/cwd").resolve())
+    assert "dotv-guest-gate" in cfg["plugins"]["enabled"] and "terminal" not in cfg["platform_toolsets"]["api_server"]
+    (pub / "dotv/cwd/AGENTS.md").write_text("owner secrets", encoding="utf-8")
+    assert any("AGENTS.md" in p for p in perm.audit(pub))
+
+
+def test_audit_flags_cwd_inside_git_repo(tmp_path, owner):
+    pub = tmp_path / "repo/public"
+    (pub / "plugins/dotv-guest-gate").mkdir(parents=True)
+    (pub / "plugins/dotv-guest-gate/__init__.py").write_text("")
+    (tmp_path / "repo/.git").mkdir()
+    (pub / "config.yaml").write_text("{}", encoding="utf-8")
+    perm.sync(owner, {"guest": pub})
+    assert any("git repository" in p for p in perm.audit(pub))

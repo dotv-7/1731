@@ -11,6 +11,11 @@ memory:
 tools:
   tool_search:
     enabled: "off"   # all guest tools eager; no tool_call bridge to proxy other tools
+terminal:
+  # Empty dir so no AGENTS.md / .hermes.md / CLAUDE.md is auto-loaded into guest prompts. Without it Hermes
+  # uses MESSAGING_CWD or the home dir (possibly the owner's workspace). `python3 -m dotv.perm sync`
+  # rewrites this to <profile>/dotv/cwd and creates it.
+  cwd: /opt/data/profiles/public/dotv/cwd
 security:
   allow_private_urls: false   # web tools must not reach 127.0.0.1 / LAN
 sessions:

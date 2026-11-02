@@ -44,9 +44,14 @@ select,input[type=text]{font:inherit;background:var(--surface);color:var(--text)
   <a href="/board">上下文看板</a><a href="/docs">全局文档</a><a href="/">← 返回聊天</a><button id="save" class="primary" disabled>保存并同步</button></div>
 <div class="card"><b>五个级别</b>　<span class="tiers">
   <span><b class="ok">Owner</b> 你本人，口令解锁，全部工具</span><span><b>Admin</b> 邀请码</span><span><b>User</b> 邀请码</span>
-  <span><b>访客</b> 不登录的所有人</span><span><b class="lk">已封禁</b> 碰不到 Hermes</span></span>
+  <span><b>访客</b> 不登录的所有人</span><span><b class="lk">已封禁</b> 碰不到 Hermes（按设备 + IP）</span></span>
   <div class="dim" id="files"></div></div>
 <details open><summary>工具权限<span class="dim">勾选 = 该级别可用；红色锁 = 非 Owner 一律禁止</span></summary><div style="overflow-x:auto"><table class="m" id="matrix"></table></div></details>
+<details open><summary>访问控制<span class="dim">封禁的人清掉 cookie 也回不来</span></summary><div style="padding:8px 12px">
+  <label><input type="checkbox" id="gaccess"> 允许不登录的访客聊天</label>
+  <span class="dim">（关掉后只有拿到邀请码的人能聊；这是最彻底的封禁方式）</span>
+  <table class="m" id="blocks"></table>
+  <p class="dim">把成员改成“已封禁”时，他用过的设备和 IP 会进入封禁名单（IP 90 天后自动解除，避免误伤同一网络的人）；Owner 口令不受封禁影响。</p></div></details>
 <details open><summary>成员与邀请码<span class="dim" id="mcount"></span></summary><div style="padding:8px 12px">
   <div><input id="mname" type="text" placeholder="名字，比如 小王"> <select id="mtier"></select> <button id="madd">生成邀请码</button></div>
   <div id="newcode"></div><table class="m" id="members"></table>
@@ -63,7 +68,12 @@ async function load(j){S=j||await api('/api/perm');policy={};for(const t of CFG)
 const snap=()=>CFG.map(t=>[...policy[t]].sort().join()).join('|');
 function draw(){
   $('#files').innerHTML='策略文件：<b>'+esc(S.policy_file)+'</b><br>'+CFG.map(t=>{const p=S.profiles[t];
-    return `${esc(S.labels[t])} → profile <b>${esc(p.name)}</b> <span class="${p.deployed?'ok':'lk'}">${p.deployed?'已部署':'未部署'}</span> <span class="dim">${esc(p.home)}</span>`}).join('<br>');
+    const a=(S.audit||{})[t]||[];const iso=!p.deployed?'':a.length?`<div class="lk">⚠ 隔离检查未通过：<br>${a.map(esc).join('<br>')}<br>点“保存并同步”自动修正配置；上下文文件需手动移走</div>`:'<span class="ok">隔离检查通过</span>';
+    return `${esc(S.labels[t])} → profile <b>${esc(p.name)}</b> <span class="${p.deployed?'ok':'lk'}">${p.deployed?'已部署':'未部署'}</span> <span class="dim">${esc(p.home)}</span> ${iso}`}).join('<br>');
+  $('#gaccess').checked=!!S.guest_access;
+  $('#blocks').innerHTML=(S.blocklist||[]).length?'<tr><th>类型</th><th>值</th><th>成员</th><th>到期</th><th></th></tr>'+S.blocklist.map(b=>
+    `<tr><td>${b.kind==='ip'?'IP':'设备'}</td><td class="dim">${esc(b.value)}</td><td>${esc(b.name)}</td><td class="dim">${new Date(b.until*1000).toLocaleDateString()}</td>
+    <td><button data-ub="${esc(b.kind)}" data-v="${esc(b.value)}">解除</button></td></tr>`).join(''):'<tr><td class="dim">封禁名单为空</td></tr>';
   let h='<tr><th>工具组</th>'+COLS.map(c=>`<th class="c">${esc(S.labels[c])}</th>`).join('')+'</tr>',cat='';
   for(const r of S.catalog){if(r.category!==cat){cat=r.category;h+=`<tr class="cat"><td colspan="6">${esc(cat)}</td></tr>`;}
     h+=`<tr><td>${esc(r.label)}<div class="dim" style="font-size:12px">${r.tools.map(esc).join(', ')}</div>`+
@@ -80,8 +90,11 @@ function draw(){
   $('#save').disabled=snap()===initial;}
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.dataset.t){t.checked?policy[t.dataset.t].add(t.dataset.id):policy[t.dataset.t].delete(t.dataset.id);$('#save').disabled=snap()===initial;}
+  if(t.id==='gaccess'){S=await api('/api/perm/access',{action:'guest_access',enabled:t.checked});toast(t.checked?'已开放访客':'已关闭访客，只认邀请码');draw();}
   if(t.dataset.m){S=await api('/api/perm/members',{action:'update',id:t.dataset.m,tier:t.value});toast('已改为 '+S.labels[t.value]+'，立即生效');draw();}});
-document.addEventListener('click',async e=>{const id=e.target.dataset.del;if(!id||!confirm('删除这个成员？他的邀请码会立刻失效'))return;
+document.addEventListener('click',async e=>{const ub=e.target.dataset.ub;
+  if(ub){S=await api('/api/perm/access',{action:'unblock',kind:ub,value:e.target.dataset.v});toast('已解除');draw();return;}
+  const id=e.target.dataset.del;if(!id||!confirm('删除这个成员？他的邀请码会立刻失效'))return;
   S=await api('/api/perm/members',{action:'delete',id});draw();});
 $('#madd').onclick=async()=>{const j=await api('/api/perm/members',{action:'add',name:$('#mname').value,tier:$('#mtier').value});
   $('#newcode').innerHTML=`给 <b>${esc(j.added.name)}</b>（${esc(j.labels[j.added.tier])}）的邀请码，只显示这一次：<br><span class="code">${esc(j.code)}</span>`;

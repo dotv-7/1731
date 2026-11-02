@@ -181,5 +181,6 @@ inp.addEventListener('keydown',e=>{const open=menu.classList.contains('show'),m=
   else if(e.key==='ArrowDown'&&hi>=0){e.preventDefault();hi++;if(hi>=hist.length){hi=-1;inp.value='';}else inp.value=hist[hi];fit();}});
 document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='c'&&busy&&!getSelection().toString()){e.preventDefault();busy.abort();}});
 $('#send').addEventListener('click',submit);
-me().then(j=>setRole((j&&j.role)||'guest',j&&j.name));
+me().then(j=>{setRole((j&&j.role)||'guest',j&&j.name);
+  if(j&&j.role==='guest'&&j.guest_access===false)sys('访客通道已关闭，请用 /unlock <邀请码> 登录。','err');});
 </script></body></html>
