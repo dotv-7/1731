@@ -4,10 +4,10 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT.parent))
+from dotv import _yaml as yaml
 _spec = importlib.util.spec_from_file_location("dotv_guest_gate", ROOT / "plugins/dotv-guest-gate/__init__.py")
 gate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gate)

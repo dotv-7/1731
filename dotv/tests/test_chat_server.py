@@ -110,7 +110,7 @@ def test_member_codes_route_to_tier_and_blocked_cannot_chat(client, tmp_path):
     assert client.post("/api/chat", json={"message": "hi"}).status_code == 403
     assert client.post("/api/lock", json={}).status_code == 403
     perm.update_member(owner, m["id"], delete=True)
-    assert client.get("/api/me").json()["role"] == "guest"
+    assert client.get("/api/me").json()["role"] == "blocked"  # deleting a member does not lift the block
 
 
 def test_perm_board_and_doc_owner_only(client, tmp_path):
@@ -122,3 +122,48 @@ def test_perm_board_and_doc_owner_only(client, tmp_path):
     j = client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "admin"}).json()
     assert j["code"].startswith("inv-") and j["members"][0]["tier"] == "admin" and "code_hash" not in j["members"][0]
     assert client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "owner"}).status_code == 400
+
+
+def _owner_client(client):
+    owner = TestClient(client.app)
+    assert owner.post("/api/unlock", json={"passphrase": PASS}).json()["role"] == "owner"
+    return owner
+
+
+def test_blocked_member_cannot_come_back_by_clearing_cookie(client):
+    owner = _owner_client(client)
+    client = TestClient(client.app, client=("203.0.113.7", 50000))
+    code = owner.post("/api/perm/members", json={"action": "add", "name": "x", "tier": "user"}).json()["code"]
+    assert client.post("/api/unlock", json={"passphrase": code}).json()["role"] == "user"
+    mid = owner.get("/api/perm").json()["members"][0]["id"]
+    owner.post("/api/perm/members", json={"action": "update", "id": mid, "tier": "blocked"})
+    assert client.post("/api/chat", json={"message": "hi"}).status_code == 403
+    client.cookies.clear()
+    assert client.get("/api/me").json()["role"] == "blocked"
+    assert client.post("/api/chat", json={"message": "hi"}).status_code == 403
+    assert client.post("/api/unlock", json={"passphrase": PASS}).json()["role"] == "owner"
+    blocks = owner.get("/api/perm").json()["blocklist"]
+    assert {b["kind"] for b in blocks} == {"ip", "device"}
+    for b in blocks:
+        owner.post("/api/perm/access", json={"action": "unblock", "kind": b["kind"], "value": b["value"]})
+    assert TestClient(client.app, client=("203.0.113.7", 50001)).get("/api/me").json()["role"] == "guest"
+
+
+def test_proxy_address_is_never_ip_blocked(client):
+    owner = _owner_client(client)
+    code = owner.post("/api/perm/members", json={"action": "add", "name": "x", "tier": "user"}).json()["code"]
+    proxied = TestClient(client.app, client=("172.18.0.1", 50000))
+    proxied.post("/api/unlock", json={"passphrase": code})
+    mid = owner.get("/api/perm").json()["members"][0]["id"]
+    owner.post("/api/perm/members", json={"action": "update", "id": mid, "tier": "blocked"})
+    assert [b["kind"] for b in owner.get("/api/perm").json()["blocklist"]] == ["device"]
+    assert proxied.get("/api/me").json()["role"] == "blocked"
+    assert TestClient(client.app, client=("172.18.0.1", 50001)).get("/api/me").json()["role"] == "guest"
+
+
+def test_guest_access_switch(client):
+    owner = _owner_client(client)
+    owner.post("/api/perm/access", json={"action": "guest_access", "enabled": False})
+    assert client.get("/api/me").json()["guest_access"] is False
+    assert client.post("/api/chat", json={"message": "hi"}).status_code == 403
+    assert client.post("/api/perm/access", json={"action": "guest_access", "enabled": True}).status_code == 403

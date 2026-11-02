@@ -325,7 +325,7 @@ def _home_item(home: Path, path: Path, rel: str) -> list[Item]:
 
 def _config(home: Path) -> dict:
     try:
-        import yaml
+        from dotv import _yaml as yaml
         return yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) or {}
     except Exception:
         return {}

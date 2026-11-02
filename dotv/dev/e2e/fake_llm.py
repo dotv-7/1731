@@ -31,7 +31,7 @@ class H(BaseHTTPRequestHandler):
             msg = {"role": "assistant", "content": None, "tool_calls": [{"id": f"call_{int(time.time()*1000)}", "type": "function",
                    "function": {"name": want, "arguments": json.dumps(ARGS.get(want, {}))}}]}
         else:
-            report = {"owner_canary_in_context": "OWNER_SECRET_CANARY" in json.dumps(msgs), "public_canary_in_context": "PUBLIC_FACT_CANARY" in sys_txt,
+            report = {"owner_canary_in_context": "OWNER_SECRET_CANARY" in json.dumps(msgs), "owner_context_file_in_context": "OWNER_CONTEXT_CANARY" in json.dumps(msgs), "public_canary_in_context": "PUBLIC_FACT_CANARY" in sys_txt,
                       "tools_offered": tools, "tool_result": tool_results[-1][:300] if tool_results else None}
             msg = {"role": "assistant", "content": "REPORT " + json.dumps(report, ensure_ascii=False)}
         fr = "tool_calls" if msg.get("tool_calls") else "stop"

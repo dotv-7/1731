@@ -96,25 +96,45 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 pass
         return {"guest_sid": "", "owner_sid": "", "owner_exp": 0}
 
+    def state(request: Request) -> dict:
+        """Cookie state with a stable device id (used to make blocking stick to the device)."""
+        st = read_state(request)
+        if not st.get("did"):
+            st["did"] = secrets.token_hex(12)
+        return st
+
+    def client_ip(request: Request) -> str:
+        return request.client.host if request.client else ""
+
     def is_owner(st: dict) -> bool:
         return st.get("owner_exp", 0) > time.time()
 
-    def identity(st: dict) -> tuple[str, str]:
-        """(tier, member name); the member's tier is re-read every request so board changes apply at once."""
+    def identity(request: Request, st: dict) -> tuple[str, str]:
+        """(tier, member name), re-read every request so board changes apply at once. The owner passphrase
+        beats the blocklist (same NAT); a blocked device or IP beats any cookie, including no cookie."""
         if is_owner(st):
             return "owner", ""
+        ip = client_ip(request)
         m = perm.member_by_id(s.owner_home, st["member"]) if st.get("member") else None
+        if m:
+            perm.note_seen(s.owner_home, m["id"], ip, st.get("did", ""))
+        if perm.is_blocked(s.owner_home, ip, st.get("did", "")):
+            return "blocked", m["name"] if m else ""
         return (m["tier"], m["name"]) if m else ("guest", "")
 
-    def me_body(st: dict) -> dict:
-        tier, name = identity(st)
-        return {"role": tier, "name": name, "label": perm.TIER_LABEL[tier], "owner_until": st.get("owner_exp", 0)}
+    def me_body(request: Request, st: dict) -> dict:
+        tier, name = identity(request, st)
+        return {"role": tier, "name": name, "label": perm.TIER_LABEL[tier], "owner_until": st.get("owner_exp", 0),
+                "guest_access": perm.load(s.owner_home)["guest_access"]}
 
-    def respond(request: Request, st: dict, body: dict, status: int = 200) -> JSONResponse:
-        resp = JSONResponse(body, status_code=status)
+    def set_cookie(resp, request: Request, st: dict) -> None:
         secure = (s.cookie_secure == "true" or (s.cookie_secure == "auto" and (
             request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https")))
         resp.set_cookie(COOKIE, sign(st), httponly=True, samesite="strict", secure=secure, max_age=180 * 86400)
+
+    def respond(request: Request, st: dict, body: dict, status: int = 200) -> JSONResponse:
+        resp = JSONResponse(body, status_code=status)
+        set_cookie(resp, request, st)
         return resp
 
     def require_json(request: Request) -> None:
@@ -122,7 +142,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(415, "application/json required")
 
     def require_owner(request: Request) -> dict:
-        st = read_state(request)
+        st = state(request)
         if not is_owner(st):
             raise HTTPException(403, "owner only")
         return st
@@ -133,7 +153,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/board")
     def board(request: Request):
-        if not is_owner(read_state(request)):
+        if not is_owner(state(request)):
             return RedirectResponse("/")
         return FileResponse(STATIC / "board.html", headers={"Cache-Control": "no-cache"})
 
@@ -143,8 +163,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/me")
     def me(request: Request):
-        st = read_state(request)
-        return respond(request, st, me_body(st))
+        st = state(request)
+        return respond(request, st, me_body(request, st))
 
     @app.post("/api/unlock")
     async def unlock(request: Request):
@@ -158,32 +178,33 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(429, "too many attempts, wait 5 minutes")
         window.append(now)
         secret = str((await request.json()).get("passphrase", ""))
-        st = read_state(request)
+        st = state(request)
         if s.passphrase_hash and verify_passphrase(secret, s.passphrase_hash):
             window.clear()
             st["owner_exp"] = int(now + OWNER_TTL)
-            return respond(request, st, me_body(st))
+            return respond(request, st, me_body(request, st))
         member = perm.find_member(s.owner_home, secret) if secret else None
         if not member:
             raise HTTPException(401, "wrong passphrase")
         window.clear()
         st["member"], st["owner_exp"] = member["id"], 0
-        return respond(request, st, me_body(st), 403 if member["tier"] == "blocked" else 200)
+        body = me_body(request, st)
+        return respond(request, st, body, 403 if body["role"] == "blocked" else 200)
 
     @app.post("/api/lock")
     def lock(request: Request):
         require_json(request)
-        st = read_state(request)
-        if identity(st)[0] == "blocked":
-            return respond(request, st, me_body(st), 403)
+        st = state(request)
+        if identity(request, st)[0] == "blocked":
+            return respond(request, st, me_body(request, st), 403)
         st["owner_exp"], st["member"] = 0, ""
-        return respond(request, st, me_body(st))
+        return respond(request, st, me_body(request, st))
 
     @app.post("/api/new")
     def new_session(request: Request):
         require_json(request)
-        st = read_state(request)
-        st[identity(st)[0] + "_sid"] = ""
+        st = state(request)
+        st[identity(request, st)[0] + "_sid"] = ""
         return respond(request, st, {"ok": True})
 
     @app.post("/api/chat")
@@ -193,10 +214,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         message = str(body.get("message", "")).strip()
         if not message or len(message) > 20000:
             raise HTTPException(400, "message must be 1-20000 chars")
-        st = read_state(request)
-        tier = identity(st)[0]
+        st = state(request)
+        tier = identity(request, st)[0]
         if tier == "blocked":
             raise HTTPException(403, "you are blocked")
+        if tier == "guest" and not perm.load(s.owner_home)["guest_access"]:
+            raise HTTPException(403, "guest chat is closed; ask the owner for an invite code")
         sid_key = tier + "_sid"
         if not st.get(sid_key):
             st[sid_key] = f"dotv-{tier[0]}-" + secrets.token_hex(16)
@@ -236,8 +259,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
         resp = StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-        secure = s.cookie_secure == "true" or (s.cookie_secure == "auto" and request.url.scheme == "https")
-        resp.set_cookie(COOKIE, sign(st), httponly=True, samesite="strict", secure=secure, max_age=180 * 86400)
+        set_cookie(resp, request, st)
         return resp
 
     # ------------------------------------------------------------ owner-only context dashboard
@@ -274,7 +296,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     # ------------------------------------------------------------ owner-only permission board (#527)
     @app.get("/perm")
     def perm_page(request: Request):
-        if not is_owner(read_state(request)):
+        if not is_owner(state(request)):
             return RedirectResponse("/")
         return FileResponse(STATIC / "perm.html", headers={"Cache-Control": "no-cache"})
 
@@ -282,6 +304,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         policy = perm.load(s.owner_home)
         homes = s.tier_homes()
         return {
+            "guest_access": policy["guest_access"],
+            "blocklist": [{k: b.get(k) for k in ("kind", "value", "name", "since", "until")} for b in policy["blocklist"]],
+            "audit": {t: perm.audit(homes[t]) for t in perm.CONFIGURABLE},
             "tiers": list(perm.TIERS), "labels": perm.TIER_LABEL, "policy": policy["tiers"],
             "catalog": [{"id": k, "tools": list(v[0]), "category": v[1], "label": v[2], "locked": v[3], "warn": v[4]}
                         for k, v in perm.CATALOG.items()],
@@ -323,10 +348,24 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return perm_state()
         raise HTTPException(400, "bad request")
 
+    @app.post("/api/perm/access")
+    async def perm_access(request: Request):
+        require_json(request)
+        require_owner(request)
+        body = await request.json()
+        if body.get("action") == "unblock":
+            if not perm.unblock(s.owner_home, str(body.get("kind", "")), str(body.get("value", ""))):
+                raise HTTPException(404, "no such block")
+        elif body.get("action") == "guest_access":
+            perm.set_guest_access(s.owner_home, bool(body.get("enabled")))
+        else:
+            raise HTTPException(400, "bad request")
+        return perm_state()
+
     # ------------------------------------------------------------ owner-only global doc
     @app.get("/docs")
     def doc_page(request: Request):
-        if not is_owner(read_state(request)):
+        if not is_owner(state(request)):
             return RedirectResponse("/")
         return FileResponse(STATIC / "doc.html", headers={"Cache-Control": "no-cache"})
 
