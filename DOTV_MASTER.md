@@ -1,7 +1,8 @@
 # dotv Hermes：全局说明文档（持续维护）
 
 > 本文档由 Devin 维护，是这个分支所有自定义功能的总入口。Hermes 每升级一个版本、或者权限设计每改一次，都要同步更新本文档。
-> 基线版本：Hermes **v0.22.2**（快照 `74e7a25c`）。工具清单和上下文来源都是从这份源码里整理出来的。
+> 基线版本：`main` = 上游 NousResearch/hermes-agent **main 分支 2026-10-16 的快照 `74e7a25c`**（不是正式 tag；文中“v0.22.2”指这一代代码）。工具清单和上下文来源都是从这份源码里整理出来的。
+> 兼容性：`dotv` 的改动在官方 **v0.22.2** 和 **v0.22.5** tag 上都能无冲突套上，`dotv/tests` 全部通过；用到的扩展点（`pre_tool_call`、`register_system_prompt_section`、`platform_toolsets`、`tools.tool_search`、`terminal.cwd`）两个版本都有。
 
 ---
 
@@ -26,10 +27,10 @@
 | # | 成品 | 内容 | 状态 |
 |---|---|---|---|
 | D1 | **上下文隐私功能 + 看板** | (a) 上下文盘点器：扫描所有上下文来源（见 §4），列出每一条内容；(b) 看板：仅 Owner 可用，逐条标记公开或私密，默认私密；(c) 公开投影同步器：把公开条目单向同步到 `public` profile；(d) 帮助 Owner 分类的 skill（只给建议，Owner 确认后才生效） | (a)(b)(c) 已实现（PR #6：`dotv/context/`、`dotv-public-context` 插件、`/board`）；(d) 未做 |
-| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 第一版已实现（PR #6）：五级 Owner/Admin/User/Guest/Blocked、权限看板 `/perm`、邀请码，真实 Hermes 验证；平台账号识别、命令权限、群聊混合未做 |
+| D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 | 第一版已实现（PR #6）：五级 Owner/Admin/User/Guest/Blocked、权限看板 `/perm`、邀请码，真实 Hermes 验证；封禁按设备 + IP 记录，清 cookie 也回不来；可关闭不登录访客；平台账号识别、命令权限、群聊混合未做 |
 | D3 | **独立 UI** | 终端风格网页聊天（**已定：风格 1“Hermes 同款”**，样稿见 `mockups/hermes-chat-mockups.html`），Owner 口令解锁，后端小服务持有 API key，访客和 Owner 走不同 profile，满足 R9 的指标 | 已实现（PR #6：`dotv/chat/`）；已用演示后端预览，未接生产 |
 | D4 | **全局说明文档** | 本文件：要求、成品、工具清单、上下文来源、角色权限矩阵、上游改动清单 | 本文件；实现进度见 §9 |
-| D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 待做 |
+| D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 已实现：Gemini 补丁在 `agent/gemini_native_adapter.py`（`HERMES_GEMINI_GOOGLE_SEARCH=on` 才生效），镜像工作流 `.github/workflows/dotv-image.yml`（手动触发，tag 不覆盖）；还没在生产换上 |
 
 ## 2. 527 管什么，我们管什么
 
@@ -86,14 +87,14 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | # | 来源 | 位置 / 代码 | 含个人信息？ | 访客默认 |
 |---|---|---|---|---|
 | A1 | `SOUL.md`（人设） | `$HERMES_HOME/SOUL.md`，`load_soul_md` | 可能有 | public profile 用自己的人设 |
-| A2 | 项目 context 文件 | cwd 下的 `.hermes.md`/`HERMES.md`、`AGENTS.md` 链、`CLAUDE.md`、`.cursorrules`、`.cursor/rules/*.mdc`，见 `build_context_files_prompt` | 可能有 | 不注入（public 的 cwd 是空目录） |
+| A2 | 项目 context 文件 | cwd 下的 `.hermes.md`/`HERMES.md`、`AGENTS.md` 链、`CLAUDE.md`、`.cursorrules`、`.cursor/rules/*.mdc`，见 `build_context_files_prompt` | 可能有 | 不注入：每个非 Owner profile 的 `terminal.cwd` 固定为 `<profile>/dotv/cwd` 空目录（`python3 -m dotv.perm sync` 写入并创建，`audit` 检查）。不设的话 Hermes 会用 home 目录，那里的 `AGENTS.md` 会进访客提示（已在真实 Hermes 上复现） |
 | A3 | workspace 快照 | `agent/coding_context.py`（当前目录的 git 状态） | 可能有 | 不注入（没有工具就不生成） |
 | A4 | skills 索引和自动加载的 skill | `build_skills_system_prompt`、`skills.auto_load` | 可能有（自写 skill） | 不注入（没有 skills 工具就不生成） |
 | A5 | 内置 memory：`MEMORY.md` | `$HERMES_HOME/memories/MEMORY.md` | **有** | 只注入公开投影 |
 | A6 | 用户画像：`USER.md` | `$HERMES_HOME/memories/USER.md` | **有** | 只注入公开投影 |
 | A7 | 外部 memory provider 的提示块 | `MemoryProvider.system_prompt_block` | **有** | public 不配置 provider |
 | A8 | 插件注入的提示段 | `_plugin_section_blocks(..., "after_memory")` | 视插件而定 | 只装白名单插件 |
-| A9 | 环境提示、profile 名、时间 | `build_environment_hints`、`_active_profile_line` | 主机路径 | 无害化 |
+| A9 | 环境提示、profile 名、时间 | `build_environment_hints`、`_active_profile_line` | 主机路径 | 只露路径不露内容：工作目录显示为空目录；home 目录和默认 profile 的数据目录路径仍会出现在提示里（Hermes 核心行为，不改核心就去不掉） |
 | A10 | 会话上下文块（平台、频道、说话人） | `gateway/session.py::build_session_context_prompt` | 平台身份 | 注入“访客”身份 |
 
 ### B. 运行时进入
@@ -160,6 +161,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 | 日期 | 变更 |
 |---|---|
+| 2026-10-30 | 修复：封禁可被清 cookie 绕过（改为按设备 + 公网 IP 封禁，Owner 可在 `/perm` 解除；可关闭不登录访客）；非 Owner profile 固定 `terminal.cwd` 空目录 + 隔离检查（`python3 -m dotv.perm audit`）；更正基线版本、D5 状态；测试环境说明 |
 | 2026-10-29 | 加 §10：#527 全部评论、关联 PR/issue 原文逐人整理，按维度和我们对比 |
 | 2026-10-29 | 527 第一版：五级权限、权限看板、邀请码、Owner 模式全局文档链接 |
 | 2026-10-29 | 加 §9 实现进度：D1/D2/D3 已实现，D2 在真实 Hermes 上端到端验证；访客关闭 tool_search |
@@ -174,6 +176,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 项 | 状态 | 验证方式 |
 |---|---|---|
 | 访客 profile 模板（`dotv/profiles/public/`） | ✅ | 真实 Hermes gateway（本仓库 v0.22.2 代码）+ 脚本化假模型 |
+| 非 Owner profile 固定空工作目录 + 隔离检查（`python3 -m dotv.perm sync/audit`，`/perm` 页面显示结果） | ✅ | 真实 Hermes：不设 `terminal.cwd` 时 home 目录的 `AGENTS.md` 进了访客系统提示；sync 后不再出现，Owner 仍能看到自己的 |
 | 工具闸门插件 `dotv-guest-gate` | ✅ | 同上：本地路径看图被拒；名单外工具调不到 |
 | 访客关闭 `tools.tool_search` | ✅ | 实测：开启时访客会拿到 `tool_call` 桥接工具，可间接调用其他工具，所以关掉 |
 | 上下文盘点 + 公开清单 + 投影（`dotv/context/`） | ✅ | 单元测试（金丝雀、改动后退回私密、会话不可公开） |
@@ -184,8 +187,9 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 帮助分类的 skill（D1-d） | ❌ 未做 | — |
 | 527 五级权限 + 权限看板 `/perm`（`dotv/perm/`） | ✅ | 真实 Hermes + DeepSeek：User 能用 memory，terminal/read_file 不存在；看板取消 memory 后新会话里 memory 消失；Blocked 403；User 打不开三个 Owner 页面 |
 | Owner 模式全局文档链接 `/docs` | ✅ | Owner 200，User/访客 403 |
+| 封禁清 cookie 也绕不过（设备 id + 公网 IP，IP 90 天过期，`/perm` 可解除）；可关闭不登录访客 | ✅ | 行为测试：封禁后清 cookie 仍 403，解除后恢复；反代/内网地址不按 IP 封 |
 | 按 Telegram/Discord 账号自动识别等级、群聊混合 | ❌ 未做 | 现在只在 dotv-chat 里用口令/邀请码认人 |
-| Gemini 补丁、GHCR 镜像（D5） | ❌ 未做 | — |
+| Gemini 补丁、GHCR 镜像（D5） | ✅ 代码已有 | 生产未换镜像 |
 | 真实模型越狱测试、生产安装 | ❌ 未做 | 需要生产或真实模型 key |
 
 ### 真实 Hermes 端到端结果（脚本：`dotv/dev/e2e/`）
@@ -196,6 +200,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 公开金丝雀出现在系统提示里 | 是 | 否 |
 | 提供给模型的工具 | `clarify`、`dotv_public_lookup`、`text_to_speech`、`vision_analyze`、`web_extract`、`web_search` | 全部工具 |
 | 调用 `read_file`、`terminal`、`execute_code`、`memory`、`session_search`、`skill_view` | 全部报"工具不存在" | 可用 |
+| Owner 工作目录里的 `AGENTS.md` 金丝雀出现在上下文里 | 否（cwd 固定为空目录） | 是 |
 
 ## 10. upstream #527 里所有人的方案，与我们的完整对比
 
