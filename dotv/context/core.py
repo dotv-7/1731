@@ -28,6 +28,8 @@ MAX_FILES = 3000
 ALLOWLIST_FILE = "dotv/public_allowlist.json"
 PROJECTION_FILE = "dotv/public_context.json"
 _HEADING = re.compile(r"^(#{1,3})\s+(.+?)\s*#*\s*$")
+# Parsed items per file from the previous scan, reused while the file (and its SQLite WAL) is unchanged.
+_MEMO: dict[tuple, tuple[tuple, list]] = {}
 
 
 def fingerprint(text: str) -> str:
@@ -172,17 +174,19 @@ def _session_items(db: Path, limit: int = 500, per_session: int = 30) -> list[It
         con = _ro(db)
         cols = {r[1] for r in con.execute("PRAGMA table_info(sessions)")}
         title = "title" if "title" in cols else ("display_name" if "display_name" in cols else "NULL")
+        recent = "SELECT id FROM sessions ORDER BY started_at DESC LIMIT ?"
         rows = con.execute(
             f"SELECT id, {title}, source, started_at, message_count FROM sessions ORDER BY started_at DESC LIMIT ?",
             (limit,)).fetchall()
         msgs: dict[str, list[str]] = {}
         if con.execute("SELECT 1 FROM sqlite_master WHERE name='messages'").fetchone():
             for sid, role, content in con.execute(
-                    "SELECT session_id, role, content FROM messages WHERE role IN ('user','assistant') "
-                    "AND content IS NOT NULL AND content != '' ORDER BY id"):
+                    f"SELECT session_id, role, substr(content, 1, 400) FROM messages WHERE session_id IN ({recent}) "
+                    "AND role IN ('user','assistant') AND content IS NOT NULL AND content != '' ORDER BY id",
+                    (limit,)):
                 bucket = msgs.setdefault(sid, [])
                 if len(bucket) < per_session:
-                    bucket.append(f"[{role}] {content[:400]}")
+                    bucket.append(f"[{role}] {content}")
         con.close()
     except sqlite3.Error:
         return []
@@ -357,11 +361,33 @@ def _bundled_skill_dirs(home: Path) -> set[Path]:
     return {p.parent.resolve() for p in (home / "skills").rglob("SKILL.md") if p.parent.name in names}
 
 
+def _stamp(path: Path) -> tuple:
+    out = []
+    for p in (path, path.with_name(path.name + "-wal")):
+        try:
+            st = p.stat()
+            out.append((st.st_mtime_ns, st.st_size))
+        except OSError:
+            out.append(None)
+    return tuple(out)
+
+
+def _memo(fresh: dict, key: tuple, path: Path, build) -> list[Item]:
+    stamp = _stamp(path)
+    hit = _MEMO.get(key)
+    items = hit[1] if hit and hit[0] == stamp else build()
+    fresh[key] = (stamp, items)
+    return items
+
+
 def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
-    """Everything under HERMES_HOME and the workspace roots, minus config/secrets/caches/add-ons (HOME_EXCLUDE)."""
+    """Everything under HERMES_HOME and the workspace roots, minus config/secrets/caches/add-ons (HOME_EXCLUDE).
+    Every path is listed each time so new files show up at once; only changed files are re-read."""
+    global _MEMO
     owner_home = Path(owner_home)
     home_abs = owner_home.resolve()
     seen: set[Path] = set()
+    fresh: dict[tuple, tuple[tuple, list]] = {}
     items = _memory_items(owner_home)
     bundled = _bundled_skill_dirs(owner_home)
     if bundled:
@@ -373,12 +399,14 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
         exclude = HOME_EXCLUDE | {f"skills/{d.parent.relative_to(skills).as_posix()}/DESCRIPTION.md"
                                   for d in bundled if d.parent != skills}
         for path, rel in _walk(owner_home, exclude, bundled, seen):
-            items += _home_item(owner_home, path, rel)
+            items += _memo(fresh, ("home", str(home_abs), rel), path, lambda: _home_item(owner_home, path, rel))
     for root in (Path(r) for r in workspace_roots):
         if root.is_dir() and root.resolve() != home_abs:
             for path, rel in _walk(root, set(), {home_abs}, seen):
-                items += _generic_items(path, f"{root.name}/{rel}", _group_for(rel, f"Workspace · {root.name}"))
+                items += _memo(fresh, ("ws", str(root.resolve()), rel), path, lambda: _generic_items(
+                    path, f"{root.name}/{rel}", _group_for(rel, f"Workspace · {root.name}")))
     items += _runtime_items(owner_home)
+    _MEMO = fresh
     return items
 
 

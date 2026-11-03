@@ -8,6 +8,7 @@ Guests -> ``/p/<public>/v1``, Admin/User members (invite code) -> ``/p/<tier pro
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import hmac
 import json
@@ -21,7 +22,7 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from dotv.context import core as ctx
@@ -263,21 +264,53 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return resp
 
     # ------------------------------------------------------------ owner-only context dashboard
+    board_cache: dict[str, ctx.Item] = {}  # latest scan by id; item text is served from here on demand
+
+    def board_scan() -> list[ctx.Item]:
+        items = ctx.scan(s.owner_home, s.workspace_roots)
+        board_cache.clear()
+        board_cache.update((it.id, it) for it in items)
+        return items
+
+    def json_gz(request: Request, body: dict) -> Response:
+        raw = json.dumps(body, ensure_ascii=False).encode()
+        if "gzip" in request.headers.get("accept-encoding", "") and len(raw) > 1024:
+            return Response(gzip.compress(raw, 5), media_type="application/json",
+                            headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
+        return Response(raw, media_type="application/json")
+
     @app.get("/api/board/items")
     def board_items(request: Request):
+        """Item list without bodies (sessions alone can be megabytes); bodies come from /api/board/text."""
         require_owner(request)
-        items = ctx.scan(s.owner_home, s.workspace_roots)
+        items = board_scan()
         allow = ctx.load_allowlist(s.owner_home)
-        return {"items": [dict(it.to_dict(), status=ctx.status(it, allow)) for it in items],
-                "owner_home": str(s.owner_home.resolve()), "public_home": str(s.public_home.resolve()),
-                "workspace_roots": [str(Path(r).resolve()) for r in s.workspace_roots]}
+        return json_gz(request, {
+            "items": [dict(it.to_dict(with_text=False), status=ctx.status(it, allow)) for it in items],
+            "owner_home": str(s.owner_home.resolve()), "public_home": str(s.public_home.resolve()),
+            "workspace_roots": [str(Path(r).resolve()) for r in s.workspace_roots]})
+
+    @app.get("/api/board/text")
+    def board_text(request: Request, id: str):
+        require_owner(request)
+        it = board_cache.get(id) or {i.id: i for i in board_scan()}.get(id)
+        if not it:
+            raise HTTPException(404, "item changed or removed; reload the board")
+        return {"text": it.text}
+
+    @app.get("/api/board/search")
+    def board_search(request: Request, q: str):
+        require_owner(request)
+        needle = q.strip().lower()
+        items = list(board_cache.values()) or board_scan()
+        return {"ids": [it.id for it in items if needle in f"{it.title}\n{it.source}\n{it.text}".lower()]}
 
     @app.post("/api/board/save")
     async def board_save(request: Request):
         require_json(request)
         require_owner(request)
         ids = (await request.json()).get("public_ids") or []
-        items = ctx.scan(s.owner_home, s.workspace_roots)
+        items = board_scan()
         ctx.save_allowlist(s.owner_home, items, [str(i) for i in ids])
         projection = {"facts": [], "documents": []}
         for home in s.tier_homes().values():

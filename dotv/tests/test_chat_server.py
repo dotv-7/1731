@@ -45,6 +45,19 @@ def test_unlock_lock_and_rate_limit(client):
     assert client.post("/api/unlock", json={"passphrase": PASS}).status_code == 429
 
 
+def test_board_list_is_light_and_bodies_load_on_demand(client):
+    for path in ("/api/board/text?id=x", "/api/board/search?q=a"):
+        assert client.get(path).status_code == 403
+    client.post("/api/unlock", json={"passphrase": PASS})
+    items = client.get("/api/board/items").json()["items"]
+    assert items and all("text" not in i for i in items)
+    texts = {i["id"]: client.get("/api/board/text", params={"id": i["id"]}).json()["text"] for i in items}
+    assert sorted(texts.values()) == ["a", "b"]
+    hit = client.get("/api/board/search", params={"q": "B"}).json()["ids"]
+    assert [texts[i] for i in hit] == ["b"]
+    assert client.get("/api/board/text", params={"id": "gone"}).status_code == 404
+
+
 def test_forged_cookie_is_guest(client):
     client.cookies.set("dotv", "eyJvd25lcl9leHAiOjk5OTk5OTk5OTl9.deadbeef")
     assert client.get("/api/me").json()["role"] == "guest"

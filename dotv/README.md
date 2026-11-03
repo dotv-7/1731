@@ -55,6 +55,7 @@ runs with the Hermes interpreter inside the official image, which has no PyYAML.
 
 Private by default. An approved item whose content changes is treated as private again ("changed") until re-approved.
 History sessions, external memory and plugin context are listed but cannot be made public.
+The board lists titles only and fetches a body when you expand it (search runs server-side); a rescan re-reads only files whose mtime/size (or SQLite WAL) changed.
 
 ## Step 3: dotv-chat (independent window)
 

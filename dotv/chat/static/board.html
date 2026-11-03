@@ -32,28 +32,43 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin-to
 <p class="dim" id="roots"></p><p class="stats" id="stats"></p><div id="preview"></div><div id="groups"></div></div>
 <div id="toast"></div>
 <script>
-const $=s=>document.querySelector(s);let items=[],checked=new Set(),initial='';
+const $=s=>document.querySelector(s);let items=[],byId={},checked=new Set(),initial='',hits=null,groups={},timer;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LABEL={private:'私密',public:'公开',changed:'已变动·需重新确认',locked:'不可公开'};
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2500);}
-async function load(){const r=await fetch('/api/board/items');if(r.status===403)return location.href='/';const j=await r.json();
+const tagOf=it=>!it.publishable?'locked':checked.has(it.id)?'public':it.status==='changed'?'changed':'private';
+async function load(){$('#stats').textContent='正在扫描…';const r=await fetch('/api/board/items');if(r.status===403)return location.href='/';const j=await r.json();
   $('#roots').innerHTML='Hermes 数据目录：<b>'+esc(j.owner_home)+'</b>'+((j.workspace_roots||[]).length?' · 工作区：'+j.workspace_roots.map(esc).join('、'):'');
-  items=j.items;checked=new Set(items.filter(i=>i.status==='public').map(i=>i.id));initial=[...checked].sort().join();draw();}
-function draw(){const q=$('#q').value.toLowerCase(),groups={};
-  for(const it of items){if(q&&!(it.title+it.text+it.source).toLowerCase().includes(q))continue;(groups[it.group]=groups[it.group]||[]).push(it);}
-  const n=items.length,pub=checked.size,chg=items.filter(i=>i.status==='changed').length;
-  $('#stats').innerHTML=`<span>共 ${n} 项</span><span class="pub">公开 ${pub}</span><span>私密 ${n-pub}</span>`+(chg?`<span class="chg">已变动 ${chg}</span>`:'');
-  $('#groups').innerHTML=Object.entries(groups).map(([g,list])=>{const sel=list.filter(i=>checked.has(i.id)).length;
-    return `<details ${q||list.length<40?'open':''}><summary>${esc(g)}<span class="dim">${sel}/${list.length} 公开</span></summary>`+list.map(it=>{
-      const st=!it.publishable?'locked':checked.has(it.id)?'public':it.status==='changed'?'changed':'private';
-      return `<div class="row" data-id="${it.id}"><input type="checkbox" ${checked.has(it.id)?'checked':''} ${it.publishable?'':'disabled'}>
-      <div><div class="t">${esc(it.title)}</div><div class="src">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><pre>${esc(it.text)}</pre></div>
-      <span class="tag ${st}">${LABEL[st]}</span></div>`}).join('')+'</details>';}).join('');
+  items=j.items;byId=Object.fromEntries(items.map(i=>[i.id,i]));
+  checked=new Set(items.filter(i=>i.status==='public').map(i=>i.id));initial=[...checked].sort().join();draw();}
+function rowHtml(it){const st=tagOf(it);
+  return `<div class="row" data-id="${it.id}"><input type="checkbox" ${checked.has(it.id)?'checked':''} ${it.publishable?'':'disabled'}>
+  <div><div class="t">${esc(it.title)}</div><div class="src">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><pre></pre></div>
+  <span class="tag ${st}">${LABEL[st]}</span></div>`;}
+// Rows are only built when a group is opened: thousands of session/doc rows would otherwise block the first paint.
+function fill(d){if(d.dataset.done)return;d.dataset.done=1;d.insertAdjacentHTML('beforeend',groups[d.dataset.g].map(rowHtml).join(''));}
+function draw(){groups={};for(const it of items){if(hits&&!hits.has(it.id))continue;(groups[it.group]=groups[it.group]||[]).push(it);}
+  $('#groups').innerHTML=Object.keys(groups).map(g=>`<details data-g="${esc(g)}"><summary>${esc(g)}<span class="dim"></span></summary></details>`).join('');
+  document.querySelectorAll('#groups details').forEach(d=>{if(hits||groups[d.dataset.g].length<40){fill(d);d.open=true;}});
+  refresh();}
+function refresh(){const n=items.length,pub=checked.size,chg=items.filter(i=>i.status==='changed').length;
+  $('#stats').innerHTML=`<span>共 ${n} 项</span><span class="pub">公开 ${pub}</span><span>私密 ${n-pub}</span>`+(chg?`<span class="chg">已变动 ${chg}</span>`:'')+
+    (hits?`<span>搜索命中 ${hits.size}</span>`:'');
+  document.querySelectorAll('#groups details').forEach(d=>{const list=groups[d.dataset.g];
+    d.querySelector('summary .dim').textContent=`${list.filter(i=>checked.has(i.id)).length}/${list.length} 公开`;});
   $('#save').disabled=[...checked].sort().join()===initial;}
-document.addEventListener('change',e=>{const row=e.target.closest('.row');if(!row)return;
-  e.target.checked?checked.add(row.dataset.id):checked.delete(row.dataset.id);draw();});
-document.addEventListener('click',e=>{const t=e.target.closest('.row .t');if(t)t.closest('.row').classList.toggle('open');});
-$('#q').addEventListener('input',draw);
+document.addEventListener('toggle',e=>{if(e.target.matches&&e.target.matches('#groups details')&&e.target.open)fill(e.target);},true);
+document.addEventListener('change',e=>{const row=e.target.closest('.row');if(!row)return;const it=byId[row.dataset.id];
+  e.target.checked?checked.add(it.id):checked.delete(it.id);
+  const tag=row.querySelector('.tag'),st=tagOf(it);tag.className='tag '+st;tag.textContent=LABEL[st];refresh();});
+document.addEventListener('click',async e=>{const t=e.target.closest('.row .t');if(!t)return;const row=t.closest('.row'),pre=row.querySelector('pre');
+  if(!row.classList.toggle('open')||pre.dataset.done)return;pre.dataset.done=1;pre.textContent='加载中…';
+  const r=await fetch('/api/board/text?id='+encodeURIComponent(row.dataset.id));
+  pre.textContent=r.ok?(await r.json()).text:'内容已变化，请刷新页面';if(!r.ok)delete pre.dataset.done;});
+async function search(){const q=$('#q').value.trim();if(!q){hits=null;return draw();}
+  const j=await (await fetch('/api/board/search?q='+encodeURIComponent(q))).json();
+  if(q!==$('#q').value.trim())return;hits=new Set(j.ids);draw();}
+$('#q').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(search,250);});
 $('#save').onclick=async()=>{const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:[...checked]})});
   if(!r.ok)return toast('保存失败');const j=await r.json();toast(`已同步：${j.facts} 条 memory，${j.documents} 段文档`);load();if($('#preview').style.display==='block')preview(true);};
 async function preview(keep){const p=$('#preview');if(p.style.display==='block'&&!keep){p.style.display='none';return;}

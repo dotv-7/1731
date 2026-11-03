@@ -156,3 +156,25 @@ def test_kanban_db_listed_even_when_empty_then_expanded(homes):
     con.close()
     kb = [i for i in core.scan(owner, ws) if i.path.endswith("kanban.db")]
     assert [i.title for i in kb] == ["写自传第二章 · todo"] and not kb[0].publishable
+
+
+def test_rescan_sees_edits_deletions_and_wal_writes(homes):
+    import sqlite3
+    owner, _, ws = homes
+    core.scan(owner, ws)
+    (ws[0] / "bio.md").write_text("# Bio\n## School\nPhD now\n", encoding="utf-8")
+    (owner / "notes.md").write_text("temp", encoding="utf-8")
+    con = sqlite3.connect(owner / "state.db")
+    con.executescript("PRAGMA journal_mode=WAL; CREATE TABLE sessions (id TEXT, title TEXT, source TEXT, started_at REAL,"
+                      " message_count INT); CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT,"
+                      " content TEXT);")
+    core.scan(owner, ws)
+    (owner / "notes.md").unlink()
+    con.execute("INSERT INTO sessions VALUES ('s1', 'trip', 'cli', 1, 1)")
+    con.execute("INSERT INTO messages VALUES (1, 's1', 'user', 'Tokyo plan')")
+    con.commit()  # stays in state.db-wal while the connection is open
+    items = core.scan(owner, ws)
+    con.close()
+    assert by_title(items, "School").text.endswith("PhD now")
+    assert not any(i.path.endswith("notes.md") for i in items)
+    assert "Tokyo plan" in by_title(items, "trip").text
