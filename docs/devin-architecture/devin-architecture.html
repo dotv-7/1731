@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><title>Devin 架构：VM / Session / 历史 / 记忆 / GitHub</title>
+<style>
+body{font-family:"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;margin:0;padding:16px;background:#fafafa;color:#222}
+h1{font-size:20px;margin:4px 0 4px}
+p.sub{margin:0 0 10px;color:#555;font-size:13px}
+svg{background:#fff;border:1px solid #ddd;border-radius:8px;max-width:100%;height:auto}
+svg text{font-family:inherit}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px;margin-top:12px}
+.legend div{background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.5}
+.sw{display:inline-block;width:22px;height:4px;vertical-align:middle;margin-right:6px;border-radius:2px}
+table{border-collapse:collapse;margin-top:14px;background:#fff;font-size:13px;width:100%}
+td,th{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f0f0f0}
+.y{color:#1a7f37;font-weight:bold}.n{color:#cf222e;font-weight:bold}
+</style></head><body>
+<h1>Devin 架构：VM、Session、历史记录、记忆和 GitHub 是怎么交互的</h1>
+<p class="sub">组织 dotv-io · 根据本 session（2026-11-05）实际查到的情况绘制 · 一个 session = 一台独立 VM</p>
+<svg viewBox="0 0 1100 880" xmlns="http://www.w3.org/2000/svg">
+<defs>
+ <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#1a7f37"/></marker>
+ <marker id="ab" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0969da"/></marker>
+ <marker id="ab2" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#0969da"/></marker>
+ <marker id="ap" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8250df"/></marker>
+ <marker id="ap2" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#8250df"/></marker>
+ <marker id="ao" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#d1700f"/></marker>
+ <marker id="ao2" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#d1700f"/></marker>
+ <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#cf222e"/></marker>
+</defs>
+
+<!-- Cloud -->
+<rect x="15" y="15" width="1070" height="235" rx="12" fill="#eef4ff" stroke="#0969da" stroke-width="2"/>
+<text x="30" y="42" font-size="16" font-weight="bold" fill="#0a3069">Devin 云端服务器（Cognition 管理，不在任何一台 VM 里）</text>
+
+<g font-size="12">
+ <rect x="35" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#0969da" stroke-width="2"/>
+ <text x="45" y="82" font-weight="bold" font-size="13" fill="#0969da">① 对话历史</text>
+ <text x="45" y="104">每个 session 的消息、</text><text x="45" y="120">执行过的命令、结果</text><text x="45" y="142">A、B、C 各一份</text><text x="45" y="164">VM 删除或休眠后</text><text x="45" y="180">仍然保留</text>
+
+ <rect x="210" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#8250df" stroke-width="2"/>
+ <text x="220" y="82" font-weight="bold" font-size="13" fill="#8250df">② 长期记忆 memory</text>
+ <text x="220" y="104">一个 git 仓库</text><text x="220" y="120">MEMORY.md、hermes.md</text><text x="220" y="142">只有我写的总结笔记，</text><text x="220" y="158">不是完整对话</text><text x="220" y="180">所有 session 共用</text>
+
+ <rect x="385" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#1a7f37" stroke-width="2"/>
+ <text x="395" y="82" font-weight="bold" font-size="13" fill="#1a7f37">③ 快照 snapshot</text>
+ <text x="395" y="104">按 blueprint 预先</text><text x="395" y="120">构建好的系统镜像：</text><text x="395" y="136">Ubuntu + 工具 +</text><text x="395" y="152">已 clone 好的仓库</text><text x="395" y="180">整个组织共用一份</text>
+
+ <rect x="560" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#57606a" stroke-width="2"/>
+ <text x="570" y="82" font-weight="bold" font-size="13" fill="#57606a">④ 组织设置</text>
+ <text x="570" y="104">Secrets（密钥）</text><text x="570" y="120">Knowledge（知识）</text><text x="570" y="136">GitHub 连接</text><text x="570" y="158">session 启动时</text><text x="570" y="174">注入到 VM</text>
+
+ <rect x="735" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#cf222e" stroke-width="2"/>
+ <text x="745" y="82" font-weight="bold" font-size="13" fill="#cf222e">⑤ 工具接口 (API)</text>
+ <text x="745" y="104">session_events</text><text x="745" y="120">session_insights</text><text x="745" y="136">查文档、构建日志…</text><text x="745" y="158">在服务器上执行，</text><text x="745" y="174">结果交回给我</text>
+
+ <rect x="910" y="60" width="160" height="140" rx="8" fill="#fff" stroke="#999" stroke-width="2" stroke-dasharray="5,4"/>
+ <text x="920" y="82" font-weight="bold" font-size="13" fill="#555">⑥ 休眠存档</text>
+ <text x="920" y="104">空闲 30 分钟后，</text><text x="920" y="120">整台 VM（含内存）</text><text x="920" y="136">存到这里</text><text x="920" y="158">休眠期间不耗用量，</text><text x="920" y="174">发消息即可唤醒恢复</text>
+</g>
+<!-- tools API reads history -->
+<path d="M815,200 L815,225 L115,225 L115,202" fill="none" stroke="#cf222e" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#ar)"/>
+<text x="400" y="241" font-size="11" fill="#cf222e">⑤ 接口从 ① 里读出别的 session 的记录（只读）</text>
+
+<!-- VMs -->
+<g font-size="12">
+ <rect x="20" y="330" width="330" height="300" rx="10" fill="#fff8e6" stroke="#bf8700" stroke-width="2.5"/>
+ <text x="35" y="355" font-weight="bold" font-size="14">VM A — 本 session（运行中）</text>
+ <text x="35" y="374" fill="#555">Troubleshoot 17x31-cognition Access</text>
+ <text x="35" y="392" fill="#555">8 核 · 31 GB 内存 · 124 GB 硬盘 · 独立</text>
+ <rect x="35" y="405" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="45" y="427">你 ⇄ 我（这个聊天窗口）</text>
+ <rect x="35" y="447" width="300" height="34" rx="5" fill="#fff" stroke="#d1700f"/><text x="45" y="469">~/repos/17x31-cognition（自己的副本）</text>
+ <rect x="35" y="489" width="300" height="34" rx="5" fill="#fff" stroke="#8250df"/><text x="45" y="511">~/memory/v_9c955a（本地副本）</text>
+ <rect x="35" y="531" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="45" y="553">终端、运行中的程序</text>
+ <text x="35" y="595" fill="#cf222e" font-size="11">只有这台 VM 自己能看到和修改上面这些文件</text>
+
+ <rect x="385" y="330" width="330" height="300" rx="10" fill="#fff8e6" stroke="#bf8700" stroke-width="2.5"/>
+ <text x="400" y="355" font-weight="bold" font-size="14">VM B — 另一个 session</text>
+ <text x="400" y="374" fill="#555">Review Tiered Permission Phase 1</text>
+ <text x="400" y="392" fill="#555">同样配置 · 独立的硬盘</text>
+ <rect x="400" y="405" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="410" y="427">你 ⇄ B 里的 Devin</text>
+ <rect x="400" y="447" width="300" height="34" rx="5" fill="#fff" stroke="#d1700f"/><text x="410" y="469">~/repos/17x31-cognition（B 自己的副本）</text>
+ <rect x="400" y="489" width="300" height="34" rx="5" fill="#fff" stroke="#8250df"/><text x="410" y="511">~/memory/…（B 的本地副本）</text>
+ <rect x="400" y="531" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="410" y="553">B 自己的终端和程序</text>
+
+ <rect x="750" y="330" width="330" height="300" rx="10" fill="#f4f4f4" stroke="#999" stroke-width="2.5" stroke-dasharray="8,5"/>
+ <text x="765" y="355" font-weight="bold" font-size="14" fill="#555">VM C — 休眠中</text>
+ <text x="765" y="374" fill="#555">Design Tiered Permission Phase 1</text>
+ <text x="765" y="392" fill="#555">VM 已存到 ⑥，目前没有占用机器</text>
+ <rect x="765" y="405" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="775" y="427" fill="#777">你一发消息 → 从 ⑥ 恢复</text>
+ <rect x="765" y="447" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="775" y="469" fill="#777">文件原样保留在存档里</text>
+ <rect x="765" y="489" width="300" height="34" rx="5" fill="#fff" stroke="#ccc"/><text x="775" y="511" fill="#777">程序状态也一起保留</text>
+</g>
+<!-- no direct link between VMs -->
+<g font-size="22" fill="#cf222e" font-weight="bold"><text x="356" y="485">✕</text><text x="721" y="485">✕</text></g>
+<text x="562" y="664" font-size="12" fill="#cf222e" font-weight="bold">✕ VM 之间不直接互通</text>
+
+<!-- lines: snapshot -> VMs (green) -->
+<g stroke="#1a7f37" stroke-width="2" fill="none" marker-end="url(#ag)" opacity="0.85">
+ <line x1="465" y1="252" x2="95" y2="328"/><line x1="465" y1="252" x2="460" y2="328"/><line x1="465" y1="252" x2="825" y2="328"/>
+</g>
+<!-- history <-> VMs (blue) -->
+<g stroke="#0969da" stroke-width="2" fill="none" marker-end="url(#ab)" marker-start="url(#ab2)" opacity="0.85">
+ <line x1="115" y1="252" x2="155" y2="328"/><line x1="115" y1="252" x2="520" y2="328"/><line x1="115" y1="252" x2="885" y2="328"/>
+</g>
+<!-- memory <-> VMs (purple) -->
+<g stroke="#8250df" stroke-width="2" fill="none" marker-end="url(#ap)" marker-start="url(#ap2)" opacity="0.85">
+ <line x1="290" y1="252" x2="215" y2="328"/><line x1="290" y1="252" x2="580" y2="328"/><line x1="290" y1="252" x2="945" y2="328"/>
+</g>
+<!-- secrets -> VMs (gray) -->
+<g stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#ag)" opacity="0.5" stroke-dasharray="3,3">
+ <line x1="640" y1="252" x2="275" y2="328"/><line x1="640" y1="252" x2="640" y2="328"/><line x1="640" y1="252" x2="1005" y2="328"/>
+</g>
+<!-- VM A calls tools API (red) -->
+<path d="M335,330 C 600,300 760,290 815,252" fill="none" stroke="#cf222e" stroke-width="2.5" stroke-dasharray="6,4" marker-end="url(#ar)"/>
+<!-- sleep archive -->
+<line x1="990" y1="252" x2="1060" y2="328" stroke="#999" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#ag)"/>
+
+<!-- GitHub path -->
+<rect x="330" y="690" width="440" height="60" rx="8" fill="#fff4e5" stroke="#d1700f" stroke-width="2"/>
+<text x="345" y="714" font-size="13" font-weight="bold" fill="#9a4a00">git-manager.devin.ai 代理</text>
+<text x="345" y="734" font-size="12">替 VM 加上 1 小时有效的临时令牌，只放行本组织登记过的仓库</text>
+<rect x="330" y="790" width="440" height="70" rx="8" fill="#f6f8fa" stroke="#24292f" stroke-width="2"/>
+<text x="345" y="815" font-size="14" font-weight="bold">GitHub：dotv-7/17x31-cognition</text>
+<text x="345" y="835" font-size="12">（旧名 dotv-io，会自动跳转）· 唯一真正共享代码的地方</text>
+<text x="345" y="851" font-size="12">A 推上去 → B 拉下来，才能看到对方改的代码</text>
+<g stroke="#d1700f" stroke-width="2" fill="none" marker-end="url(#ao)" marker-start="url(#ao2)">
+ <line x1="185" y1="632" x2="420" y2="688"/><line x1="550" y1="632" x2="550" y2="688"/><line x1="915" y1="632" x2="680" y2="688"/>
+ <line x1="550" y1="752" x2="550" y2="788"/>
+</g>
+<text x="80" y="680" font-size="11" fill="#9a4a00">git pull / push</text>
+</svg>
+
+<div class="legend">
+ <div><span class="sw" style="background:#1a7f37"></span><b>开机复制：</b>新 session 启动时，从 ③ 快照复制一整台 VM。三台 VM 的起点相同，之后各改各的。</div>
+ <div><span class="sw" style="background:#0969da"></span><b>写入历史：</b>每条消息、每个命令都实时记到 ① 里。你在网页上看到的聊天记录就来自这里，而不是 VM。</div>
+ <div><span class="sw" style="background:#8250df"></span><b>同步记忆：</b>启动时从 ② 下载到 <code>~/memory/v_9c955a</code>；我改完调用 memory_sync 上传合并。别的 session 要下次同步才看得到。</div>
+ <div><span class="sw" style="background:#cf222e"></span><b>工具调用：</b>我（A）调用 ⑤ 的接口，接口从 ① 里读出 B、C 的记录交给我。只读，而且限于同一个组织。</div>
+ <div><span class="sw" style="background:#d1700f"></span><b>代码同步：</b>各 VM 里的仓库副本通过代理连到 GitHub。代码要共享，只能经过 GitHub 推送和拉取。</div>
+ <div><span class="sw" style="background:#999"></span><b>休眠：</b>空闲 30 分钟后，VM 整个存进 ⑥，不再占用机器和用量；唤醒时原样恢复。</div>
+</div>
+
+<table>
+<tr><th>东西</th><th>放在哪</th><th>三个 session 共享吗</th></tr>
+<tr><td>聊天记录 / 命令记录</td><td>① 云端</td><td class="y">能互相读（通过工具接口，只读）</td></tr>
+<tr><td>长期记忆笔记</td><td>② 云端 + 每台 VM 一份本地副本</td><td class="y">共享（需要同步）</td></tr>
+<tr><td>初始环境</td><td>③ 快照</td><td class="y">起点相同</td></tr>
+<tr><td>Secrets / Knowledge / GitHub 连接</td><td>④ 云端</td><td class="y">共享</td></tr>
+<tr><td>代码（已提交并推送的）</td><td>GitHub</td><td class="y">共享</td></tr>
+<tr><td>VM 里的文件（未推送的修改、临时文件）</td><td>各自 VM 的硬盘</td><td class="n">不共享</td></tr>
+<tr><td>终端、运行中的程序、内存</td><td>各自 VM</td><td class="n">不共享</td></tr>
+</table>
+</body></html>
