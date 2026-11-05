@@ -16,7 +16,7 @@ th{background:#f0f0f0}
 </style></head><body>
 <h1>Devin 架构：VM、Session、历史记录、记忆和 GitHub 是怎么交互的</h1>
 <p class="sub">组织 dotv-io · 根据本 session（2026-11-05）实际查到的情况绘制 · 一个 session = 一台独立 VM</p>
-<svg viewBox="0 0 1100 880" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1100 975" xmlns="http://www.w3.org/2000/svg">
 <defs>
  <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#1a7f37"/></marker>
  <marker id="ab" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0969da"/></marker>
@@ -29,7 +29,7 @@ th{background:#f0f0f0}
 </defs>
 
 <!-- Cloud -->
-<rect x="15" y="15" width="1070" height="235" rx="12" fill="#eef4ff" stroke="#0969da" stroke-width="2"/>
+<rect x="15" y="15" width="1070" height="330" rx="12" fill="#eef4ff" stroke="#0969da" stroke-width="2"/>
 <text x="30" y="42" font-size="16" font-weight="bold" fill="#0a3069">Devin 云端服务器（Cognition 管理，不在任何一台 VM 里）</text>
 
 <g font-size="12">
@@ -57,10 +57,55 @@ th{background:#f0f0f0}
  <text x="920" y="82" font-weight="bold" font-size="13" fill="#555">⑥ 休眠存档</text>
  <text x="920" y="104">空闲 30 分钟后，</text><text x="920" y="120">整台 VM（含内存）</text><text x="920" y="136">存到这里</text><text x="920" y="158">休眠期间不耗用量，</text><text x="920" y="174">发消息即可唤醒恢复</text>
 </g>
+<g font-size="10" font-family="Menlo,Consolas,monospace">
+<rect x="35" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#0969da" stroke-dasharray="3,2"/>
+<text x="43" y="222" font-weight="bold" fill="#0969da">路径 / 位置</text>
+<text x="43" y="238" fill="#333">VM 上：无（存在云端）</text>
+<text x="43" y="252" fill="#333">网页：</text>
+<text x="43" y="266" fill="#333">app.devin.ai/sessions/</text>
+<text x="43" y="280" fill="#333">  &lt;session-id&gt;</text>
+<text x="43" y="294" fill="#333">本 session：b3c611cd…</text>
+<rect x="210" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#8250df" stroke-dasharray="3,2"/>
+<text x="218" y="222" font-weight="bold" fill="#8250df">路径 / 位置</text>
+<text x="218" y="238" fill="#333">VM 本地副本：</text>
+<text x="218" y="252" fill="#333">/home/ubuntu/memory/</text>
+<text x="218" y="266" fill="#333">  v_9c955a/</text>
+<text x="218" y="280" fill="#333">云端原件：无公开路径</text>
+<text x="218" y="294" fill="#333">（memory_sync 上传合并）</text>
+<rect x="385" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#1a7f37" stroke-dasharray="3,2"/>
+<text x="393" y="222" font-weight="bold" fill="#1a7f37">路径 / 位置</text>
+<text x="393" y="238" fill="#333">/ 整个根目录=快照副本</text>
+<text x="393" y="252" fill="#333">（/dev/vda1，124 GB）</text>
+<text x="393" y="266" fill="#333">仓库：/home/ubuntu/</text>
+<text x="393" y="280" fill="#333">  repos/17x31-cognition</text>
+<text x="393" y="294" fill="#333">blueprint：网页设置里</text>
+<rect x="560" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#57606a" stroke-dasharray="3,2"/>
+<text x="568" y="222" font-weight="bold" fill="#57606a">路径 / 位置</text>
+<text x="568" y="238" fill="#333">Secrets：启动时注入为</text>
+<text x="568" y="252" fill="#333">  环境变量，磁盘无文件</text>
+<text x="568" y="266" fill="#333">Knowledge：注入给我，</text>
+<text x="568" y="280" fill="#333">  磁盘无文件</text>
+<text x="568" y="294" fill="#333">GitHub：网页设置里</text>
+<rect x="735" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#cf222e" stroke-dasharray="3,2"/>
+<text x="743" y="222" font-weight="bold" fill="#cf222e">路径 / 位置</text>
+<text x="743" y="238" fill="#333">VM 上的执行程序：</text>
+<text x="743" y="252" fill="#333">/mnt/host_share/</text>
+<text x="743" y="266" fill="#333">  devin-remote</text>
+<text x="743" y="280" fill="#333">云端接口：无 VM 路径</text>
+<text x="743" y="294" fill="#333">大输出：~/.devin-files/</text>
+<rect x="910" y="208" width="160" height="90" rx="6" fill="#f7f9fc" stroke="#999" stroke-dasharray="3,2"/>
+<text x="918" y="222" font-weight="bold" fill="#999">路径 / 位置</text>
+<text x="918" y="238" fill="#333">VM 上：无</text>
+<text x="918" y="252" fill="#333">休眠时整台 VM</text>
+<text x="918" y="266" fill="#333">由云端保存</text>
+<text x="918" y="280" fill="#333">唤醒后路径不变，</text>
+<text x="918" y="294" fill="#333">文件原样恢复</text>
+</g>
 <!-- tools API reads history -->
-<path d="M815,200 L815,225 L115,225 L115,202" fill="none" stroke="#cf222e" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#ar)"/>
-<text x="400" y="241" font-size="11" fill="#cf222e">⑤ 接口从 ① 里读出别的 session 的记录（只读）</text>
+<path d="M815,302 L815,316 L115,316 L115,304" fill="none" stroke="#cf222e" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#ar)"/>
+<text x="400" y="333" font-size="11" fill="#cf222e">⑤ 接口从 ① 里读出别的 session 的记录（只读）</text>
 
+<g transform="translate(0,90)">
 <!-- VMs -->
 <g font-size="12">
  <rect x="20" y="330" width="330" height="300" rx="10" fill="#fff8e6" stroke="#bf8700" stroke-width="2.5"/>
@@ -128,6 +173,7 @@ th{background:#f0f0f0}
  <line x1="550" y1="752" x2="550" y2="788"/>
 </g>
 <text x="80" y="680" font-size="11" fill="#9a4a00">git pull / push</text>
+</g>
 </svg>
 
 <div class="legend">
@@ -148,5 +194,17 @@ th{background:#f0f0f0}
 <tr><td>代码（已提交并推送的）</td><td>GitHub</td><td class="y">共享</td></tr>
 <tr><td>VM 里的文件（未推送的修改、临时文件）</td><td>各自 VM 的硬盘</td><td class="n">不共享</td></tr>
 <tr><td>终端、运行中的程序、内存</td><td>各自 VM</td><td class="n">不共享</td></tr>
+</table>
+
+<h2 style="font-size:16px;margin:18px 0 6px">每个模块的绝对路径（本 session 的 VM 上实际查到的）</h2>
+<table>
+<tr><th>模块</th><th>在 VM 上的绝对路径</th><th>云端 / 网页位置</th></tr>
+<tr><td>① 对话历史</td><td><b>无</b>：不存在 VM 上</td><td>https://app.devin.ai/sessions/&lt;session-id&gt;<br>本 session：https://app.devin.ai/sessions/b3c611cd683b4ed0adfc280e0d437f66</td></tr>
+<tr><td>② 长期记忆</td><td><code>/home/ubuntu/memory/v_9c955a/</code><br>├ <code>MEMORY.md</code><br>├ <code>hermes.md</code><br>└ <code>.git/</code>（同步用的 git 仓库）</td><td>云端原件没有公开路径；启动时下载，memory_sync 时上传合并</td></tr>
+<tr><td>③ 快照</td><td>整个根目录 <code>/</code>（磁盘 <code>/dev/vda1</code>，124 GB）就是快照的副本<br>仓库：<code>/home/ubuntu/repos/17x31-cognition/</code><br>构建日志：<code>/home/ubuntu/.snapshot_build_log_sbj-d275b9f97b0941a181734bb8545ad4fe.jsonl</code></td><td>blueprint：Devin 网页 → Settings → Environment<br>构建记录：https://app.devin.ai/org/dotv-io/settings/environment/builds/sbj-d275b9f97b0941a181734bb8545ad4fe</td></tr>
+<tr><td>④ 组织设置</td><td>Secrets：<b>没有文件</b>，shell 启动时注入为环境变量<br>Knowledge：<b>没有文件</b>，直接放进我的提示里<br>插件/技能缓存：<code>/opt/.devin/plugins/</code><br>提交作者信息：<code>/opt/.devin/git_author</code></td><td>GitHub 连接：Devin 网页 → Settings → Integrations → GitHub<br>Secrets / Knowledge：Devin 网页 → Settings</td></tr>
+<tr><td>⑤ 工具接口</td><td>VM 上的执行程序：<code>/mnt/host_share/devin-remote</code>（替我在 VM 上运行命令、读写文件）<br>Devin 运行时目录：<code>/opt/.devin/</code><br>工具大输出暂存：<code>/home/ubuntu/.devin-files/devin-remote-overflows-1000/</code></td><td>session_events / session_insights 等在云端执行，<b>VM 上没有路径</b></td></tr>
+<tr><td>⑥ 休眠存档</td><td><b>无</b>：整台 VM 由云端保存，唤醒后所有路径不变</td><td>没有公开位置</td></tr>
+<tr><td>GitHub 代理</td><td>仓库远程地址：<code>https://git-manager.devin.ai/proxy/github.com/dotv-io/17x31-cognition</code></td><td>https://github.com/dotv-7/17x31-cognition</td></tr>
 </table>
 </body></html>
