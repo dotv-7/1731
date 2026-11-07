@@ -78,6 +78,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if owner_cfg.get("model") and "model" not in cfg:
         cfg["model"] = owner_cfg["model"]
         say("model settings copied from the owner profile")
+    if owner_cfg.get("providers") and "providers" not in cfg:
+        cfg["providers"] = owner_cfg["providers"]
     _enable(cfg)
     _settings(cfg).update(role="public", public_profile=pub.name, owner_name=owner_name)
     _write_yaml(pub / "config.yaml", cfg)

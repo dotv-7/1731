@@ -238,3 +238,10 @@ def test_only_owner_can_switch_models(client, tmp_path, monkeypatch):
     plain, default, opus = sent
     assert plain == default and "provider" not in plain and plain["model"] == "hermes-agent"
     assert opus["provider"] == "bai" and opus["model"] == "claude-opus-5.5"
+
+
+def test_pages_use_configured_names(tmp_path):
+    s = server.Settings({"DOTV_OWNER_HOME": str(tmp_path), "DOTV_OWNER_NAME": "Ada", "DOTV_PUBLIC_NAME": "Byte"})
+    html = TestClient(server.create_app(s)).get("/").text
+    assert "Byte's assistant" in html and "Hi Ada." in html
+    assert "Salt" not in html and "Lena" not in html

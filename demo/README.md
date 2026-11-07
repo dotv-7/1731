@@ -26,6 +26,7 @@ DOTV_OWNER_HOME="$PWD/.demo/owner" DOTV_OWNER_PASSPHRASE_HASH=... DOTV_SECRET=<r
 `DOTV_OWNER_HOME` defaults to `~/.hermes`; `DOTV_PUBLIC_HOME` defaults to
 `$DOTV_OWNER_HOME/profiles/public`. Without `DOTV_HERMES_URL` the chat talks to
 `http://127.0.0.1:8642`, the Hermes API server (or `fake_hermes.py`).
+`DOTV_OWNER_NAME` and `DOTV_PUBLIC_NAME` (default `Lena` and `Salt`) set the names the pages show.
 
 ## Traces
 

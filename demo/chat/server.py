@@ -23,7 +23,7 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import _yaml as yaml
@@ -55,11 +55,21 @@ class Settings:
         self.tier_keys = {"admin": e.get("DOTV_ADMIN_KEY", ""), "user": e.get("DOTV_USER_KEY", ""),
                           "guest": self.public_key, "owner": self.owner_key}
         self.docs_url = e.get("DOTV_DOCS_URL", "")
+        self.owner_name = e.get("DOTV_OWNER_NAME", "Lena")
+        self.public_name = e.get("DOTV_PUBLIC_NAME", "Salt")
 
     def tier_homes(self) -> dict[str, Path]:
         homes = {t: self.owner_home / "profiles" / name for t, name in self.tier_profiles.items()}
         homes["guest"] = self.public_home
         return homes
+
+
+def render_page(name: str, s: Settings) -> HTMLResponse:
+    """A static page with the demo names (Lena, Salt) replaced by the configured ones."""
+    html = (STATIC / name).read_text(encoding="utf-8")
+    html = re.sub(r"\bLena\b", s.owner_name, html)
+    html = re.sub(r"\bSalt\b", s.public_name, html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 def hash_passphrase(passphrase: str, salt: Optional[bytes] = None) -> str:
@@ -185,7 +195,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/")
     def index():
-        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        return render_page("index.html", s)
 
     @app.get("/static/avatar/{name}")
     def avatar_asset(name: str):
@@ -200,7 +210,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/shelf")
     def shelf():
         """Memory shelf: the showcase view of the always-injected memory entries (falls back to demo data for guests)."""
-        return FileResponse(STATIC / "shelf.html", headers={"Cache-Control": "no-cache"})
+        return render_page("shelf.html", s)
 
     @app.get("/board")
     def board(request: Request):
@@ -441,7 +451,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     def _draft_system(kind: str) -> str:
         base = ("You produce the public version of one piece of a private assistant's context. The assistant belongs to a "
-                "pseudonymous writer called Salt; strangers will read what you write through her public assistant. Follow the "
+                f"pseudonymous writer called {s.public_name}; strangers will read what you write through her public assistant. Follow the "
                 "owner's disclosure policy below exactly: keep what it allows, remove or generalise what it forbids. Do not add "
                 "facts. Write in the language of the source. No preamble, no quotes, no commentary. If nothing in the source can "
                 "be shared under the policy, reply with exactly: NOTHING_SAFE_TO_SHARE\n\n")
@@ -530,7 +540,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def perm_page(request: Request):
         if not is_owner(state(request)):
             return RedirectResponse("/")
-        return FileResponse(STATIC / "perm.html", headers={"Cache-Control": "no-cache"})
+        return render_page("perm.html", s)
 
     def perm_state() -> dict:
         policy = perm.load(s.owner_home)
@@ -604,7 +614,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return RedirectResponse("/")
         page = TRACE_DIR / "index.html"
         if not page.is_file():
-            return Response("No trace rendered yet: run dotv/dev/trace_run.py then dotv/dev/trace_render.py", media_type="text/plain")
+            return Response("No trace rendered yet: run demo/trace_run.py then demo/trace_render.py", media_type="text/plain")
         return FileResponse(page, headers={"Cache-Control": "no-cache"})
 
     @app.get("/trace/{name:path}")
