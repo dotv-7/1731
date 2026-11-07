@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from dotv import _yaml as yaml
 from dotv.context import core as ctx
+from dotv.context import guests
 from dotv.perm import core as perm
 
 STATIC = Path(__file__).parent / "static"
@@ -210,7 +211,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"ok": True}
+        return {"ok": True, "isolation": perm.isolation_check(s.owner_home, s.public_home)}
 
     @app.get("/api/me")
     def me(request: Request):
@@ -370,11 +371,33 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         items = board_scan()
         ctx.save_allowlist(s.owner_home, items, [str(i) for i in ids],
                            {str(k): str(v) for k, v in texts.items()})
+        before = _projection_on_disk(s.public_home)
         projection = {"facts": [], "documents": []}
         for home in s.tier_homes().values():
             if home.is_dir() or home == s.public_home:
                 projection = ctx.sync_public(s.owner_home, home, s.workspace_roots)
-        return {"facts": len(projection["facts"]), "documents": len(projection["documents"])}
+        # Revocation is only real if the guest store forgets too: archive for Lena, then purge.
+        purge = guests.revoke_and_purge(s.owner_home, s.public_home, before, projection)
+        return {"facts": len(projection["facts"]), "documents": len(projection["documents"]), **purge}
+
+    def _projection_on_disk(home: Path) -> dict:
+        try:
+            return json.loads((home / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {"facts": [], "documents": []}
+
+    @app.get("/api/board/guests")
+    def board_guests(request: Request):
+        """What guests said: live public sessions plus the owner's archive. Owner only; never injected anywhere."""
+        require_owner(request)
+        return guests.digest(s.owner_home, s.public_home)
+
+    @app.post("/api/board/guests/clear")
+    async def board_guests_clear(request: Request):
+        require_json(request)
+        require_owner(request)
+        archived = guests.archive(s.owner_home, s.public_home, reason="owner cleared")
+        return {"archived": archived, **guests.purge(s.public_home)}
 
     # ------------------------------------------------------------ guest-version drafts (rewrite before anything crosses)
     DRAFT_FILE = "dotv/public_drafts.json"

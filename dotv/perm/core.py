@@ -297,6 +297,59 @@ def _context_files_near(cwd: Path) -> list[str]:
     return found
 
 
+ROUTE_PLUGIN = "dotv-guest-route"
+
+
+def _env_value(home: Path, name: str) -> str:
+    try:
+        for line in (Path(home) / ".env").read_text(encoding="utf-8").splitlines():
+            if line.startswith(name + "="):
+                return line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
+def isolation_check(owner_home: Path, public_home: Path) -> dict:
+    """The one-line answer to "is the guest side isolated right now?". Every condition the design relies on,
+    checked against the files as they are, not as they were meant to be. ``ok`` is True only when all pass."""
+    owner_home, public_home = Path(owner_home), Path(public_home)
+    checks: list[dict] = []
+
+    def add(ok: bool, text: str) -> None:
+        checks.append({"ok": bool(ok), "text": text})
+
+    def cfg(home: Path) -> dict:
+        try:
+            return yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return {}
+
+    oc, pc = cfg(owner_home), cfg(public_home)
+    o_en = (oc.get("plugins") or {}).get("enabled") or []
+    add(ROUTE_PLUGIN in o_en and (owner_home / "plugins" / ROUTE_PLUGIN / "__init__.py").exists(),
+        f"owner: {ROUTE_PLUGIN} installed and enabled (strangers never reach the owner agent)")
+    add(CONTEXT_PLUGIN not in o_en, f"owner: {CONTEXT_PLUGIN} not enabled on the owner side")
+    add(bool((oc.get("gateway") or {}).get("multiplex_profiles")), "owner: gateway.multiplex_profiles is on (the /p/<profile> entrance exists)")
+    add(public_home.is_dir(), f"public profile exists: {public_home}")
+    problems = audit(public_home) if public_home.is_dir() else ["profile does not exist"]
+    add(not problems, "public: tool audit passes (no terminal, files, sessions or context files)" + ("" if not problems else " — " + "; ".join(problems)))
+    mem = pc.get("memory") or {}
+    add(mem.get("memory_enabled") is False and mem.get("user_profile_enabled") is False,
+        "public: MEMORY.md and USER.md injection switched off")
+    p_en = (pc.get("plugins") or {}).get("enabled") or []
+    add(CONTEXT_PLUGIN in p_en and (public_home / "plugins" / CONTEXT_PLUGIN / "__init__.py").exists(),
+        f"public: {CONTEXT_PLUGIN} installed and enabled (only the approved projection is injected)")
+    add((public_home / "dotv" / "public_context.json").exists(), "public: projection file dotv/public_context.json exists")
+    ok_key, pk = _env_value(owner_home, "DOTV_PUBLIC_KEY"), _env_value(public_home, "API_SERVER_KEY")
+    add(bool(ok_key) and ok_key == pk, "keys: owner's DOTV_PUBLIC_KEY equals the public profile's API_SERVER_KEY")
+    add(ok_key != _env_value(owner_home, "API_SERVER_KEY") or not ok_key, "keys: public key differs from the owner key")
+    ok = all(c["ok"] for c in checks)
+    failing = [c["text"].split(" — ")[0] for c in checks if not c["ok"]]
+    line = f"ISOLATION OK · {len(checks)} checks" if ok else f"ISOLATION BROKEN · {len(failing)} of {len(checks)} failing: " + "; ".join(failing)
+    return {"ok": ok, "line": line, "checks": checks, "checked_at": int(time.time())}
+
+
 def audit(home: Path) -> list[str]:
     """Isolation problems of a non-owner tier profile; an empty list means the hard isolation is in place."""
     home = Path(home)

@@ -1,7 +1,8 @@
 name: dotv-public-context
 version: "0.1.0"
+requires_hermes: ">=0.23.0"
 description: "Public (Guest) profile context: injects the owner's approved public facts into the system prompt and provides dotv_public_lookup over approved public documents. Reads only the generated projection dotv/public_context.json in this profile's home."
-author: "dotv-io"
+author: "dotv-7"
 provides_hooks: []
 provides_tools:
   - dotv_public_lookup

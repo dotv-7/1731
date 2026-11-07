@@ -1,7 +1,8 @@
 name: dotv-guest-route
 version: "0.1.0"
+requires_hermes: ">=0.23.0"
 description: "Identity-based context isolation for messaging platforms (#527): only the owner's private DM reaches the owner profile. Every other inbound message (strangers' DMs, any group/channel/thread, even the owner's own messages in a public venue) is withheld from the owner agent and answered by the public profile through the local API server, so the private memory, files and tools never exist in that conversation. Fail-closed: when the public profile cannot answer, the message is dropped with a short notice; it is never passed to the owner agent."
-author: "dotv-io"
+author: "dotv-7"
 provides_hooks:
   - pre_gateway_dispatch
 config_schema:
