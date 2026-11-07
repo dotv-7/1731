@@ -118,3 +118,29 @@ def test_profile_template_matches_gate():
     manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
     assert manifest["name"] == "salts-secrets"
     assert {"pre_tool_call", "pre_gateway_dispatch"} <= set(manifest["provides_hooks"])
+
+
+def _registrations(monkeypatch, home, settings):
+    import salts_secrets
+
+    monkeypatch.setattr("salts_secrets.home.current", lambda: home)
+    calls = []
+    ctx = type("Ctx", (), {
+        "get_config": lambda self, key, default=None: settings.get(key, default),
+        "__getattr__": lambda self, name: lambda *a, **k: calls.append(name),
+    })()
+    salts_secrets.register(ctx)
+    return calls
+
+
+@pytest.mark.parametrize("home_rel,settings,public", [
+    ("owner", {}, False),
+    ("owner/profiles/public", {}, True),
+    ("owner/profiles/strangers", {"public_profile": "strangers"}, True),
+    ("owner/profiles/anything", {"role": "public"}, True),
+    ("owner/profiles/public", {"role": "owner"}, False),
+])
+def test_role_follows_settings_then_profile_name(monkeypatch, tmp_path, home_rel, settings, public):
+    calls = _registrations(monkeypatch, tmp_path / home_rel, settings)
+    assert ("register_hook" in calls and "register_tool" in calls) is public
+    assert ("register_cli_command" in calls) is not public

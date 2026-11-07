@@ -79,7 +79,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
         cfg["model"] = owner_cfg["model"]
         say("model settings copied from the owner profile")
     _enable(cfg)
-    _settings(cfg).update(public_profile=pub.name, owner_name=owner_name)
+    _settings(cfg).update(role="public", public_profile=pub.name, owner_name=owner_name)
     _write_yaml(pub / "config.yaml", cfg)
 
     target = pub / "plugins" / NAME

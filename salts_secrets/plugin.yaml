@@ -13,6 +13,12 @@ provides_hooks:
 provides_tools:
   - public_notes_lookup
 config_schema:
+  role:
+    type: str
+    default: ""
+    description: >-
+      owner or public. `setup` sets it on the public profile; when empty, a profile named after
+      public_profile plays the public part and every other profile the owner part.
   owners:
     type: list
     default: []
