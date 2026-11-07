@@ -1,12 +1,12 @@
-# 1731 — one Hermes, two minds
+# Salt's Secrets
 
-### Identity-based context isolation for Hermes Agent.
+### Identity-based context isolation for Hermes Agent. One Hermes, two minds.
 
 Your Hermes knows your passwords, your cat's name, your father's anniversary and the deploy key of
 your server, because you told it. The moment you hand that same Hermes to other people, through a
 Telegram bot, a Discord server or a web chat, every one of those facts is one question away.
 
-1731 gives Hermes a second mind. Strangers never reach your agent. They reach a **public profile**
+This project gives Hermes a second mind. Strangers never reach your agent. They reach a **public profile**
 that is built from nothing but what you ticked as public, rewritten in a guest-safe voice, and that
 cannot reach your files, your sessions or your memory even if it wanted to. You keep one Hermes,
 one gateway, one API key. Only the context is split, and it is split by **who is asking**.
@@ -46,7 +46,7 @@ Requires Hermes Agent **>= 0.23.0** with the API server enabled. One command tur
 into a two-mind install:
 
 ```bash
-git clone https://github.com/dotv-7/1731.git && cd 1731
+git clone https://github.com/dotv-7/salt-s-secrets.git && cd salt-s-secrets
 python3 -m dotv setup --owner-home "$HERMES_HOME" --passphrase <your-passphrase>
 ```
 
@@ -64,7 +64,7 @@ Then restart the gateway, run the start script, and open `http://127.0.0.1:8780/
 plugin can also be installed on its own:
 
 ```bash
-hermes plugins install dotv-7/1731/dotv/plugins/dotv-guest-route
+hermes plugins install dotv-7/salt-s-secrets/dotv/plugins/dotv-guest-route
 ```
 
 Before trusting any of it, ask the install what it thinks of itself:
@@ -151,8 +151,9 @@ RESEARCH_527.md                  the research behind it and the first design
 ## Why
 
 Hermes issue [#527](https://github.com/NousResearch/hermes-agent/issues/527) asks for multi-user
-permission tiers. Most proposals there tier the *tools*. 1731 tiers the *context*: a guest should not
-be denied the answer, they should be talking to an agent that never had it. The permission matrix is
+permission tiers. Most proposals there tier the *tools*. This project tiers the *context*: a guest should not
+be denied the answer, they should be talking to an agent that never had it. Hence the name: Salt is the
+owner's public persona, and her secrets are not refused to you, they were never in the room. The permission matrix is
 still there (`/perm`), but it is the second line, not the first.
 
 Built on [Hermes Agent](https://github.com/NousResearch/hermes-agent) v0.23.0. Branch `main` of this
