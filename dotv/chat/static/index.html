@@ -192,7 +192,7 @@ function md(src){
   return out.join('');}
 const key=()=> 'dotv.log.'+role;
 let transcript=[];
-function save(){localStorage.setItem(key(),JSON.stringify(transcript.slice(-300)));}
+function save(){if(role==='guest')return;localStorage.setItem(key(),JSON.stringify(transcript.slice(-300)));}
 function render(e){const d=document.createElement('div');d.className='msg '+e.k;
   if(e.k==='u')d.innerHTML=`<span class="p">❯</span>${esc(e.t)}`;
   else if(e.k==='a')d.innerHTML=md(e.t)+(e.live?'<span class="cursor"></span>':'');
@@ -200,7 +200,7 @@ function render(e){const d=document.createElement('div');d.className='msg '+e.k;
   log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
 function push(e,persist=true){if(persist){transcript.push(e);save();}return render(e);}
 function sys(t,cls='sys'){return push({k:cls,t},false);}
-function restore(){log.innerHTML='';transcript=JSON.parse(localStorage.getItem(key())||'[]');transcript.forEach(render);
+function restore(){log.innerHTML='';if(role==='guest'){localStorage.removeItem(key());transcript=[];}else transcript=JSON.parse(localStorage.getItem(key())||'[]');transcript.forEach(render);
   if(!transcript.length)sys(HELLO[role]||HELLO.guest);}
 const portrait=$('#portrait'),whoBox=$('#whoBox');
 const SEAL_RE=/not something i (know|'d confirm|would confirm)|doesn'?t share|salt doesn'?t|can'?t (tell|share|confirm|say)|won'?t (say|confirm)|not something i can|不知道|不会说|不方便|不能(告诉|说)|无可奉告|不会透露/i;
@@ -216,7 +216,7 @@ blinkLoop();
 // demo/dev: force a portrait state from the URL hash (#seal, #talk, #blink)
 if(['#seal','#talk','#blink'].includes(location.hash)){portrait.classList.add(location.hash.slice(1));clearTimeout(blinkTimer);}
 function setRole(r,name,ms){role=r;who=name||'';whoCaption(r);$('#brandWho').textContent=r==='owner'?'LENA MOREAU':"SALT'S ASSISTANT";models=r==='owner'&&ms||[];mi=0;showModel();const b=$('#badge');b.className='badge '+r;b.textContent=(LABEL[r]||r)+(who?' · '+who:'');
-  $('#ownerLinks').hidden=r!=='owner';const ab=$('#auth');if(ab)ab.textContent=['owner','admin','user'].includes(r)?'SIGN OUT':'SIGN IN';restore();}
+  $('#ownerLinks').hidden=r!=='owner';const ab=$('#auth');if(ab)ab.textContent=['owner','admin','user'].includes(r)?'SIGN OUT':'SIGN IN';if(r==='guest')api('/api/new').catch(()=>{});restore();}
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
   let j={};try{j=await r.json()}catch{}; if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function me(){try{const r=await fetch('/api/me');const j=await r.json();online(true);return j;}catch{online(false);return null;}}
