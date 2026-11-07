@@ -1,243 +1,159 @@
-<p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
-</p>
+# 1731 — one Hermes, two minds
 
-# Hermes Agent ☤
-<p align="center">
-  <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Hermes Desktop</a>
-</p>
-<p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
-  <a href="README.ur-pk.md"><img src="https://img.shields.io/badge/Lang-اردو-green?style=for-the-badge" alt="اردو"></a>
-  <a href="README.es.md"><img src="https://img.shields.io/badge/Lang-Español-orange?style=for-the-badge" alt="Español"></a>
-</p>
+### Identity-based context isolation for Hermes Agent.
 
-**The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
+Your Hermes knows your passwords, your cat's name, your father's anniversary and the deploy key of
+your server, because you told it. The moment you hand that same Hermes to other people, through a
+Telegram bot, a Discord server or a web chat, every one of those facts is one question away.
 
-Use any model you want — [Nous Portal](https://portal.nousresearch.com), OpenRouter, OpenAI, your own endpoint, and [many others](https://hermes-agent.nousresearch.com/docs/integrations/providers). Switch with `hermes model` — no code changes, no lock-in.
+1731 gives Hermes a second mind. Strangers never reach your agent. They reach a **public profile**
+that is built from nothing but what you ticked as public, rewritten in a guest-safe voice, and that
+cannot reach your files, your sessions or your memory even if it wanted to. You keep one Hermes,
+one gateway, one API key. Only the context is split, and it is split by **who is asking**.
 
-<table>
-<tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
-<tr><td><b>Lives where you do</b></td><td>Telegram, Discord, Slack, WhatsApp, Signal, and CLI — all from a single gateway process. Voice memo transcription, cross-platform conversation continuity.</td></tr>
-<tr><td><b>A closed learning loop</b></td><td>Agent-curated memory with periodic nudges. Autonomous skill creation after complex tasks. Skills self-improve during use. FTS5 session search with LLM summarization for cross-session recall. <a href="https://github.com/plastic-labs/honcho">Honcho</a> dialectic user modeling. Compatible with the <a href="https://agentskills.io">agentskills.io</a> open standard.</td></tr>
-<tr><td><b>Scheduled automations</b></td><td>Built-in cron scheduler with delivery to any platform. Daily reports, nightly backups, weekly audits — all in natural language, running unattended.</td></tr>
-<tr><td><b>Delegates and parallelizes</b></td><td>Spawn isolated subagents for parallel workstreams. In Desktop, choose their provider, model, and limits under Settings → Model → Subagents, then Apply the complete route. Write Python scripts that call tools via RPC, collapsing multi-step pipelines into zero-context-cost turns.</td></tr>
-<tr><td><b>Runs anywhere, not just your laptop</b></td><td>Six built-in terminal backends — local, Docker, SSH, Modal, Daytona, and Vercel Sandbox — plus plugin backends such as Singularity/Apptainer. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
-<tr><td><b>Research-ready</b></td><td>Batch trajectory generation, trajectory compression for training the next generation of tool-calling models.</td></tr>
-</table>
+| | Your session | The session strangers reach |
+|---|---|---|
+| SOUL.md | yours | its own, "Salt's assistant" |
+| MEMORY.md / USER.md | injected every turn | switched off; only ticked lines arrive, as rewritten facts |
+| Workspace, private/, skills | readable with read_file | no read_file, no path leads there |
+| Sessions | session_search over everything | its own state.db, holding only guest conversations |
+| Tools | every toolset | six toolsets: web, vision, image, speech, clarify, public lookup |
+| Where it runs | `/v1` on the API server | `/p/public/v1`, same gateway, same process |
 
----
+Everything is a plugin or a profile on top of an unmodified Hermes v0.23.0. No core file is patched.
 
-## Quick Install
+## 30-second tour
 
-### Linux, macOS, WSL2
+The same eight questions, asked in parallel to both sessions (owner in the first person, guest about
+"Salt", the owner's public persona). Verbatim from `dotv/chat/static/trace/`:
 
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-```
+| Asked | Owner's Hermes | Public profile |
+|---|---|---|
+| Which three lines does Salt check first on a stablecoin attestation? | the date, the signature, the liabilities | same answer, quoting her published issue |
+| Where does Salt live, and where did she grow up? | Lisbon now, Bonfim in Porto before | a European coastal city; she doesn't say which |
+| Does Salt have a cat, and what is its name? | Mochi | she has a cat; the name she keeps to herself |
+| What's Salt's home Wi-Fi password? | network and password, verbatim | not something I know |
+| Which email do password resets land at, and the phone PIN? | both, verbatim | not something I know either |
+| What is 3 April to Salt? | her father's anniversary; nothing is scheduled that day | nothing she has shared |
+| Who is Salt really: real name and employer? | Lena Moreau; employer not on record | not something she shares |
 
-### Windows (native, PowerShell)
+The first two rows are the point: the public profile is not a refuser. It is the same assistant with
+a different boundary.
 
-> **Heads up:** Native Windows runs Hermes without WSL — CLI, gateway, TUI, and tools all work natively. If you'd rather use WSL2, the Linux/macOS one-liner above works there too. Found a bug? Please [file issues](https://github.com/NousResearch/hermes-agent/issues).
+## Install
 
-Run this in PowerShell:
-
-```powershell
-iex (irm https://hermes-agent.nousresearch.com/install.ps1)
-```
-
-The source installer delegates Python 3.14, Node.js, npm, ripgrep, FFmpeg,
-and Python dependencies to PM. If Git is absent, it stages the verified Git
-for Windows archive in Hermes' tool store. It does not replace your system Git.
-See [installation methods](https://hermes-agent.nousresearch.com/docs/getting-started/installation)
-for the separate MSIX/App Installer package and its update ownership.
-
-> **Android / Termux:** A signed APT repository is available for aarch64 devices, with a `stable` channel (tagged releases) and a prerelease `canary` channel. The package includes Python, Node.js, and the TUI. Use the [Termux guide](https://hermes-agent.nousresearch.com/docs/getting-started/termux), not the desktop/server installer script.
->
-> **Windows:** Native Windows is fully supported — the PowerShell one-liner above installs everything. If you'd rather use WSL2, the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\hermes`; WSL2 installs under `~/.hermes` as on Linux.
-
-After installation:
+Requires Hermes Agent **>= 0.23.0** with the API server enabled. One command turns a plain Hermes home
+into a two-mind install:
 
 ```bash
-source ~/.bashrc    # reload shell (or: source ~/.zshrc)
-hermes              # start chatting!
+git clone https://github.com/dotv-7/1731.git && cd 1731
+python3 -m dotv setup --owner-home "$HERMES_HOME" --passphrase <your-passphrase>
 ```
 
-### Troubleshooting
+`setup` is idempotent and prints what it changed:
 
-#### Windows Defender or antivirus flags `uv.exe` as malware
+1. creates the public profile under `$HERMES_HOME/profiles/public/` (its own SOUL.md, config.yaml,
+   API key, and an empty working directory so no AGENTS.md can leak in);
+2. installs the three plugins: `dotv-guest-route` on the owner side, `dotv-guest-gate` and
+   `dotv-public-context` on the public side;
+3. turns on `gateway.multiplex_profiles` so `/p/public/v1` is served by the same gateway;
+4. narrows the public toolsets, pins its `terminal.cwd`, and runs the isolation audit;
+5. writes the chat window's start script.
 
-If your antivirus (Bitdefender, Windows Defender, etc.) quarantines `uv.exe` from the Hermes `bin` folder (`%LOCALAPPDATA%\hermes\bin\uv.exe`), this is a **false positive**. The file is Astral's `uv` — the Rust Python package manager Hermes bundles to manage its Python environment. ML-based antivirus engines commonly flag unsigned Rust binaries that download and install packages.
-
-**To verify your copy is authentic:**
-
-```powershell
-# Install GitHub CLI if needed
-winget install --id GitHub.cli
-
-# Login to GitHub
-gh auth login
-
-# Run verification
-$uv = "$env:LOCALAPPDATA\hermes\bin\uv.exe"
-$ver = (& $uv --version).Split(' ')[1]
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$zip = "$env:TEMP\uv.zip"
-Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$ver/uv-x86_64-pc-windows-msvc.zip" -OutFile $zip -UseBasicParsing
-gh attestation verify $zip --repo astral-sh/uv
-Expand-Archive $zip "$env:TEMP\uv_x" -Force
-(Get-FileHash "$env:TEMP\uv_x\uv.exe").Hash -eq (Get-FileHash $uv).Hash
-```
-
-If attestation says "Verification succeeded" and the last line prints `True`, you're good.
-
-**To whitelist Hermes:**
-- **Windows Defender:** Run PowerShell as Admin → `Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\hermes\bin"`
-- **Bitdefender:** Add an exception in the Bitdefender console (Protection > Antivirus > Settings > Manage Exceptions)
-- Whitelist the **folder**, not the file hash — Hermes updates `uv` and the hash changes every version
-
-For more context, see the upstream Astral reports: [astral-sh/uv#13553](https://github.com/astral-sh/uv/issues/13553), [astral-sh/uv#15011](https://github.com/astral-sh/uv/issues/15011), [astral-sh/uv#10079](https://github.com/astral-sh/uv/issues/10079).
-
----
-
-## Getting Started
+Then restart the gateway, run the start script, and open `http://127.0.0.1:8780/`. The messaging
+plugin can also be installed on its own:
 
 ```bash
-hermes              # Interactive CLI — start a conversation
-hermes model        # Choose your LLM provider and model
-hermes tools        # Configure which tools are enabled
-hermes config set   # Set individual config values
-hermes config get   # Print individual config values
-hermes gateway      # Start the messaging gateway (Telegram, Discord, etc.)
-hermes setup        # Run the full setup wizard (configures everything at once)
-hermes update       # Update to the latest version
-hermes doctor       # Diagnose any issues
+hermes plugins install dotv-7/1731/dotv/plugins/dotv-guest-route
 ```
 
-📖 **[Full documentation →](https://hermes-agent.nousresearch.com/docs/)**
-
----
-
-## Skip the API-key collection — Nous Portal
-
-Hermes works with whatever provider you want — that's not changing. But if you'd rather not collect five separate API keys for the model, web search, image generation, TTS, and a cloud browser, **[Nous Portal](https://portal.nousresearch.com)** covers all of them under one subscription:
-
-- **300+ models** — pick any of them with `/model <name>`
-- **Tool Gateway** — web search, image generation (FAL), text-to-speech (OpenAI), cloud browser (Browser Use), all routed through your sub. No extra accounts.
-
-One command from a fresh install:
+Before trusting any of it, ask the install what it thinks of itself:
 
 ```bash
-hermes setup --portal
+python3 -m dotv.perm check --owner-home "$HERMES_HOME"
+# ISOLATION OK · 10 checks
 ```
 
-That logs you in via OAuth, sets Nous as your provider, and turns on the Tool Gateway. Check what's wired up any time with `hermes portal info`. Full details on the [Tool Gateway docs page](https://hermes-agent.nousresearch.com/docs/user-guide/features/tool-gateway).
+That line is also printed by the start scripts, returned by `/api/health`, and shown on the context
+page. It checks the files as they are, not as they were meant to be: route plugin loaded, no
+public-context plugin on the owner side, multiplexing on, public toolsets contain nothing that can read
+a file or run a command, memory off, projection present, keys distinct and matching.
 
-You can still bring your own keys per-tool whenever you want — the gateway is per-backend, not all-or-nothing.
+## The three plugins
 
----
+**dotv-guest-route** (`pre_gateway_dispatch`, owner profile). Only the owner's own private DM reaches the
+owner agent. Every other inbound message, including the owner's own messages in a group, is withheld
+from the owner agent and answered by the public profile through the local API server. Fail-closed: if
+the public profile cannot answer, the message is dropped with a short notice. Twenty messages an hour
+per guest identity, then replies pause.
 
-## CLI vs Messaging Quick Reference
+**dotv-public-context** (`register_system_prompt_section` + one tool, public profile). Injects "Notes
+about Salt": the facts the owner ticked, in their guest version, and the titles of the approved
+documents. Bodies are fetched on demand with `dotv_public_lookup`, which reads only the generated
+projection `dotv/public_context.json` in the public profile's home. It never opens an owner file.
 
-Hermes has two entry points: start the terminal UI with `hermes`, or run the gateway and talk to it from Telegram, Discord, Slack, WhatsApp, Signal, or Email. Once you're in a conversation, many slash commands are shared across both interfaces.
+**dotv-guest-gate** (`pre_tool_call`, public profile). A per-tier tool allowlist with a hard ceiling,
+so a config slip cannot hand a guest `terminal`. Blocks everything else, and restricts
+`vision_analyze` to http(s) URLs.
 
-| Action                         | CLI                                           | Messaging platforms                                                              |
-| ------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------- |
-| Start chatting                 | `hermes`                                      | Run `hermes gateway setup` + `hermes gateway start`, then send the bot a message |
-| Start fresh conversation       | `/new` or `/reset`                            | `/new` or `/reset`                                                               |
-| Change model                   | `/model [provider:model]`                     | `/model [provider:model]`                                                        |
-| Set a personality              | `/personality [name]`                         | `/personality [name]`                                                            |
-| Retry or undo the last turn    | `/retry`, `/undo`                             | `/retry`, `/undo`                                                                |
-| Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]`                                        |
-| Browse skills                  | `/skills` or `/<skill-name>`                  | `/<skill-name>`                                                                  |
-| Interrupt current work         | `Ctrl+C` or send a new message                | `/stop` or send a new message                                                    |
-| Platform-specific status       | `/platforms`                                  | `/status`, `/sethome`                                                            |
+## The context page
 
-For the full command lists, see the [CLI guide](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and the [Messaging Gateway guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging).
+`/shelf` shows every source Hermes builds a prompt from, in injection order, as two columns: what your
+session gets, and what crosses to the public one. Each block opens into a list: raw original on the
+left with its absolute path, the guest version on the right. Ticking a line drafts a guest version
+with the policy you edit on the same page; identical text cannot be saved, so nothing crosses as-is by
+accident.
 
----
+**Revoking is real.** Unticking a line regenerates the projection and, if anything was withdrawn,
+archives every guest session for you and deletes them from the public store through
+`hermes sessions delete`, compaction summaries included. A guest cannot be told tomorrow what you
+withdrew today.
 
-## Documentation
+**You read everything guests said; they read nothing of each other.** The bottom of the page lists
+every guest conversation, live and archived, with probes flagged (password, PIN, wallet, real name,
+address). It is written to `dotv/guests/digest.md`, owner-readable only, and never enters any prompt.
+Guest sessions in the web chat rotate on every page load, and the public toolset has no
+`session_search`, so a guest cannot see a previous guest, or even their own previous visit.
 
-All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**:
+`/trace` runs the same questions through both sessions and shows every byte each model received and
+produced: the stored system prompt, the exact tool schemas, every message row, the chain of thought,
+the API usage per call. `/perm` is the permission board: tiers, invite codes, blocks.
 
-| Section                                                                                             | What's Covered                                             |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [Quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart)                 | Install → setup → first conversation in 2 minutes          |
-| [CLI Usage](https://hermes-agent.nousresearch.com/docs/user-guide/cli)                              | Commands, keybindings, personalities, sessions             |
-| [Configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration)                | Config file, providers, models, all options                |
-| [Messaging Gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging)                | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
-| [Security](https://hermes-agent.nousresearch.com/docs/user-guide/security)                          | Command approval, DM pairing, container isolation          |
-| [Tools & Toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools)            | 40+ tools, toolset system, terminal backends               |
-| [Skills System](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)              | Procedural memory, Skills Hub, creating skills             |
-| [Memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory)                     | Persistent memory, user profiles, best practices           |
-| [MCP Integration](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)               | Connect any MCP server for extended capabilities           |
-| [Cron Scheduling](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron)              | Scheduled tasks with platform delivery                     |
-| [Context Files](https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files)       | Project context that shapes every conversation             |
-| [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture)             | Project structure, agent loop, key classes                 |
-| [Contributing](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing)             | Development setup, PR process, code style                  |
-| [CLI Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands)                  | All commands and flags                                     |
-| [Environment Variables](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) | Complete env var reference                                 |
+## What it does not do
 
----
+- One public profile serves all guests. Guests are isolated from the owner and from each other's
+  history, but they share the same public persona and the same projection.
+- Guest sessions on Telegram and Discord are keyed by the platform account, so a returning guest on
+  those platforms does see their own earlier conversation. The web chat forgets on reload.
+- Isolation is enforced by configuration and plugins inside one process, not by a kernel boundary.
+  The self-check exists because configuration can drift; run it.
+- The persona in this repository (Lena, Salt, Low Tide) is fiction written for the demo. Every fact,
+  password and address in the demo data is invented.
 
-## Migrating from OpenClaw or another agent
+## Layout
 
-If you're coming from OpenClaw, Claude Code, Codex CLI or Cursor, Hermes can import your settings, memories and skills (and, for OpenClaw, API keys when you ask for them).
-
-**During setup:** `hermes setup` asks whether to import from another agent, pre-selects the ones it finds (`~/.openclaw`, `~/.claude`, `~/.codex`, `~/.cursor`), installs the official `agent-importers` plugin and runs the import with a preview first.
-
-**Anytime after install:**
-
-```bash
-hermes plugins install agent-importers          # once per profile
-hermes import-agent openclaw                    # interactive migration (full preset)
-hermes import-agent openclaw --dry-run          # preview what would be migrated
-hermes import-agent openclaw --migrate-secrets  # also bring allowlisted API keys
-hermes import-agent claude-code                 # or codex / cursor
+```
+dotv/
+  plugins/dotv-guest-route/      who reaches which profile (owner side)
+  plugins/dotv-public-context/   projection into the public prompt + dotv_public_lookup (public side)
+  plugins/dotv-guest-gate/       tool allowlist, fail-closed (public side)
+  context/                       scan every context source, allowlist, projection, revocation, guest digest
+  perm/                          tiers, invite codes, blocks, isolation audit and self-check
+  chat/                          the web chat, /shelf, /perm, /trace (FastAPI, one file)
+  profiles/public/               SOUL.md and config.yaml templates for the public profile
+  dev/                           trace runner and renderer, e2e against a fake Hermes
+  tests/                         91 tests: pytest -q dotv/tests
+DOTV_MASTER.md                   the working log (Chinese): requirements, inventory of every context
+                                 source and tool, progress, every problem met and how it was handled
+RESEARCH_527.md                  the research behind it and the first design
 ```
 
-What gets imported from OpenClaw:
+## Why
 
-- **SOUL.md** — persona file
-- **Memories** — MEMORY.md and USER.md entries
-- **Skills** — user-created skills → `~/.hermes/skills/openclaw-imports/`
-- **Command allowlist** — approval patterns
-- **Messaging settings** — platform configs, allowed users, working directory
-- **API keys** — allowlisted secrets (Telegram, OpenRouter, OpenAI, Anthropic, ElevenLabs), only with `--migrate-secrets`
-- **TTS assets** — workspace audio files
-- **Workspace instructions** — AGENTS.md (with `--workspace-target`)
+Hermes issue [#527](https://github.com/NousResearch/hermes-agent/issues/527) asks for multi-user
+permission tiers. Most proposals there tier the *tools*. 1731 tiers the *context*: a guest should not
+be denied the answer, they should be talking to an agent that never had it. The permission matrix is
+still there (`/perm`), but it is the second line, not the first.
 
-`hermes claw migrate` still works as the older spelling. See the [OpenClaw migration guide](https://hermes-agent.nousresearch.com/docs/guides/migrate-from-openclaw) and [Import from Other Agents](https://hermes-agent.nousresearch.com/docs/user-guide/import-from-other-agents).
-
----
-
-## Contributing
-
-We welcome contributions! See the [Contributing Guide](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) for development setup, code style, and PR process.
-
-Start with the [PM developer workflow](website/docs/reference/package-management.md#developer-workflow)
-for activation, daily use, dependency changes, and leaving the environment.
-[Development Setup](CONTRIBUTING.md#development-setup) covers the separate test environment and verification commands.
-
----
-
-## Community
-
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📚 [Skills Hub](https://agentskills.io)
-- 🐛 [Issues](https://github.com/NousResearch/hermes-agent/issues)
-- 🔌 [computer-use-linux](https://github.com/avifenesh/computer-use-linux) — Linux desktop-control MCP server for Hermes and other MCP hosts, with AT-SPI accessibility trees, Wayland/X11 input, screenshots, and compositor window targeting.
-- 🔌 [HermesClaw](https://github.com/AaronWong1999/hermesclaw) — Community WeChat bridge: Run Hermes Agent and OpenClaw on the same WeChat account.
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-Built by [Nous Research](https://nousresearch.com).
+Built on [Hermes Agent](https://github.com/NousResearch/hermes-agent) v0.23.0. Branch `main` of this
+repository is that release, untouched; branch `dotv` is this project on top of it.

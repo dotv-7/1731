@@ -1,6 +1,6 @@
 # dotv add-ons for Hermes (pluggable)
 
-Everything here installs on top of an official Hermes image (v0.22.2+); no Hermes core file is changed.
+Everything here installs on top of an official Hermes install (v0.23.0+); no Hermes core file is changed.
 See `DOTV_MASTER.md` for requirements, deliverables, tool/context inventory and the role matrix.
 
 ## Step 1: public (Guest) profile + tool gate
