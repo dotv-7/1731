@@ -1,9 +1,25 @@
-"""PyYAML when installed, else Hermes' own ruamel-based ``hermes_yaml``: the official Hermes image and its
-test environment ship no PyYAML, so ``import yaml`` would break the permission sync inside the container."""
+"""PyYAML when installed, else ruamel.yaml (a Hermes dependency): the official Hermes image ships no PyYAML."""
+
+from __future__ import annotations
+
+import io
+from typing import Any
 
 try:
     from yaml import YAMLError, safe_dump, safe_load
 except ImportError:
-    from hermes_yaml import YAMLError, safe_dump, safe_load
+    from ruamel.yaml import YAML
+    from ruamel.yaml.error import YAMLError
+
+    def safe_load(text: str) -> Any:
+        return YAML(typ="safe", pure=True).load(text)
+
+    def safe_dump(data: Any, sort_keys: bool = False, allow_unicode: bool = True) -> str:
+        yaml = YAML(typ="safe", pure=True)
+        yaml.default_flow_style = False
+        yaml.allow_unicode = allow_unicode
+        out = io.StringIO()
+        yaml.dump(data, out)
+        return out.getvalue()
 
 __all__ = ["YAMLError", "safe_dump", "safe_load"]
