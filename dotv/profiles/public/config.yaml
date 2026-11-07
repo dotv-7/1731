@@ -1,0 +1,27 @@
+# dotv public (Guest) profile — merge into $HERMES_HOME/profiles/public/config.yaml.
+# Hard isolation comes from the profile itself (own memories/, sessions, SOUL.md, API key);
+# the dotv-guest-gate plugin is the second line of defence.
+platform_toolsets:
+  api_server: [web, vision, image_gen, tts, clarify, dotv_public]
+memory:
+  memory_enabled: false       # guests get no MemoryStore; public facts come from dotv-public-context
+  user_profile_enabled: false
+  provider: ""                # no external memory provider for guests
+  nudge_interval: 0           # never review guest chats into memory
+tools:
+  tool_search:
+    enabled: "off"   # all guest tools eager; no tool_call bridge to proxy other tools
+terminal:
+  # Empty dir so no AGENTS.md / .hermes.md / CLAUDE.md is auto-loaded into guest prompts. Without it Hermes
+  # uses MESSAGING_CWD or the home dir (possibly the owner's workspace). `python3 -m dotv.perm sync`
+  # rewrites this to <profile>/dotv/cwd and creates it.
+  cwd: /opt/data/profiles/public/dotv/cwd
+security:
+  allow_private_urls: false   # web tools must not reach 127.0.0.1 / LAN
+sessions:
+  auto_prune: false
+plugins:
+  enabled: [dotv-guest-gate, dotv-public-context]
+# No reasoning on the public profile: the API would otherwise return reasoning_content (P24).
+agent:
+  reasoning_effort: none

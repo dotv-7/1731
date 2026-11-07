@@ -1,0 +1,6 @@
+# Test/runtime deps for dotv add-ons (dotv-chat + tests); Hermes itself is not needed.
+pytest>=8,<10
+pyyaml>=6,<7
+fastapi>=0.110,<1
+httpx>=0.27,<1
+uvicorn>=0.29,<1
