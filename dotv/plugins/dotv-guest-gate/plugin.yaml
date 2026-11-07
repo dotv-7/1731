@@ -1,7 +1,0 @@
-name: dotv-guest-gate
-version: "0.1.0"
-requires_hermes: ">=0.23.0"
-description: "Per-tier tool allowlist (#527) for dotv non-owner profiles. Reads dotv/tier.json, capped by a hard ceiling; blocks everything else (fail-closed) and restricts vision_analyze to http(s) URLs."
-author: "dotv-7"
-provides_hooks:
-  - pre_tool_call
