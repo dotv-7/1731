@@ -49,7 +49,7 @@ Requires Hermes Agent **>= 0.23.0** with the API server enabled, and in-process 
 hermes plugins install salts-secrets          # into your own (owner) profile
 hermes salts-secrets setup --owner-name "your handle"
 hermes gateway restart
-hermes salts-secrets check                    # ISOLATION OK · 10 checks
+hermes salts-secrets check                    # ISOLATION OK · 8 checks
 ```
 
 From a checkout instead of the catalog: `hermes plugins install dotv-7/salt-s-secrets/salts_secrets`.

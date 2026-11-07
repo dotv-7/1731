@@ -18,8 +18,9 @@ log = logging.getLogger(__name__)
 
 
 def register(ctx) -> None:
+    role = ctx.get_config("role", default="") or ""
     public_profile = ctx.get_config("public_profile", default="public") or "public"
-    if home.is_public(home.current(), public_profile):
+    if role == "public" or (role != "owner" and home.is_public(home.current(), public_profile)):
         from . import gate, public_context
 
         gate.register(ctx)
