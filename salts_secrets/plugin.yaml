@@ -31,6 +31,12 @@ config_schema:
     type: str
     default: the owner
     description: How the public profile refers to you (a handle or pen name, never your real name).
+  workspaces:
+    type: list
+    default: []
+    description: >-
+      Folders the Context tab offers for publishing (default <HERMES_HOME>/workspace). Nothing in them
+      reaches guests until you tick it.
 requires_env:
   - name: SALTS_PUBLIC_API_KEY
     description: API_SERVER_KEY of the public profile. `hermes salts-secrets setup` writes it.

@@ -1,5 +1,7 @@
 """Create a demo owner home (fake data) for previewing the dashboard."""
-import sqlite3, sys, time
+import sqlite3
+import sys
+import time
 from pathlib import Path
 
 root = Path(sys.argv[1])

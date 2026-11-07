@@ -14,14 +14,32 @@ from typing import Any, Optional
 
 from . import home
 
-DEFAULT_ALLOWED_TOOLS = frozenset({
-    "web_search", "web_extract", "clarify", "vision_analyze", "image_generate", "text_to_speech",
-    "public_notes_lookup",
-})
-CEILING = DEFAULT_ALLOWED_TOOLS | frozenset({
-    "x_search", "video_analyze", "video_generate", "xai_video_edit", "xai_video_extend", "todo_list",
-    "memory", "session_search", "skills_list", "skill_view", "skill_manage",
-})
+DEFAULT_ALLOWED_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_extract",
+        "clarify",
+        "vision_analyze",
+        "image_generate",
+        "text_to_speech",
+        "public_notes_lookup",
+    }
+)
+CEILING = DEFAULT_ALLOWED_TOOLS | frozenset(
+    {
+        "x_search",
+        "video_analyze",
+        "video_generate",
+        "xai_video_edit",
+        "xai_video_extend",
+        "todo_list",
+        "memory",
+        "session_search",
+        "skills_list",
+        "skill_view",
+        "skill_manage",
+    }
+)
 TIER_FILE = "tier.json"
 
 

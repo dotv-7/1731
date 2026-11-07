@@ -1,10 +1,8 @@
-import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-ROOT = Path(__file__).resolve().parents[2]
 from demo.chat import server
 
 PASS = "open sesame"
@@ -14,9 +12,16 @@ PASS = "open sesame"
 def client(tmp_path):
     (tmp_path / "owner/memories").mkdir(parents=True)
     (tmp_path / "owner/memories/MEMORY.md").write_text("a\n§\nb", encoding="utf-8")
-    s = server.Settings({"DOTV_OWNER_HOME": str(tmp_path / "owner"), "DOTV_PUBLIC_HOME": str(tmp_path / "public"),
-                         "DOTV_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS), "DOTV_SECRET": "x" * 32,
-                         "DOTV_OWNER_KEY": "ok", "DOTV_PUBLIC_KEY": "pk"})
+    s = server.Settings(
+        {
+            "DOTV_OWNER_HOME": str(tmp_path / "owner"),
+            "DOTV_PUBLIC_HOME": str(tmp_path / "public"),
+            "DOTV_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS),
+            "DOTV_SECRET": "x" * 32,
+            "DOTV_OWNER_KEY": "ok",
+            "DOTV_PUBLIC_KEY": "pk",
+        }
+    )
     return TestClient(server.create_app(s))
 
 
@@ -63,8 +68,12 @@ def test_forged_cookie_is_guest(client):
 
 
 def test_json_required(client):
-    assert client.post("/api/unlock", data="passphrase=x",
-                       headers={"content-type": "application/x-www-form-urlencoded"}).status_code == 415
+    assert (
+        client.post(
+            "/api/unlock", data="passphrase=x", headers={"content-type": "application/x-www-form-urlencoded"}
+        ).status_code
+        == 415
+    )
 
 
 def test_chat_routes_by_role(client, monkeypatch):
@@ -111,6 +120,7 @@ def test_chat_routes_by_role(client, monkeypatch):
 
 def test_member_codes_route_to_tier_and_blocked_cannot_chat(client, tmp_path):
     from salts_secrets import tiers as perm
+
     owner = tmp_path / "owner"
     m, code = perm.add_member(owner, "小王", "user")
     r = client.post("/api/unlock", json={"passphrase": code})
@@ -185,7 +195,8 @@ def test_only_owner_can_switch_models(client, tmp_path, monkeypatch):
     (tmp_path / "owner/config.yaml").write_text(
         "model:\n  provider: ds\n  default: deepseek-flash\nproviders:\n"
         "  bai:\n    api_key: sk-secret\n    model: claude-opus-5.5\n  ds:\n    model: deepseek-flash\n",
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     sent = []
 
     class FakeStream:

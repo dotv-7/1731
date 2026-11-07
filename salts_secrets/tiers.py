@@ -27,8 +27,16 @@ ISOLATED_CWD = "cwd"
 BLOCK_TTL = 90 * 86400
 SEEN_MAX = 5
 # Files Hermes auto-loads into the system prompt from the working directory (agent/prompt_builder.py).
-CONTEXT_FILE_NAMES = (".hermes.md", "HERMES.md", "AGENTS.md", "AGENTS.override.md", "agents.md", "CLAUDE.md",
-                      ".cursorrules", ".cursor")
+CONTEXT_FILE_NAMES = (
+    ".hermes.md",
+    "HERMES.md",
+    "AGENTS.md",
+    "AGENTS.override.md",
+    "agents.md",
+    "CLAUDE.md",
+    ".cursorrules",
+    ".cursor",
+)
 TIERS = ("owner", "admin", "user", "guest", "blocked")
 CONFIGURABLE = ("admin", "user", "guest")
 TIER_LABEL = {"owner": "Owner", "admin": "Admin", "user": "User", "guest": "Guest", "blocked": "Blocked"}
@@ -40,18 +48,54 @@ CATALOG: dict[str, tuple[tuple[str, ...], str, str, str, str]] = {
     "vision": (("vision_analyze",), "Images and video", "Look at images (URLs only)", "", ""),
     "video": (("video_analyze",), "Images and video", "Watch video", "", ""),
     "image_gen": (("image_generate",), "Generate", "Generate images", "", "spends your API budget"),
-    "video_gen": (("video_generate", "xai_video_edit", "xai_video_extend"), "Generate", "Generate video", "", "spends your API budget"),
+    "video_gen": (
+        ("video_generate", "xai_video_edit", "xai_video_extend"),
+        "Generate",
+        "Generate video",
+        "",
+        "spends your API budget",
+    ),
     "tts": (("text_to_speech",), "Generate", "Read aloud", "", ""),
     "clarify": (("clarify",), "Conversation", "Ask a clarifying question", "", ""),
     "public_notes": (("public_notes_lookup",), "Conversation", "Look up public notes", "", ""),
     "todo": (("todo_list",), "Conversation", "To-do list", "", ""),
     "memory": (("memory",), "Memory", "Memory (the tier's own)", "", "shared by everyone in the tier"),
-    "session_search": (("session_search",), "Memory", "Search past sessions (the tier's own)", "", "members of the tier can search each other's sessions"),
-    "skills": (("skills_list", "skill_view", "skill_manage"), "Skills", "Skills (the tier's own)", "", "shared by everyone in the tier"),
-    "terminal": (("terminal", "process_manage"), "Terminal and code", "Terminal", "can read any file on your machine", ""),
+    "session_search": (
+        ("session_search",),
+        "Memory",
+        "Search past sessions (the tier's own)",
+        "",
+        "members of the tier can search each other's sessions",
+    ),
+    "skills": (
+        ("skills_list", "skill_view", "skill_manage"),
+        "Skills",
+        "Skills (the tier's own)",
+        "",
+        "shared by everyone in the tier",
+    ),
+    "terminal": (
+        ("terminal", "process_manage"),
+        "Terminal and code",
+        "Terminal",
+        "can read any file on your machine",
+        "",
+    ),
     "code_execution": (("execute_code",), "Terminal and code", "Run code", "can read any file on your machine", ""),
-    "file": (("read_file", "write_file", "patch", "search_files"), "Files", "Read and write files", "can read your private files", ""),
-    "browser": (("browser_exec", "browser_cdp", "browser_dialog", "browser_vault"), "Browser", "Browser (4 tools, v0.23.0)", "can use sites you are signed in to and open local files", ""),
+    "file": (
+        ("read_file", "write_file", "patch", "search_files"),
+        "Files",
+        "Read and write files",
+        "can read your private files",
+        "",
+    ),
+    "browser": (
+        ("browser_exec", "browser_cdp", "browser_dialog", "browser_vault"),
+        "Browser",
+        "Browser (4 tools, v0.23.0)",
+        "can use sites you are signed in to and open local files",
+        "",
+    ),
     "computer_use": (("computer_use",), "Browser", "Computer use", "can drive your desktop", ""),
     "cronjob": (("cronjob_manage",), "Scheduling", "Scheduled jobs", "runs as you, indefinitely", ""),
     "delegation": (("delegate_task",), "Scheduling", "Delegate sub-tasks", "sub-tasks bypass the gate", ""),
@@ -61,8 +105,20 @@ CATALOG: dict[str, tuple[tuple[str, ...], str, str, str, str]] = {
 }
 SAFE_TOOLSETS = frozenset(k for k, v in CATALOG.items() if not v[3])
 DEFAULT_TIERS = {
-    "admin": ["web", "x_search", "vision", "video", "image_gen", "tts", "clarify", "public_notes", "todo",
-              "memory", "session_search", "skills"],
+    "admin": [
+        "web",
+        "x_search",
+        "vision",
+        "video",
+        "image_gen",
+        "tts",
+        "clarify",
+        "public_notes",
+        "todo",
+        "memory",
+        "session_search",
+        "skills",
+    ],
     "user": ["web", "vision", "image_gen", "tts", "clarify", "public_notes", "todo", "memory"],
     "guest": ["web", "vision", "image_gen", "tts", "clarify", "public_notes"],
 }
@@ -77,8 +133,15 @@ def _clean(toolsets: Iterable[str]) -> list[str]:
 
 
 def _live_blocks(entries, now: float) -> list[dict]:
-    return [b for b in entries or [] if isinstance(b, dict) and b.get("kind") in ("ip", "device")
-            and isinstance(b.get("value"), str) and b["value"] and b.get("until", 0) > now]
+    return [
+        b
+        for b in entries or []
+        if isinstance(b, dict)
+        and b.get("kind") in ("ip", "device")
+        and isinstance(b.get("value"), str)
+        and b["value"]
+        and b.get("until", 0) > now
+    ]
 
 
 def load(owner_home: Path) -> dict:
@@ -89,10 +152,12 @@ def load(owner_home: Path) -> dict:
     if not isinstance(data, dict):
         data = {}
     tiers = data.get("tiers") if isinstance(data.get("tiers"), dict) else {}
-    return {"tiers": {t: _clean(tiers.get(t, DEFAULT_TIERS[t])) for t in CONFIGURABLE},
-            "members": [m for m in data.get("members") or [] if isinstance(m, dict) and m.get("tier") in TIERS[1:]],
-            "blocklist": _live_blocks(data.get("blocklist"), time.time()),
-            "guest_access": data.get("guest_access", True) is not False}
+    return {
+        "tiers": {t: _clean(tiers.get(t, DEFAULT_TIERS[t])) for t in CONFIGURABLE},
+        "members": [m for m in data.get("members") or [] if isinstance(m, dict) and m.get("tier") in TIERS[1:]],
+        "blocklist": _live_blocks(data.get("blocklist"), time.time()),
+        "guest_access": data.get("guest_access", True) is not False,
+    }
 
 
 def _write(path: Path, data: dict) -> None:
@@ -104,18 +169,21 @@ def _write(path: Path, data: dict) -> None:
 
 
 def save(owner_home: Path, policy: dict) -> dict:
-    clean = {"tiers": {t: _clean((policy.get("tiers") or {}).get(t, [])) for t in CONFIGURABLE},
-             "members": policy.get("members") or [],
-             "blocklist": _live_blocks(policy.get("blocklist"), time.time()),
-             "guest_access": policy.get("guest_access", True) is not False}
+    clean = {
+        "tiers": {t: _clean((policy.get("tiers") or {}).get(t, [])) for t in CONFIGURABLE},
+        "members": policy.get("members") or [],
+        "blocklist": _live_blocks(policy.get("blocklist"), time.time()),
+        "guest_access": policy.get("guest_access", True) is not False,
+    }
     _write(data_dir(owner_home) / POLICY_FILE, clean)
     return clean
 
 
 # Members and invite codes
 
+
 def _hash(code: str, salt: bytes) -> str:
-    return hashlib.scrypt(code.encode(), salt=salt, n=2 ** 14, r=8, p=1).hex()
+    return hashlib.scrypt(code.encode(), salt=salt, n=2**14, r=8, p=1).hex()
 
 
 def add_member(owner_home: Path, name: str, tier: str) -> tuple[dict, str]:
@@ -124,8 +192,14 @@ def add_member(owner_home: Path, name: str, tier: str) -> tuple[dict, str]:
     policy = load(owner_home)
     code = "inv-" + secrets.token_urlsafe(12)
     salt = secrets.token_bytes(16)
-    member = {"id": secrets.token_hex(6), "name": name.strip()[:40] or "unnamed", "tier": tier,
-              "salt": salt.hex(), "code_hash": _hash(code, salt), "created": int(time.time())}
+    member = {
+        "id": secrets.token_hex(6),
+        "name": name.strip()[:40] or "unnamed",
+        "tier": tier,
+        "salt": salt.hex(),
+        "code_hash": _hash(code, salt),
+        "created": int(time.time()),
+    }
     policy["members"].append(member)
     save(owner_home, policy)
     return member, code
@@ -154,9 +228,16 @@ def update_member(owner_home: Path, member_id: str, tier: Optional[str] = None, 
 def _add_block(policy: dict, kind: str, value: str, member: dict) -> None:
     if not value or any(b["kind"] == kind and b["value"] == value for b in policy["blocklist"]):
         return
-    policy["blocklist"].append({"kind": kind, "value": value, "member": member.get("id", ""),
-                                "name": member.get("name", ""), "since": int(time.time()),
-                                "until": int(time.time() + BLOCK_TTL)})
+    policy["blocklist"].append(
+        {
+            "kind": kind,
+            "value": value,
+            "member": member.get("id", ""),
+            "name": member.get("name", ""),
+            "since": int(time.time()),
+            "until": int(time.time() + BLOCK_TTL),
+        }
+    )
 
 
 def _block_member(policy: dict, member: dict) -> None:
@@ -166,8 +247,9 @@ def _block_member(policy: dict, member: dict) -> None:
         _add_block(policy, "device", did, member)
 
 
-_SHARED_NETS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
-                                                        "100.64.0.0/10", "fc00::/7"))
+_SHARED_NETS = tuple(
+    ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7")
+)
 
 
 def blockable_ip(ip: str) -> bool:
@@ -201,9 +283,15 @@ def note_seen(owner_home: Path, member_id: str, ip: str, device: str) -> None:
 
 
 def is_blocked(owner_home: Path, ip: str, device: str) -> Optional[dict]:
-    return next((b for b in load(owner_home)["blocklist"]
-                 if (b["kind"] == "ip" and ip and b["value"] == ip) or (b["kind"] == "device" and device
-                                                                       and b["value"] == device)), None)
+    return next(
+        (
+            b
+            for b in load(owner_home)["blocklist"]
+            if (b["kind"] == "ip" and ip and b["value"] == ip)
+            or (b["kind"] == "device" and device and b["value"] == device)
+        ),
+        None,
+    )
 
 
 def unblock(owner_home: Path, kind: str, value: str) -> bool:
@@ -308,6 +396,7 @@ def plugin_ready(home: Path) -> bool:
 
 def profile_secrets(home: Path) -> dict[str, str]:
     from agent.secret_scope import build_profile_secret_scope
+
     try:
         return build_profile_secret_scope(Path(home))
     except Exception:  # noqa: BLE001
@@ -324,25 +413,40 @@ def isolation_check(owner_home: Path, public_home: Path) -> dict:
 
     owner_cfg, public_cfg = _profile_config(owner_home), _profile_config(public_home)
     add(plugin_ready(owner_home), f"owner: {NAME} installed and enabled (strangers never reach the owner agent)")
-    add(bool((owner_cfg.get("gateway") or {}).get("multiplex_profiles")),
-        "owner: gateway.multiplex_profiles is on (the /p/<profile> entrance exists)")
+    add(
+        bool((owner_cfg.get("gateway") or {}).get("multiplex_profiles")),
+        "owner: gateway.multiplex_profiles is on (the /p/<profile> entrance exists)",
+    )
     add(public_home.is_dir(), f"public profile exists: profiles/{public_home.name}")
     problems = audit(public_home)
-    add(not problems, "public: tool audit passes (no terminal, files, sessions or context files)"
-        + ("" if not problems else " — " + "; ".join(problems)))
+    add(
+        not problems,
+        "public: tool audit passes (no terminal, files, sessions or context files)"
+        + ("" if not problems else " — " + "; ".join(problems)),
+    )
     memory = public_cfg.get("memory") or {}
-    add(memory.get("memory_enabled") is False and memory.get("user_profile_enabled") is False,
-        "public: MEMORY.md and USER.md injection switched off")
+    add(
+        memory.get("memory_enabled") is False and memory.get("user_profile_enabled") is False,
+        "public: MEMORY.md and USER.md injection switched off",
+    )
     add((data_dir(public_home) / "public_context.json").exists(), "public: approved projection has been published")
     owner_secrets, public_secrets = profile_secrets(owner_home), profile_secrets(public_home)
     public_key = owner_secrets.get(PUBLIC_KEY_ENV, "")
-    add(bool(public_key) and public_key == public_secrets.get("API_SERVER_KEY"),
-        f"keys: owner's {PUBLIC_KEY_ENV} matches the public profile's API_SERVER_KEY")
-    add(not public_key or public_key != owner_secrets.get("API_SERVER_KEY"), "keys: public key differs from the owner key")
+    add(
+        bool(public_key) and public_key == public_secrets.get("API_SERVER_KEY"),
+        f"keys: owner's {PUBLIC_KEY_ENV} matches the public profile's API_SERVER_KEY",
+    )
+    add(
+        not public_key or public_key != owner_secrets.get("API_SERVER_KEY"),
+        "keys: public key differs from the owner key",
+    )
     ok = all(c["ok"] for c in checks)
     failing = [c["text"].split(" — ")[0] for c in checks if not c["ok"]]
-    line = (f"ISOLATION OK · {len(checks)} checks" if ok
-            else f"ISOLATION BROKEN · {len(failing)} of {len(checks)} failing: " + "; ".join(failing))
+    line = (
+        f"ISOLATION OK · {len(checks)} checks"
+        if ok
+        else f"ISOLATION BROKEN · {len(failing)} of {len(checks)} failing: " + "; ".join(failing)
+    )
     return {"ok": ok, "line": line, "checks": checks, "checked_at": int(time.time())}
 
 
@@ -373,9 +477,13 @@ def audit(home: Path) -> list[str]:
         problems.append(f"{NAME} is not installed or not enabled (no tool gate)")
     cwd = (cfg.get("terminal") or {}).get("cwd")
     if not cwd or str(cwd) in (".", "auto", "cwd"):
-        problems.append("terminal.cwd is not set: Hermes falls back to MESSAGING_CWD or the home directory, whose AGENTS.md etc. would enter the guest prompt")
+        problems.append(
+            "terminal.cwd is not set: Hermes falls back to MESSAGING_CWD or the home directory, whose AGENTS.md etc. would enter the guest prompt"
+        )
     elif not Path(cwd).is_dir():
         problems.append(f"terminal.cwd does not exist: {cwd}")
     else:
-        problems += [f"context file in the working directory would be injected: {f}" for f in _context_files_near(Path(cwd))]
+        problems += [
+            f"context file in the working directory would be injected: {f}" for f in _context_files_near(Path(cwd))
+        ]
     return problems

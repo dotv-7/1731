@@ -1,12 +1,9 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-import pytest
-
-ROOT = Path(__file__).resolve().parents[2]
 from salts_secrets import route as route
 
 
@@ -51,8 +48,11 @@ OWNER = "7206705424"
 
 
 def settings(key="public-key"):
-    return route.Settings(owners={f"telegram:{OWNER}"}, rate_per_hour=3,
-                          env=lambda name, default: key if name == route.PUBLIC_KEY_ENV else default)
+    return route.Settings(
+        owners={f"telegram:{OWNER}"},
+        rate_per_hour=3,
+        env=lambda name, default: key if name == route.PUBLIC_KEY_ENV else default,
+    )
 
 
 def run(hook, event, gw):
@@ -136,6 +136,7 @@ def test_missing_public_key_fails_closed():
 
 def test_adapter_lookup_by_platform_value():
     """Adapters keyed by a different Platform enum class (the real one) still resolve by value."""
+
     class Other(Enum):
         TELEGRAM = "telegram"
 

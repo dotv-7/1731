@@ -15,5 +15,5 @@ cp -r $D/plugins/* $P/plugins/; cp $D/profiles/public/SOUL.md $P/
 { printf '%s\n' "$MODEL"; cat $D/profiles/public/config.yaml; } > $P/config.yaml
 printf 'API_SERVER_KEY=public-e2e-key-fedcba9876543210fedc\n' > $P/.env
 printf '{"version":1,"facts":["PUBLIC_FACT_CANARY: dotv writes a blog about agents."],"documents":[{"title":"Education","text":"Master degree (PUBLIC_DOC_CANARY)."}]}' > $P/dotv/public_context.json
-[ "${E2E_NO_SYNC:-}" = 1 ] && sed -i '/^terminal:/,/^  cwd:/d' $P/config.yaml || (cd $D/.. && python3 -m dotv.perm sync --owner-home $R --profile guest=public)
+[ "${E2E_NO_SYNC:-}" = 1 ] && sed -i '/^terminal:/,/^  cwd:/d' $P/config.yaml || (cd $D/.. && python3 -c "import sys; from pathlib import Path; from salts_secrets import tiers; tiers.sync(Path(sys.argv[1]), {\"guest\": Path(sys.argv[1]) / \"profiles/public\"})" $R)
 echo setup-ok

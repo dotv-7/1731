@@ -19,12 +19,38 @@ DATA_SUFFIXES = {".json", ".jsonl", ".yaml", ".yml", ".csv", ".toml", ".log", ".
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".cache", ".mypy_cache", ".pytest_cache"}
 SKIP_FILE_SUFFIXES = (".lock", ".pid", ".sock", "-wal", "-shm", "-journal", ".pyc")
 # HERMES_HOME paths that hold config, secrets, caches or runtime state rather than the owner's content.
-HOME_EXCLUDE = {".env", "auth.json", "config.yaml", "logs", "cache", "plugins", "plugin-data", "profiles", "runtime",
-                "installs", "state", "source-checks", "plugin-update-checks", "platforms", "pairing", "checkpoints",
-                "sandboxes", "bin", "web_dist", "backups/config", "gateway_state.json", "gateway-starts.log",
-                "install_id", "models_dev_cache.json", "models_dev_cache.etag", ".skills_prompt_snapshot.json",
-                "runs_idempotency.db", "skills/.bundled_manifest", "cron/ticker_heartbeat",
-                "cron/ticker_last_success"}
+HOME_EXCLUDE = {
+    ".env",
+    "auth.json",
+    "config.yaml",
+    "logs",
+    "cache",
+    "plugins",
+    "plugin-data",
+    "profiles",
+    "runtime",
+    "installs",
+    "state",
+    "source-checks",
+    "plugin-update-checks",
+    "platforms",
+    "pairing",
+    "checkpoints",
+    "sandboxes",
+    "bin",
+    "web_dist",
+    "backups/config",
+    "gateway_state.json",
+    "gateway-starts.log",
+    "install_id",
+    "models_dev_cache.json",
+    "models_dev_cache.etag",
+    ".skills_prompt_snapshot.json",
+    "runs_idempotency.db",
+    "skills/.bundled_manifest",
+    "cron/ticker_heartbeat",
+    "cron/ticker_last_success",
+}
 MAX_FILE_BYTES = 1_000_000
 MAX_FILES = 3000
 ALLOWLIST_FILE = "public_allowlist.json"
@@ -41,7 +67,7 @@ def display_path(path: str | Path) -> str:
     text = str(path)
     for root, label in ((str(current().resolve()), "<HERMES_HOME>"), (str(Path.home()), "~")):
         if text == root or text.startswith(root + os.sep):
-            return label + text[len(root):]
+            return label + text[len(root) :]
     return text
 
 
@@ -52,15 +78,15 @@ def fingerprint(text: str) -> str:
 @dataclass
 class Item:
     id: str
-    kind: str             # memory | user | soul | workspace | skill | session | provider | plugin
-    group: str            # dashboard grouping label
-    source: str           # path relative to its root, or a descriptor
+    kind: str  # memory | user | soul | workspace | skill | session | provider | plugin
+    group: str  # dashboard grouping label
+    source: str  # path relative to its root, or a descriptor
     title: str
     text: str
     fingerprint: str
     publishable: bool = True
     note: str = ""
-    path: str = ""        # absolute path of the backing file, "" for non-file sources
+    path: str = ""  # absolute path of the backing file, "" for non-file sources
     meta: dict = field(default_factory=dict)
 
     def to_dict(self, with_text: bool = True) -> dict:
@@ -74,8 +100,7 @@ class Item:
 def _item(kind: str, group: str, source: str, locator: str, title: str, text: str, **kw) -> Item:
     fp = fingerprint(text)
     item_id = hashlib.sha256(f"{kind}\0{source}\0{locator}".encode()).hexdigest()[:20]
-    return Item(id=item_id, kind=kind, group=group, source=source, title=title, text=text.strip(),
-                fingerprint=fp, **kw)
+    return Item(id=item_id, kind=kind, group=group, source=source, title=title, text=text.strip(), fingerprint=fp, **kw)
 
 
 def _read(path: Path) -> Optional[str]:
@@ -97,8 +122,17 @@ def _memory_items(home: Path) -> list[Item]:
             if entry:
                 # Entries have no stable name; their content is their identity (an edited entry is a new one).
                 first = entry.splitlines()[0]
-                items.append(_item(kind, group, f"memories/{name}", fingerprint(entry), first[:80], entry,
-                                   path=str((home / "memories" / name).resolve())))
+                items.append(
+                    _item(
+                        kind,
+                        group,
+                        f"memories/{name}",
+                        fingerprint(entry),
+                        first[:80],
+                        entry,
+                        path=str((home / "memories" / name).resolve()),
+                    )
+                )
     return items
 
 
@@ -163,7 +197,7 @@ def _walk(root: Path, exclude: set[str], stop_dirs: set[Path], seen: set[Path]) 
             keep.append(d)
         dirnames[:] = keep
         for name in sorted(filenames):
-            p = (here / name)
+            p = here / name
             rel = p.relative_to(root).as_posix()
             if _skip_file(name) or rel in exclude or p.resolve() in seen or not p.is_file():
                 continue
@@ -191,13 +225,15 @@ def _session_items(db: Path, limit: int = 500, per_session: int = 30) -> list[It
         recent = "SELECT id FROM sessions ORDER BY started_at DESC LIMIT ?"
         rows = con.execute(
             f"SELECT id, {title}, source, started_at, message_count FROM sessions ORDER BY started_at DESC LIMIT ?",
-            (limit,)).fetchall()
+            (limit,),
+        ).fetchall()
         msgs: dict[str, list[str]] = {}
         if con.execute("SELECT 1 FROM sqlite_master WHERE name='messages'").fetchone():
             for sid, role, content in con.execute(
-                    f"SELECT session_id, role, substr(content, 1, 400) FROM messages WHERE session_id IN ({recent}) "
-                    "AND role IN ('user','assistant') AND content IS NOT NULL AND content != '' ORDER BY id",
-                    (limit,)):
+                f"SELECT session_id, role, substr(content, 1, 400) FROM messages WHERE session_id IN ({recent}) "
+                "AND role IN ('user','assistant') AND content IS NOT NULL AND content != '' ORDER BY id",
+                (limit,),
+            ):
                 bucket = msgs.setdefault(sid, [])
                 if len(bucket) < per_session:
                     bucket.append(f"[{role}] {content}")
@@ -209,9 +245,19 @@ def _session_items(db: Path, limit: int = 500, per_session: int = 30) -> list[It
         when = time.strftime("%Y-%m-%d", time.localtime(started or 0))
         label = f"{when} · {t or '(untitled)'} · {src} · {n or 0} messages"
         body = "\n\n".join(msgs.get(sid, [])) or label
-        items.append(_item("session", "Sessions · state.db", f"state.db/{sid}", "", label, body,
-                           publishable=False, note="sessions cannot be published in v1 (private and public content are mixed)",
-                           path=str(db.resolve())))
+        items.append(
+            _item(
+                "session",
+                "Sessions · state.db",
+                f"state.db/{sid}",
+                "",
+                label,
+                body,
+                publishable=False,
+                note="sessions cannot be published in v1 (private and public content are mixed)",
+                path=str(db.resolve()),
+            )
+        )
     return items
 
 
@@ -225,9 +271,20 @@ def _kanban_items(db: Path) -> list[Item]:
         con.close()
     except sqlite3.Error:
         return _database_items(db, "kanban.db")
-    return [_item("kanban", "Kanban · kanban.db", f"kanban.db/{tid}", "", f"{title} · {st}",
-                  "\n\n".join([title, body or "", *comments.get(tid, [])]), publishable=False,
-                  note="task records cannot be published", path=str(db.resolve())) for tid, title, body, st in tasks]
+    return [
+        _item(
+            "kanban",
+            "Kanban · kanban.db",
+            f"kanban.db/{tid}",
+            "",
+            f"{title} · {st}",
+            "\n\n".join([title, body or "", *comments.get(tid, [])]),
+            publishable=False,
+            note="task records cannot be published",
+            path=str(db.resolve()),
+        )
+        for tid, title, body, st in tasks
+    ]
 
 
 def _strings(node, out: list[str], budget: int = 4000) -> None:
@@ -248,7 +305,9 @@ def _strings(node, out: list[str], budget: int = 4000) -> None:
 def _response_items(db: Path) -> list[Item]:
     try:
         con = _ro(db)
-        rows = con.execute("SELECT response_id, data, accessed_at FROM responses ORDER BY accessed_at DESC LIMIT 500").fetchall()
+        rows = con.execute(
+            "SELECT response_id, data, accessed_at FROM responses ORDER BY accessed_at DESC LIMIT 500"
+        ).fetchall()
         con.close()
     except sqlite3.Error:
         return _database_items(db, "response_store.db")
@@ -261,9 +320,19 @@ def _response_items(db: Path) -> list[Item]:
         texts: list[str] = []
         _strings(parsed, texts)
         when = time.strftime("%Y-%m-%d", time.localtime(at or 0))
-        items.append(_item("response", "API transcripts · response_store.db", f"response_store.db/{rid}", "",
-                           f"{when} · {rid}", "\n\n".join(texts)[:4000] or data[:4000], publishable=False,
-                           note="transcripts cannot be published", path=str(db.resolve())))
+        items.append(
+            _item(
+                "response",
+                "API transcripts · response_store.db",
+                f"response_store.db/{rid}",
+                "",
+                f"{when} · {rid}",
+                "\n\n".join(texts)[:4000] or data[:4000],
+                publishable=False,
+                note="transcripts cannot be published",
+                path=str(db.resolve()),
+            )
+        )
     return items
 
 
@@ -273,16 +342,29 @@ def _cron_items(path: Path) -> list[Item]:
     except (OSError, ValueError):
         return _data_items(path, "cron/jobs.json", "Cron · cron")
     jobs = data.get("jobs", []) if isinstance(data, dict) else data if isinstance(data, list) else []
-    return [_item("cron", "Cron · cron", f"cron/jobs.json#{j.get('id', i)}", "",
-                  str(j.get("name") or j.get("id") or f"job {i}"), json.dumps(j, ensure_ascii=False, indent=1)[:4000],
-                  publishable=False, note="cron jobs cannot be published", path=str(path.resolve()))
-            for i, j in enumerate(jobs) if isinstance(j, dict)]
+    return [
+        _item(
+            "cron",
+            "Cron · cron",
+            f"cron/jobs.json#{j.get('id', i)}",
+            "",
+            str(j.get("name") or j.get("id") or f"job {i}"),
+            json.dumps(j, ensure_ascii=False, indent=1)[:4000],
+            publishable=False,
+            note="cron jobs cannot be published",
+            path=str(path.resolve()),
+        )
+        for i, j in enumerate(jobs)
+        if isinstance(j, dict)
+    ]
 
 
 def _database_items(db: Path, rel: str, group: str = "") -> list[Item]:
     try:
         con = _ro(db)
-        names = [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+        names = [
+            r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        ]
         lines = []
         for n in names:
             rows = con.execute('SELECT count(*) FROM "' + n.replace('"', '""') + '"').fetchone()[0]
@@ -290,21 +372,53 @@ def _database_items(db: Path, rel: str, group: str = "") -> list[Item]:
         con.close()
     except sqlite3.Error:
         lines = ["(unreadable)"]
-    return [_item("database", group or _group_for(rel), rel, "", f"{Path(rel).name} · database · {_size(db)}",
-                  "\n".join(lines), publishable=False, note="databases show their structure only", path=str(db.resolve()))]
+    return [
+        _item(
+            "database",
+            group or _group_for(rel),
+            rel,
+            "",
+            f"{Path(rel).name} · database · {_size(db)}",
+            "\n".join(lines),
+            publishable=False,
+            note="databases show their structure only",
+            path=str(db.resolve()),
+        )
+    ]
 
 
 def _data_items(path: Path, rel: str, group: str) -> list[Item]:
     text = _read(path) or ""
-    return [_item("data", group, rel, "", f"{Path(rel).name} · {_size(path)}", text[:4000] or "(empty)",
-                  publishable=False, note="structured data cannot be published", path=str(path.resolve()))]
+    return [
+        _item(
+            "data",
+            group,
+            rel,
+            "",
+            f"{Path(rel).name} · {_size(path)}",
+            text[:4000] or "(empty)",
+            publishable=False,
+            note="structured data cannot be published",
+            path=str(path.resolve()),
+        )
+    ]
 
 
 def _file_item(path: Path, rel: str, group: str) -> list[Item]:
     stat = path.stat()
-    return [_item("file", group, rel, "", f"{Path(rel).name} · {_size(path)}",
-                  f"{display_path(path)}\n{_size(path)} · modified {time.strftime('%Y-%m-%d %H:%M', time.localtime(stat.st_mtime))}",
-                  publishable=False, note="binary files show their path only", path=str(path.resolve()))]
+    return [
+        _item(
+            "file",
+            group,
+            rel,
+            "",
+            f"{Path(rel).name} · {_size(path)}",
+            f"{display_path(path)}\n{_size(path)} · modified {time.strftime('%Y-%m-%d %H:%M', time.localtime(stat.st_mtime))}",
+            publishable=False,
+            note="binary files show their path only",
+            path=str(path.resolve()),
+        )
+    ]
 
 
 def _group_for(rel: str, prefix: str = "Data dir") -> str:
@@ -332,11 +446,26 @@ def _home_item(home: Path, path: Path, rel: str) -> list[Item]:
     if rel.startswith("skills/") and path.name == "SKILL.md":
         text = _read(path)
         return [_item("skill", "Skills", rel, "", path.parent.name, text, path=str(path.resolve()))] if text else []
-    special = {"state.db": _session_items, "kanban.db": _kanban_items, "response_store.db": _response_items,
-               "cron/jobs.json": _cron_items}
+    special = {
+        "state.db": _session_items,
+        "kanban.db": _kanban_items,
+        "response_store.db": _response_items,
+        "cron/jobs.json": _cron_items,
+    }
     if rel in special:
-        return special[rel](path) or [_item("data", _group_for(rel), rel, "", f"{rel} · no records yet · {_size(path)}", "",
-                                            publishable=False, note="expands once records exist", path=str(path.resolve()))]
+        return special[rel](path) or [
+            _item(
+                "data",
+                _group_for(rel),
+                rel,
+                "",
+                f"{rel} · no records yet · {_size(path)}",
+                "",
+                publishable=False,
+                note="expands once records exist",
+                path=str(path.resolve()),
+            )
+        ]
     group = "Skills" if rel.startswith("skills/") else _group_for(rel)
     return _generic_items(path, rel, group)
 
@@ -344,6 +473,7 @@ def _home_item(home: Path, path: Path, rel: str) -> list[Item]:
 def _config(home: Path) -> dict:
     try:
         from . import _yaml as yaml
+
         return yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) or {}
     except Exception:
         return {}
@@ -353,23 +483,45 @@ def _runtime_items(home: Path) -> list[Item]:
     items = []
     provider = ((_config(home).get("memory") or {}).get("provider") or "").strip()
     if provider:
-        items.append(_item("provider", "External memory / plugins", f"memory.provider={provider}", "",
-                           f"External memory provider: {provider}", provider, publishable=False,
-                           note="the public profile has no external memory"))
+        items.append(
+            _item(
+                "provider",
+                "External memory / plugins",
+                f"memory.provider={provider}",
+                "",
+                f"External memory provider: {provider}",
+                provider,
+                publishable=False,
+                note="the public profile has no external memory",
+            )
+        )
     plugins = home / "plugins"
     if plugins.is_dir():
         for p in sorted(x for x in plugins.iterdir() if x.is_dir() and not x.name.startswith(".")):
-            items.append(_item("plugin", "External memory / plugins", f"plugins/{p.name}", "", f"Plugin: {p.name}",
-                               p.name, publishable=False, note="plugin context never enters a guest session",
-                               path=str(p.resolve())))
+            items.append(
+                _item(
+                    "plugin",
+                    "External memory / plugins",
+                    f"plugins/{p.name}",
+                    "",
+                    f"Plugin: {p.name}",
+                    p.name,
+                    publishable=False,
+                    note="plugin context never enters a guest session",
+                    path=str(p.resolve()),
+                )
+            )
     return items
 
 
 def _bundled_skill_dirs(home: Path) -> set[Path]:
     """Official skills synced in by Hermes (tools/skills_sync.py manifest); they are not the owner's content."""
     try:
-        names = {line.split(":", 1)[0].strip() for line in
-                 (home / "skills" / ".bundled_manifest").read_text(encoding="utf-8").splitlines() if line.strip()}
+        names = {
+            line.split(":", 1)[0].strip()
+            for line in (home / "skills" / ".bundled_manifest").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
     except OSError:
         return set()
     return {p.parent.resolve() for p in (home / "skills").rglob("SKILL.md") if p.parent.name in names}
@@ -405,26 +557,42 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
     items = _memory_items(owner_home)
     bundled = _bundled_skill_dirs(owner_home)
     if bundled:
-        items.append(_item("skill", "Skills", "skills/.bundled_manifest", "", f"Built-in skills: {len(bundled)} (folded)",
-                           "\n".join(sorted(d.name for d in bundled)), publishable=False,
-                           note="shipped with Hermes, not your content", path=str((owner_home / "skills").resolve())))
+        items.append(
+            _item(
+                "skill",
+                "Skills",
+                "skills/.bundled_manifest",
+                "",
+                f"Built-in skills: {len(bundled)} (folded)",
+                "\n".join(sorted(d.name for d in bundled)),
+                publishable=False,
+                note="shipped with Hermes, not your content",
+                path=str((owner_home / "skills").resolve()),
+            )
+        )
     if owner_home.is_dir():
         skills = (owner_home / "skills").resolve()
-        exclude = HOME_EXCLUDE | {f"skills/{d.parent.relative_to(skills).as_posix()}/DESCRIPTION.md"
-                                  for d in bundled if d.parent != skills}
+        exclude = HOME_EXCLUDE | {
+            f"skills/{d.parent.relative_to(skills).as_posix()}/DESCRIPTION.md" for d in bundled if d.parent != skills
+        }
         for path, rel in _walk(owner_home, exclude, bundled, seen):
             items += _memo(fresh, ("home", str(home_abs), rel), path, lambda: _home_item(owner_home, path, rel))
     for root in (Path(r) for r in workspace_roots):
         if root.is_dir() and root.resolve() != home_abs:
             for path, rel in _walk(root, set(), {home_abs}, seen):
-                items += _memo(fresh, ("ws", str(root.resolve()), rel), path, lambda: _generic_items(
-                    path, f"{root.name}/{rel}", _group_for(rel, f"Workspace · {root.name}")))
+                items += _memo(
+                    fresh,
+                    ("ws", str(root.resolve()), rel),
+                    path,
+                    lambda: _generic_items(path, f"{root.name}/{rel}", _group_for(rel, f"Workspace · {root.name}")),
+                )
     items += _runtime_items(owner_home)
     _MEMO = fresh
     return items
 
 
 # ---------------------------------------------------------------- allowlist
+
 
 def _atomic_write(path: Path, text: str, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -447,8 +615,9 @@ def load_allowlist(owner_home: Path) -> dict[str, dict]:
         return {}
 
 
-def save_allowlist(owner_home: Path, items: list[Item], public_ids: Iterable[str],
-                   public_texts: Optional[dict[str, str]] = None) -> dict[str, dict]:
+def save_allowlist(
+    owner_home: Path, items: list[Item], public_ids: Iterable[str], public_texts: Optional[dict[str, str]] = None
+) -> dict[str, dict]:
     """``public_texts`` maps an item id to the guest-facing rewrite the owner approved. Guests never get the
     original text when a rewrite exists; an empty or identical rewrite means "publish the original"."""
     wanted = set(public_ids)
@@ -457,14 +626,22 @@ def save_allowlist(owner_home: Path, items: list[Item], public_ids: Iterable[str
     for it in items:
         if it.id not in wanted or not it.publishable:
             continue
-        entry = {"id": it.id, "kind": it.kind, "source": it.source, "title": it.title,
-                 "fingerprint": it.fingerprint, "approved_at": int(time.time())}
+        entry = {
+            "id": it.id,
+            "kind": it.kind,
+            "source": it.source,
+            "title": it.title,
+            "fingerprint": it.fingerprint,
+            "approved_at": int(time.time()),
+        }
         rewrite = (texts.get(it.id) or "").strip()
         if rewrite and rewrite != it.text:
             entry["public_text"] = rewrite
         entries[it.id] = entry
-    _atomic_write(data_dir(owner_home) / ALLOWLIST_FILE,
-                  json.dumps({"version": 1, "entries": list(entries.values())}, ensure_ascii=False, indent=2))
+    _atomic_write(
+        data_dir(owner_home) / ALLOWLIST_FILE,
+        json.dumps({"version": 1, "entries": list(entries.values())}, ensure_ascii=False, indent=2),
+    )
     return entries
 
 
@@ -493,8 +670,9 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
     }
 
 
-def sync_public(owner_home: Path, public_home: Path, workspace_roots: list[Path],
-                owner_name: str = "the owner") -> dict:
+def sync_public(
+    owner_home: Path, public_home: Path, workspace_roots: list[Path], owner_name: str = "the owner"
+) -> dict:
     items = scan(owner_home, workspace_roots)
     projection = build_projection(items, load_allowlist(owner_home), owner_name)
     _atomic_write(data_dir(public_home) / PROJECTION_FILE, json.dumps(projection, ensure_ascii=False, indent=2), 0o644)

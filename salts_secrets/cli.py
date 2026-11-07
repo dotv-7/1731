@@ -67,8 +67,9 @@ def cmd_setup(args: argparse.Namespace) -> int:
         say("created")
     soul = pub / "SOUL.md"
     if not soul.exists() or not soul.read_text(encoding="utf-8").strip():
-        soul.write_text((TEMPLATES / "SOUL.md").read_text(encoding="utf-8").format(owner_name=owner_name),
-                        encoding="utf-8")
+        soul.write_text(
+            (TEMPLATES / "SOUL.md").read_text(encoding="utf-8").format(owner_name=owner_name), encoding="utf-8"
+        )
         say("SOUL.md written from the template; edit it to shape the public persona")
 
     cfg = _read_yaml(pub / "config.yaml")
@@ -108,17 +109,20 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def _next_steps(public: str) -> int:
-    print("\nnext:\n  1. restart the gateway (hermes gateway restart)\n"
-          f"  2. set your own ids: hermes config set plugins.entries.{NAME}.settings.owners '[\"telegram:<id>\"]'\n"
-          "  3. open the dashboard (hermes dashboard) and approve what guests may know under Context")
+    print(
+        "\nnext:\n  1. restart the gateway (hermes gateway restart)\n"
+        f"  2. set your own ids: hermes config set plugins.entries.{NAME}.settings.owners '[\"telegram:<id>\"]'\n"
+        "  3. open the dashboard (hermes dashboard) and approve what guests may know under Context"
+    )
     return 0
 
 
 def _sync(owner: Path, pub: Path, owner_cfg: dict, say) -> None:
     for tier, toolsets in tiers.sync(owner, {"guest": pub}).items():
         say(f"{tier}: {', '.join(toolsets)}")
-    projection = context.sync_public(owner, pub, _workspaces(owner, owner_cfg),
-                                     _settings(owner_cfg).get("owner_name") or "the owner")
+    projection = context.sync_public(
+        owner, pub, _workspaces(owner, owner_cfg), _settings(owner_cfg).get("owner_name") or "the owner"
+    )
     say(f"published {len(projection['facts'])} facts and {len(projection['documents'])} documents")
 
 
@@ -161,5 +165,6 @@ def handle(args: argparse.Namespace) -> int:
 
 
 def register(ctx) -> None:
-    ctx.register_cli_command(name=NAME, help="Isolate guests from your private context",
-                             setup_fn=setup_parser, handler_fn=handle)
+    ctx.register_cli_command(
+        name=NAME, help="Isolate guests from your private context", setup_fn=setup_parser, handler_fn=handle
+    )

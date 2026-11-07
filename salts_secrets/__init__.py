@@ -21,11 +21,13 @@ def register(ctx) -> None:
     public_profile = ctx.get_config("public_profile", default="public") or "public"
     if home.is_public(home.current(), public_profile):
         from . import gate, public_context
+
         gate.register(ctx)
         public_context.register(ctx)
         log.info("salts-secrets: public role")
         return
     from . import cli, route
+
     route.register(ctx)
     cli.register(ctx)
     log.info("salts-secrets: owner role")

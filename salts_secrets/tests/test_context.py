@@ -1,15 +1,13 @@
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
 from salts_secrets import context as core
+from salts_secrets import public_context as plugin
 from salts_secrets.home import data_dir
 
 CANARY = "CANARY-PRIVATE-7f3a"
-from salts_secrets import public_context as plugin
 
 
 @pytest.fixture
@@ -65,6 +63,7 @@ def test_edited_public_section_falls_back_to_private(homes):
 def test_unpublishable_items_cannot_be_approved(homes, tmp_path):
     owner, public, ws = homes
     import sqlite3
+
     con = sqlite3.connect(owner / "state.db")
     con.execute("CREATE TABLE sessions (id TEXT, source TEXT, title TEXT, started_at REAL, message_count INT)")
     con.execute("INSERT INTO sessions VALUES ('s1','cli',?,0,3)", (CANARY,))
@@ -141,10 +140,13 @@ def test_workspace_containing_home_does_not_reexpose_excluded_files(homes):
 
 def test_kanban_db_listed_even_when_empty_then_expanded(homes):
     import sqlite3
+
     owner, _, ws = homes
     con = sqlite3.connect(owner / "kanban.db")
-    con.executescript("CREATE TABLE tasks (id TEXT, title TEXT, body TEXT, status TEXT, created_at INT);"
-                      "CREATE TABLE task_comments (id INTEGER PRIMARY KEY, task_id TEXT, author TEXT, body TEXT);")
+    con.executescript(
+        "CREATE TABLE tasks (id TEXT, title TEXT, body TEXT, status TEXT, created_at INT);"
+        "CREATE TABLE task_comments (id INTEGER PRIMARY KEY, task_id TEXT, author TEXT, body TEXT);"
+    )
     con.commit()
     kb = [i for i in core.scan(owner, ws) if i.path.endswith("kanban.db")]
     assert len(kb) == 1 and "no records yet" in kb[0].title and not kb[0].publishable
@@ -157,14 +159,17 @@ def test_kanban_db_listed_even_when_empty_then_expanded(homes):
 
 def test_rescan_sees_edits_deletions_and_wal_writes(homes):
     import sqlite3
+
     owner, _, ws = homes
     core.scan(owner, ws)
     (ws[0] / "bio.md").write_text("# Bio\n## School\nPhD now\n", encoding="utf-8")
     (owner / "notes.md").write_text("temp", encoding="utf-8")
     con = sqlite3.connect(owner / "state.db")
-    con.executescript("PRAGMA journal_mode=WAL; CREATE TABLE sessions (id TEXT, title TEXT, source TEXT, started_at REAL,"
-                      " message_count INT); CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT,"
-                      " content TEXT);")
+    con.executescript(
+        "PRAGMA journal_mode=WAL; CREATE TABLE sessions (id TEXT, title TEXT, source TEXT, started_at REAL,"
+        " message_count INT); CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT,"
+        " content TEXT);"
+    )
     core.scan(owner, ws)
     (owner / "notes.md").unlink()
     con.execute("INSERT INTO sessions VALUES ('s1', 'trip', 'cli', 1, 1)")

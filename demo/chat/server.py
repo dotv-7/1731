@@ -45,7 +45,7 @@ class Settings:
         self.public_profile = e.get("DOTV_PUBLIC_PROFILE", "public")
         self.passphrase_hash = e.get("DOTV_OWNER_PASSPHRASE_HASH", "")
         self.secret = (e.get("DOTV_SECRET") or secrets.token_hex(32)).encode()
-        self.owner_home = Path(e.get("DOTV_OWNER_HOME", "/opt/data"))
+        self.owner_home = Path(e.get("DOTV_OWNER_HOME", str(Path.home() / ".hermes")))
         self.public_home = Path(e.get("DOTV_PUBLIC_HOME", str(self.owner_home / "profiles" / self.public_profile)))
         roots = e.get("DOTV_WORKSPACE_ROOTS", "")
         self.workspace_roots = [Path(p) for p in roots.split(os.pathsep) if p]
@@ -54,7 +54,7 @@ class Settings:
                               "user": e.get("DOTV_USER_PROFILE", "dotv-user"), "guest": self.public_profile}
         self.tier_keys = {"admin": e.get("DOTV_ADMIN_KEY", ""), "user": e.get("DOTV_USER_KEY", ""),
                           "guest": self.public_key, "owner": self.owner_key}
-        self.docs_url = e.get("DOTV_DOCS_URL", "http://127.0.0.1:8806/doc.html")
+        self.docs_url = e.get("DOTV_DOCS_URL", "")
 
     def tier_homes(self) -> dict[str, Path]:
         homes = {t: self.owner_home / "profiles" / name for t, name in self.tier_profiles.items()}
@@ -464,7 +464,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def _model_cfg() -> dict:
         """Hermes' own model settings from the owner profile (same model that serves her sessions)."""
         try:
-            from dotv import _yaml
+            from salts_secrets import _yaml
             cfg = _yaml.safe_load((s.owner_home / "config.yaml").read_text(encoding="utf-8")) or {}
         except (OSError, ValueError):
             cfg = {}

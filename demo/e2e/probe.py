@@ -1,4 +1,5 @@
-import json, sys, urllib.request
+import json
+import urllib.request
 B = "http://127.0.0.1:8650"
 K = {"guest": ("/p/public", "public-e2e-key-fedcba9876543210fedc"), "owner": ("", "owner-e2e-key-0123456789abcdef0123")}
 def ask(role, prompt):

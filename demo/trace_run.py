@@ -7,7 +7,12 @@ usage: trace_run.py <bundle.json> --tools-owner tools_owner.json --tools-public 
        [--questions questions.txt] [--owner-home DIR] [--public-home DIR] [--hermes URL]
 Keys come from <owner-home>/.env (API_SERVER_KEY, DOTV_PUBLIC_KEY). Questions: one per line, blank lines ignored.
 """
-import argparse, json, sqlite3, sys, time, urllib.request, uuid
+import argparse
+import json
+import sqlite3
+import sys
+import time
+import urllib.request
 from pathlib import Path
 
 DEFAULT_QUESTIONS = """\
@@ -83,7 +88,7 @@ def main() -> None:
                   "key": env_key(owner_home, "API_SERVER_KEY"), "sid": f"trace-owner-{run_id}", "db": owner_home / "state.db",
                   "home": str(owner_home), "tools": json.load(open(a.tools_owner, encoding="utf-8"))},
         "public": {"label": "Salt's assistant (public session)", "url": f"{a.hermes}/p/{a.public_profile}/v1/chat/completions",
-                   "key": env_key(owner_home, "DOTV_PUBLIC_KEY"), "sid": f"trace-public-{run_id}", "db": public_home / "state.db",
+                   "key": env_key(owner_home, "SALTS_PUBLIC_API_KEY"), "sid": f"trace-public-{run_id}", "db": public_home / "state.db",
                    "home": str(public_home), "tools": json.load(open(a.tools_public, encoding="utf-8"))},
     }
     turns = []
