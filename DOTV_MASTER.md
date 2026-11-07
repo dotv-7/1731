@@ -1,7 +1,7 @@
 # dotv Hermes：全局说明文档（持续维护）
 
 > 本文档由 Devin 维护，是这个分支所有自定义功能的总入口。Hermes 每升级一个版本、或者权限设计每改一次，都要同步更新本文档。
-> 版本（2026-11-07 核对）：**本机现在跑的是官方 v0.23.0**（`hermes --version` 报 `Hermes Agent v0.23.0 · upstream b6520bf5 · local 2bd378ed`，代码在 `~/code/17x31-cognition` 的 hermes-latest 分支）。`dotv` 分支自己的基线是上游 **main 分支 2026-10-16 的快照 `74e7a25c`**，落在 v0.22.2（10-15）和 v0.22.5（10-22）之间，不是正式 tag；旧文里说的“v0.22.2 代”指的就是它。工具清单和上下文来源最初从 `74e7a25c` 整理，已按 v0.23.0 逐项核过一遍，差异只有 browser 工具组（见 §3）。
+> 版本（2026-11-07 核对）：**本机现在跑的是官方 v0.23.0**（`hermes --version` 报 `Hermes Agent v0.23.0 · upstream b6520bf5 · local 2bd378ed`，代码在 `~/code/salt-s-secrets` 的 hermes-latest 分支）。`dotv` 分支自己的基线是上游 **main 分支 2026-10-16 的快照 `74e7a25c`**，落在 v0.22.2（10-15）和 v0.22.5（10-22）之间，不是正式 tag；旧文里说的“v0.22.2 代”指的就是它。工具清单和上下文来源最初从 `74e7a25c` 整理，已按 v0.23.0 逐项核过一遍，差异只有 browser 工具组（见 §3）。
 > 兼容性：`dotv` 的改动在官方 **v0.22.2** 和 **v0.22.5** tag 上都能无冲突套上，`dotv/tests` 全部通过；2026-11-06 两个 dotv 插件在 **v0.23.0** 上也照常加载（本机 hermes-latest 分支）；用到的扩展点（`pre_tool_call`、`register_system_prompt_section`、`platform_toolsets`、`tools.tool_search`、`terminal.cwd`）两个版本都有。
 
 ---
@@ -581,7 +581,7 @@ A 组任何一条在访客窗口被答出来，就是隔离失败，直接记进
 
 | 项 | 绝对路径或值 |
 |---|---|
-| 代码 checkout | `/Users/chen.zhe/code/17x31-cognition`，唯一一份 |
+| 代码 checkout | `/Users/chen.zhe/code/salt-s-secrets`，唯一一份 |
 | 分支 dotv | 日常用的分支：官方 v0.23.0 加上 dotv 的改动（`dotv/` 目录、插件、聊天窗、权限工具）。v0.23.0 是它的祖先提交 |
 | 分支 hermes-latest | 纯官方 v0.23.0（tag v0.23.0，commit 2bd378ed），不含任何 dotv 改动，用来做分支差异对照（8806 的 `/diff.html`） |
 | upstream remote | `upstream` 指向 NousResearch/hermes-agent |
@@ -598,7 +598,7 @@ A 组任何一条在访客窗口被答出来，就是隔离失败，直接记进
 |---|---|
 | `start_1105.sh` | 导出 HERMES_HOME，source 仓库的 `activate`，确保 `.env` 里有 API_SERVER_HOST/PORT/KEY 三行（8642，主人 key），先调 stop，再后台起 `hermes gateway run` 和 `hermes dashboard --host 127.0.0.1 --no-open`，等 9119 就绪 |
 | `stop_1105.sh` | 按 8642 和 9119 的监听进程 kill，兜底 pkill gateway 和 dashboard |
-| `start_board.sh` | 起 8780 聊天窗和上下文页（源码 `/Users/chen.zhe/code/17x31-cognition/dotv/chat/server.py`，用 Hermes 的 venv 跑），通过环境变量传入主人 home、访客 home、workspace 根、8642 地址、两把 key、口令 `1234` 的哈希、DOTV_MASTER.md 路径 |
+| `start_board.sh` | 起 8780 聊天窗和上下文页（源码 `/Users/chen.zhe/code/salt-s-secrets/dotv/chat/server.py`，用 Hermes 的 venv 跑），通过环境变量传入主人 home、访客 home、workspace 根、8642 地址、两把 key、口令 `1234` 的哈希、DOTV_MASTER.md 路径 |
 | `serve_hub.sh` | 起 8806 资料站 |
 | `lena_chat.py` | 脚本化和 Lena 的 Hermes 对话：`python3 -I /Users/chen.zhe/code/ops/hermes_local/lena_chat.py <会话名> "<一句话>"`，走 8642 的主人 key，带 `X-Hermes-Session-Id`，历史存在 `lena_sessions/<会话名>.json` |
 | `publish_public.py` | 调看板 API 把 `workspace/public/` 下全部段落勾成公开并同步到访客投影 |
@@ -610,7 +610,7 @@ A 组任何一条在访客窗口被答出来，就是隔离失败，直接记进
 dotv 的测试环境是单独的 `~/dotv-venv`（uv 建，装 `dotv/requirements-dev.txt`，Python 3.14），因为 Hermes 自己的 venv 没有 pytest。跑法：
 
 ```
-cd /Users/chen.zhe/code/17x31-cognition && PYTHONPATH=. ~/dotv-venv/bin/python -m pytest -q dotv/tests
+cd /Users/chen.zhe/code/salt-s-secrets && PYTHONPATH=. ~/dotv-venv/bin/python -m pytest -q dotv/tests
 ```
 
 `dotv/tests/` 里有五个文件：`test_chat_server.py`、`test_context.py`、`test_guest_gate.py`、`test_guest_route.py`、`test_perm.py`。
@@ -629,7 +629,7 @@ cd /Users/chen.zhe/code/17x31-cognition && PYTHONPATH=. ~/dotv-venv/bin/python -
 | `plugins.enabled` | `dotv-guest-gate`、`dotv-public-context`，装在它自己的 `plugins/` 下 |
 | `agent.reasoning_effort` | `none` |
 
-`SOUL.md` 开头是 "You are Salt's assistant"，对谁打招呼都一样，不知道的事一句带过，明文禁止提 rules、session、profile、entrance、"public version" 这类字眼；里面只有口径没有事实。模板同步在 `/Users/chen.zhe/code/17x31-cognition/dotv/profiles/public/SOUL.md`。`dotv/public_context.json` 是看板同步过来的投影，是访客唯一能拿到的主人信息，当前是 96 段公开文档（Low Tide 存档）。`visitor-rules/` 是 Hermes 自存的笔记，访客加载不到。
+`SOUL.md` 开头是 "You are Salt's assistant"，对谁打招呼都一样，不知道的事一句带过，明文禁止提 rules、session、profile、entrance、"public version" 这类字眼；里面只有口径没有事实。模板同步在 `/Users/chen.zhe/code/salt-s-secrets/dotv/profiles/public/SOUL.md`。`dotv/public_context.json` 是看板同步过来的投影，是访客唯一能拿到的主人信息，当前是 96 段公开文档（Low Tide 存档）。`visitor-rules/` 是 Hermes 自存的笔记，访客加载不到。
 
 key 和入口：
 
@@ -658,7 +658,7 @@ key 和入口：
 | Discord DNS | 本机 VPN 的 DNS 对 gateway.discord.gg 返回 SERVFAIL，`/etc/hosts` 里钉了一行 `162.159.135.234 gateway.discord.gg`；开发者后台开了 Server Members Intent 和 Message Content Intent |
 | Telegram 群 | 隐私模式下 bot 只收命令和回复它的消息，@ 不算；要么把 bot 设成群管理员，要么 BotFather `/setprivacy` Disable 后重新拉进群。这条线路偶尔断，Hermes 看门狗会自动重连 |
 
-分流插件 `dotv-guest-route` 源码在 `/Users/chen.zhe/code/17x31-cognition/dotv/plugins/dotv-guest-route/`，装在主人 profile 的 `plugins/dotv-guest-route/`，`hermes plugins validate` 通过，单元测试在 `dotv/tests/test_guest_route.py`。它的行为：
+分流插件 `dotv-guest-route` 源码在 `/Users/chen.zhe/code/salt-s-secrets/dotv/plugins/dotv-guest-route/`，装在主人 profile 的 `plugins/dotv-guest-route/`，`hermes plugins validate` 通过，单元测试在 `dotv/tests/test_guest_route.py`。它的行为：
 
 - 规则一句话：只有主人的私聊走主人 profile；其余一切（陌生人私聊、任何群、频道、子区、主人自己在群里说的话）在主人 agent 看到之前被拦下，转给 public profile 回答。
 - 机制：`pre_gateway_dispatch` 钩子在鉴权之前触发，非主人私聊返回 `skip`，自己 POST 到 `http://127.0.0.1:8642/p/public/v1/chat/completions`（带 `X-Hermes-Session-Id`，私聊按人、群按群），回复用 `gateway.adapters[platform].send()` 发回原聊天。每个访客身份每小时 20 条。
