@@ -35,9 +35,14 @@ _MEMO: dict[tuple, tuple[tuple, list]] = {}
 
 
 def display_path(path: str | Path) -> str:
-    """Path as shown in the dashboard: the user's home directory becomes ``~``."""
-    text, user_home = str(path), str(Path.home())
-    return "~" + text[len(user_home):] if text == user_home or text.startswith(user_home + os.sep) else text
+    """Path as shown to the owner: ``<HERMES_HOME>/…`` inside the Hermes home, ``~/…`` inside the user's home."""
+    from .home import current
+
+    text = str(path)
+    for root, label in ((str(current().resolve()), "<HERMES_HOME>"), (str(Path.home()), "~")):
+        if text == root or text.startswith(root + os.sep):
+            return label + text[len(root):]
+    return text
 
 
 def fingerprint(text: str) -> str:
