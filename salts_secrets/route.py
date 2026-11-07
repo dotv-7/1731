@@ -21,8 +21,13 @@ from .home import NAME, PUBLIC_KEY_ENV
 log = logging.getLogger(__name__)
 
 PLATFORM_ENV_PREFIX = {
-    "telegram": "TELEGRAM", "discord": "DISCORD", "slack": "SLACK", "whatsapp": "WHATSAPP",
-    "signal": "SIGNAL", "matrix": "MATRIX", "mattermost": "MATTERMOST",
+    "telegram": "TELEGRAM",
+    "discord": "DISCORD",
+    "slack": "SLACK",
+    "whatsapp": "WHATSAPP",
+    "signal": "SIGNAL",
+    "matrix": "MATRIX",
+    "mattermost": "MATTERMOST",
 }
 NOTICE_UNAVAILABLE = "The guest entrance is temporarily unavailable. Please try again in a minute."
 NOTICE_RATE = "You have reached the guest message limit for this hour. Please come back later."
@@ -35,6 +40,7 @@ Getter = Callable[[str, str], str]
 def scoped_env(name: str, default: str = "") -> str:
     """Profile-scoped variable lookup; never reads another profile's value under multiplexing."""
     from agent.secret_scope import get_secret
+
     return get_secret(name, default) or default
 
 
@@ -126,7 +132,8 @@ async def _reply(gateway: Any, event: Any, content: str) -> None:
     src = event.source
     adapters = getattr(gateway, "adapters", {}) or {}
     adapter = adapters.get(src.platform) or next(
-        (a for key, a in adapters.items() if platform_name(key) == platform_name(src.platform)), None)
+        (a for key, a in adapters.items() if platform_name(key) == platform_name(src.platform)), None
+    )
     if adapter is None:
         log.warning("%s: no adapter for %s, reply dropped", NAME, platform_name(src.platform))
         return

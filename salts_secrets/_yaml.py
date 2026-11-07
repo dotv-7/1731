@@ -22,4 +22,5 @@ except ImportError:
         yaml.dump(data, out)
         return out.getvalue()
 
+
 __all__ = ["YAMLError", "safe_dump", "safe_load"]

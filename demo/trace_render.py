@@ -7,11 +7,14 @@ longer than the fold limit shows its head and opens in place.
 
 usage: trace_render.py <bundle.json> <out_dir>   -> <out_dir>/index.html, run_<id>.html, run_<id>_{owner,public}.prompt.txt
 """
-import html, json, re, sys
+import html
+import json
+import re
+import sys
 from pathlib import Path
 
 HERMES = "Hermes Agent v0.23.0 (local 2bd378ed, hermes-latest)"
-MODEL_NOTE = "deepseek-flash as the API reports it: the DeepSeek Flash build of 2026-10-17, set in Lena's config.yaml, the same model on both sides; reasoning is produced on both sides and shown here, the public API just does not return it"
+MODEL_NOTE = "deepseek-flash as the API reports it: the DeepSeek Flash build of 2026-10-17, set in Lena's config.yaml, the same model on both sides; chain of thought is removed before publishing"
 FOLD = {"sys": 14000, "tools": 6000, "tool": 7000, "think": 14000, "asst": 14000, "call": 6000, "user": 14000, "meta": 2000}
 E = lambda s: html.escape(str(s if s is not None else ""), quote=False)
 fmt = lambda n: f"{n:,}" if isinstance(n, int) else "—"
@@ -168,7 +171,32 @@ def prompt_txt(side: dict) -> str:
     return "\n".join(parts)
 
 
+LOOPBACK = re.compile(r"https?://(?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?")
+
+
+def redact(bundle: dict) -> dict:
+    """Drop chain of thought and replace machine paths and loopback URLs before anything is published."""
+    sides = [bundle.get(k) or {} for k in ("owner", "public")]
+    swaps = sorted({(str(sides[1].get("home") or ""), "<HERMES_HOME>/profiles/public"),
+                    (str(sides[0].get("home") or ""), "<HERMES_HOME>"), (str(Path.home()), "~")} - {("", "")},
+                   key=lambda kv: -len(kv[0]))
+
+    def clean(value):
+        if isinstance(value, dict):
+            return {k: clean(v) for k, v in value.items() if k != "reasoning_content"}
+        if isinstance(value, list):
+            return [clean(v) for v in value]
+        if isinstance(value, str):
+            for old, new in swaps:
+                value = value.replace(old, new)
+            return LOOPBACK.sub("<local-api>", value)
+        return value
+
+    return clean(bundle)
+
+
 def render(bundle: dict, out_dir: Path) -> Path:
+    bundle = redact(bundle)
     L, R = bundle["sides"]["owner"], bundle["sides"]["public"]
     qs = bundle["questions"]
     qps = bundle.get("questions_public") or qs
@@ -185,7 +213,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
             return '<span class="none">—</span>'
         kind, title, body, tok, extra, aid = step
         return f'<a class="seg {kind}" href="#{aid}" title="{E(title)}"><b>{E(title)}</b><span>{fmt(tok) if tok else ""}</span></a>'
-    side = [f'<div class="row head"><span class="lbl">step</span><span class="lbl">Lena</span><span class="lbl">Salt\'s assistant</span></div>',
+    side = ['<div class="row head"><span class="lbl">step</span><span class="lbl">Lena</span><span class="lbl">Salt\'s assistant</span></div>',
             f'<div class="row"><span class="n">sys</span><a class="seg sys" href="#sys"><b>system</b><span>{len(L["system_prompt"]):,} ch</span></a><a class="seg sys" href="#sys"><b>system</b><span>{len(R["system_prompt"]):,} ch</span></a></div>',
             f'<div class="row"><span class="n">tools</span><a class="seg tools" href="#tools"><b>{len(L["tools"])} tools</b><span></span></a><a class="seg tools" href="#tools"><b>{len(R["tools"])} tools</b><span></span></a></div>']
     for i, q in enumerate(qs):

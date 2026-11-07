@@ -20,7 +20,7 @@ TOOL_NAME = "public_notes_lookup"
 LOOKUP_SCHEMA = {
     "name": TOOL_NAME,
     "description": "Search the owner's public notes (documents the owner approved for guests). Use it when a "
-                   "guest asks about the owner's background, writing or projects. An empty query lists titles.",
+    "guest asks about the owner's background, writing or projects. An empty query lists titles.",
     "parameters": {
         "type": "object",
         "properties": {"query": {"type": "string", "description": "Keywords or a document title"}},
@@ -86,7 +86,14 @@ def _handle_lookup(args: Optional[dict[str, Any]] = None, **_: Any) -> str:
 
 
 def register(ctx) -> None:
-    ctx.register_system_prompt_section(home.NAME, lambda _info: render_section(load_projection()),
-                                       max_chars=SECTION_MAX)
-    ctx.register_tool(name=TOOL_NAME, toolset="public_notes", schema=LOOKUP_SCHEMA,
-                      handler=_handle_lookup, description=LOOKUP_SCHEMA["description"], emoji="📖")
+    ctx.register_system_prompt_section(
+        home.NAME, lambda _info: render_section(load_projection()), max_chars=SECTION_MAX
+    )
+    ctx.register_tool(
+        name=TOOL_NAME,
+        toolset="public_notes",
+        schema=LOOKUP_SCHEMA,
+        handler=_handle_lookup,
+        description=LOOKUP_SCHEMA["description"],
+        emoji="📖",
+    )

@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import tiers as perm
 from salts_secrets.home import data_dir
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 @pytest.fixture
@@ -35,6 +36,7 @@ def test_members_code_lookup_tier_change_and_delete(owner):
 
 def test_sync_writes_tier_file_and_narrows_profile_config(owner):
     from salts_secrets import _yaml as yaml
+
     home = owner / "profiles/members"
     home.mkdir(parents=True)
     (home / "config.yaml").write_text("model:\n  default: m\nplatform_toolsets:\n  api_server: [web, terminal]\n")
@@ -70,8 +72,10 @@ def test_blocking_covers_seen_devices_and_ips_until_unblocked(owner):
 
 def test_only_public_ips_are_blockable():
     assert perm.blockable_ip("203.0.113.7") and perm.blockable_ip("2001:db8::1")
-    assert not any(perm.blockable_ip(ip) for ip in ("127.0.0.1", "::1", "10.1.2.3", "172.18.0.1", "192.168.1.5",
-                                                    "fd00::1", "testclient", ""))
+    assert not any(
+        perm.blockable_ip(ip)
+        for ip in ("127.0.0.1", "::1", "10.1.2.3", "172.18.0.1", "192.168.1.5", "fd00::1", "testclient", "")
+    )
 
 
 def test_ip_blocks_expire_and_policy_save_keeps_blocks(owner, monkeypatch):
@@ -79,7 +83,7 @@ def test_ip_blocks_expire_and_policy_save_keeps_blocks(owner, monkeypatch):
     perm.update_member(owner, m["id"], tier="blocked")
     perm.save(owner, dict(perm.load(owner), tiers={"admin": [], "user": [], "guest": ["web"]}))
     assert perm.is_blocked(owner, "203.0.113.7", "")
-    monkeypatch.setattr(perm.time, "time", lambda: 10 ** 11)
+    monkeypatch.setattr(perm.time, "time", lambda: 10**11)
     assert perm.load(owner)["blocklist"] == []
 
 
@@ -93,6 +97,7 @@ def test_sync_isolates_cwd_and_audit_passes(tmp_path, owner):
     perm.sync(owner, {"guest": pub})
     assert perm.audit(pub) == []
     from salts_secrets import _yaml as yaml
+
     cfg = yaml.safe_load((pub / "config.yaml").read_text(encoding="utf-8"))
     assert cfg["terminal"]["cwd"] == str(data_dir(pub).joinpath("cwd").resolve())
     assert "salts-secrets" in cfg["plugins"]["enabled"] and "terminal" not in cfg["platform_toolsets"]["api_server"]

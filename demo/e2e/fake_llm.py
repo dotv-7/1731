@@ -1,5 +1,7 @@
 """OpenAI-compatible scripted model: reports what Hermes put in its context, or requests a tool."""
-import json, os, time
+import json
+import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.environ.get("E2E_ROOT", os.path.expanduser("~/hermes-e2e/root"))
 ARGS = {"read_file": {"path": f"{ROOT}/memories/MEMORY.md"}, "terminal": {"command": f"cat {ROOT}/memories/MEMORY.md"},

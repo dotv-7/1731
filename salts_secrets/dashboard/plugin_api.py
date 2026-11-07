@@ -20,8 +20,9 @@ def _load_package():
     root = Path(__file__).resolve().parents[1]
     name = f"_{root.name.replace('-', '_')}_dashboard"
     if name not in sys.modules:
-        spec = importlib.util.spec_from_file_location(name, root / "__init__.py",
-                                                      submodule_search_locations=[str(root)])
+        spec = importlib.util.spec_from_file_location(
+            name, root / "__init__.py", submodule_search_locations=[str(root)]
+        )
         package = importlib.util.module_from_spec(spec)
         sys.modules[name] = package
         spec.loader.exec_module(package)
@@ -68,9 +69,14 @@ def items():
     allowlist = context.load_allowlist(owner)
     return {
         "owner_name": owner_name,
-        "items": [dict(item.to_dict(with_text=False), status=context.status(item, allowlist),
-                       public_text=allowlist.get(item.id, {}).get("public_text", ""))
-                  for item in context.scan(owner, workspaces)],
+        "items": [
+            dict(
+                item.to_dict(with_text=False),
+                status=context.status(item, allowlist),
+                public_text=allowlist.get(item.id, {}).get("public_text", ""),
+            )
+            for item in context.scan(owner, workspaces)
+        ],
     }
 
 
@@ -120,8 +126,18 @@ def clear_guests():
 @router.get("/permissions")
 def permissions():
     owner = _homes()[0]
-    catalog = [{"id": key, "tools": list(tools), "category": category, "label": label, "locked": bool(locked), "locked_reason": locked,
-                "warning": warning} for key, (tools, category, label, locked, warning) in tiers.CATALOG.items()]
+    catalog = [
+        {
+            "id": key,
+            "tools": list(tools),
+            "category": category,
+            "label": label,
+            "locked": bool(locked),
+            "locked_reason": locked,
+            "warning": warning,
+        }
+        for key, (tools, category, label, locked, warning) in tiers.CATALOG.items()
+    ]
     return {"catalog": catalog, "guest": tiers.load(owner)["tiers"]["guest"]}
 
 

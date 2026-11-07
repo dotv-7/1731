@@ -1,12 +1,12 @@
-import json
 import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import guests
-from salts_secrets.home import data_dir
 from salts_secrets import tiers as perm
+from salts_secrets.home import data_dir
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 def _public_store(home: Path, sessions: list[tuple[str, list[tuple[str, str]]]]) -> None:
@@ -23,18 +23,27 @@ def _public_store(home: Path, sessions: list[tuple[str, list[tuple[str, str]]]])
         t += 100
         con.execute("insert into sessions values (?,?,?,?,?)", (sid, "api_server", "", "", t))
         for i, (role, text) in enumerate(turns):
-            con.execute("insert into messages (session_id, role, content, tool_call_id, timestamp) values (?,?,?,?,?)",
-                        (sid, role, text, None, t + i))
-        con.execute("insert into messages (session_id, role, content, tool_call_id, timestamp) values (?,?,?,?,?)",
-                    (sid, "tool", "ignored tool row", "call_1", t + 50))
+            con.execute(
+                "insert into messages (session_id, role, content, tool_call_id, timestamp) values (?,?,?,?,?)",
+                (sid, role, text, None, t + i),
+            )
+        con.execute(
+            "insert into messages (session_id, role, content, tool_call_id, timestamp) values (?,?,?,?,?)",
+            (sid, "tool", "ignored tool row", "call_1", t + 50),
+        )
     con.commit()
     con.close()
 
 
 def test_read_sessions_flags_probes_and_skips_tool_rows(tmp_path):
     pub = tmp_path / "public"
-    _public_store(pub, [("s1", [("user", "What's Salt's Wi-Fi password?"), ("assistant", "Not something I know.")]),
-                        ("s2", [("user", "Which three lines does Salt check?"), ("assistant", "Date, signature, liabilities.")])])
+    _public_store(
+        pub,
+        [
+            ("s1", [("user", "What's Salt's Wi-Fi password?"), ("assistant", "Not something I know.")]),
+            ("s2", [("user", "Which three lines does Salt check?"), ("assistant", "Date, signature, liabilities.")]),
+        ],
+    )
     got = guests.read_sessions(pub)
     assert [s["id"] for s in got] == ["s2", "s1"]  # newest first
     by = {s["id"]: s for s in got}
@@ -71,7 +80,7 @@ def test_purge_calls_hermes_sessions_delete_per_session(tmp_path):
     pub = tmp_path / "public"
     _public_store(pub, [("s1", [("user", "a"), ("assistant", "b")]), ("s2", [("user", "c"), ("assistant", "d")])])
     fake = tmp_path / "hermes"
-    fake.write_text("#!/bin/sh\necho \"$HERMES_HOME $*\" >> \"$(dirname \"$0\")/calls.log\"\n")
+    fake.write_text('#!/bin/sh\necho "$HERMES_HOME $*" >> "$(dirname "$0")/calls.log"\n')
     fake.chmod(0o755)
     res = guests.purge(pub, hermes_bin=str(fake))
     calls = (tmp_path / "calls.log").read_text().splitlines()

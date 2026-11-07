@@ -21,7 +21,9 @@ def client(tmp_path, monkeypatch):
     (owner / "memories/MEMORY.md").write_text(f"writes a newsletter\n§\nwifi password {CANARY}", encoding="utf-8")
     (owner / "config.yaml").write_text(
         "plugins:\n  entries:\n    salts-secrets:\n      settings:\n"
-        "        public_profile: strangers\n        owner_name: Ada\n", encoding="utf-8")
+        "        public_profile: strangers\n        owner_name: Ada\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr("salts_secrets.home.current", lambda: owner)
     spec = importlib.util.spec_from_file_location("salts_secrets_dashboard_api", API)
     module = importlib.util.module_from_spec(spec)

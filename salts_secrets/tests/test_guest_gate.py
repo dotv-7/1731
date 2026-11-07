@@ -8,10 +8,30 @@ from salts_secrets import gate, tiers
 from salts_secrets.home import data_dir
 
 ROOT = Path(gate.__file__).resolve().parent
-DENIED = ["terminal", "process_manage", "execute_code", "read_file", "write_file", "patch", "search_files",
-          "memory", "session_search", "skills_list", "skill_view", "skill_manage", "browser_exec",
-          "computer_use", "cronjob_manage", "delegate_task", "send_message", "todo_list", "kanban_create",
-          "mcp_github_create_issue", "", "WEB_SEARCH"]
+DENIED = [
+    "terminal",
+    "process_manage",
+    "execute_code",
+    "read_file",
+    "write_file",
+    "patch",
+    "search_files",
+    "memory",
+    "session_search",
+    "skills_list",
+    "skill_view",
+    "skill_manage",
+    "browser_exec",
+    "computer_use",
+    "cronjob_manage",
+    "delegate_task",
+    "send_message",
+    "todo_list",
+    "kanban_create",
+    "mcp_github_create_issue",
+    "",
+    "WEB_SEARCH",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -48,17 +68,24 @@ def test_denied_tools_blocked(tool):
     assert gate.on_pre_tool_call(tool_name=tool, args={})["action"] == "block"
 
 
-@pytest.mark.parametrize("tool", ["web_search", "web_extract", "clarify", "image_generate", "text_to_speech",
-                                  "public_notes_lookup"])
+@pytest.mark.parametrize(
+    "tool", ["web_search", "web_extract", "clarify", "image_generate", "text_to_speech", "public_notes_lookup"]
+)
 def test_allowed_tools_pass(tool):
     assert gate.on_pre_tool_call(tool_name=tool, args={"query": "x"}) is None
 
 
-@pytest.mark.parametrize("url,blocked", [
-    ("https://example.com/a.png", False), ("http://example.com/a.png", False),
-    ("/home/someone/.hermes/memories/MEMORY.md", True), ("file:///etc/passwd", True), ("~/photo.jpg", True),
-    (None, True),
-])
+@pytest.mark.parametrize(
+    "url,blocked",
+    [
+        ("https://example.com/a.png", False),
+        ("http://example.com/a.png", False),
+        ("/home/someone/.hermes/memories/MEMORY.md", True),
+        ("file:///etc/passwd", True),
+        ("~/photo.jpg", True),
+        (None, True),
+    ],
+)
 def test_vision_only_remote_urls(url, blocked):
     result = gate.on_pre_tool_call(tool_name="vision_analyze", args={"image_url": url})
     assert (result is not None) is blocked
@@ -77,8 +104,14 @@ def test_register_hooks_pre_tool_call():
 
 def test_profile_template_matches_gate():
     cfg = yaml.safe_load((ROOT / "profile/config.yaml").read_text())
-    assert set(cfg["platform_toolsets"]["api_server"]) == {"web", "vision", "image_gen", "tts", "clarify",
-                                                           "public_notes"}
+    assert set(cfg["platform_toolsets"]["api_server"]) == {
+        "web",
+        "vision",
+        "image_gen",
+        "tts",
+        "clarify",
+        "public_notes",
+    }
     assert cfg["security"]["allow_private_urls"] is False
     assert cfg["tools"]["tool_search"]["enabled"] == "off"
     assert cfg["memory"]["provider"] == "" and cfg["memory"]["nudge_interval"] == 0

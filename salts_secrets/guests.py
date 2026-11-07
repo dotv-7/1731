@@ -9,6 +9,7 @@ Three rules, in code rather than in prose:
   after archiving them for the owner. Hermes' own ``sessions delete`` does the deleting, so FTS, ledgers and
   session files are handled by the code that owns them.
 """
+
 from __future__ import annotations
 
 import json
@@ -58,15 +59,22 @@ def read_sessions(public_home: Path, limit: int = 500) -> list[dict]:
             rows = con.execute(
                 f"select role, content, timestamp from messages m where m.session_id = ? and m.role in ('user','assistant') "
                 f"and m.content is not null and m.content != '' and m.tool_call_id is null {active} order by m.id",
-                (s["id"],)).fetchall()
+                (s["id"],),
+            ).fetchall()
             turns = [{"role": r["role"], "text": r["content"], "at": r["timestamp"]} for r in rows]
             questions = [t["text"] for t in turns if t["role"] == "user"]
-            out.append({
-                "id": s["id"], "source": s.get("source") or "", "started_at": s.get("started_at"),
-                "user_id": s.get("user_id") or "", "display_name": s.get("display_name") or "",
-                "turns": turns, "questions": questions,
-                "probes": [q for q in questions if PROBE_RE.search(q)],
-            })
+            out.append(
+                {
+                    "id": s["id"],
+                    "source": s.get("source") or "",
+                    "started_at": s.get("started_at"),
+                    "user_id": s.get("user_id") or "",
+                    "display_name": s.get("display_name") or "",
+                    "turns": turns,
+                    "questions": questions,
+                    "probes": [q for q in questions if PROBE_RE.search(q)],
+                }
+            )
         return out
     finally:
         con.close()
@@ -101,14 +109,20 @@ def archive(owner_home: Path, public_home: Path, reason: str = "manual") -> int:
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:
         for s in fresh:
-            f.write(json.dumps({**s, "archived_at": int(time.time()), "archived_because": reason}, ensure_ascii=False) + "\n")
+            f.write(
+                json.dumps({**s, "archived_at": int(time.time()), "archived_because": reason}, ensure_ascii=False)
+                + "\n"
+            )
     os.chmod(p, 0o600)
     return len(fresh)
 
 
 def find_hermes() -> Optional[str]:
-    for cand in (shutil.which("hermes"), str(Path(sys.executable).parent / "hermes"),
-                 str(Path.home() / ".local" / "bin" / "hermes")):
+    for cand in (
+        shutil.which("hermes"),
+        str(Path(sys.executable).parent / "hermes"),
+        str(Path.home() / ".local" / "bin" / "hermes"),
+    ):
         if cand and Path(cand).exists():
             return cand
     return None
@@ -126,7 +140,9 @@ def purge(public_home: Path, hermes_bin: Optional[str] = None, keep_ids: Optiona
     env = {**os.environ, "HERMES_HOME": str(public_home)}
     deleted = failed = 0
     for sid in ids:
-        r = subprocess.run([hermes, "sessions", "delete", sid, "--yes"], env=env, capture_output=True, text=True, timeout=120)
+        r = subprocess.run(
+            [hermes, "sessions", "delete", sid, "--yes"], env=env, capture_output=True, text=True, timeout=120
+        )
         if r.returncode == 0:
             deleted += 1
         else:
@@ -143,8 +159,9 @@ def revoked(old_projection: dict, new_projection: dict) -> list[str]:
     return sorted(old_facts - new_facts) + sorted(old_docs - new_docs)
 
 
-def revoke_and_purge(owner_home: Path, public_home: Path, old_projection: dict, new_projection: dict,
-                     hermes_bin: Optional[str] = None) -> dict:
+def revoke_and_purge(
+    owner_home: Path, public_home: Path, old_projection: dict, new_projection: dict, hermes_bin: Optional[str] = None
+) -> dict:
     """If anything was revoked, archive the guest sessions for the owner and purge them from the public store."""
     gone = revoked(old_projection, new_projection)
     if not gone:
@@ -166,13 +183,24 @@ def digest(owner_home: Path, public_home: Path, write: bool = True) -> dict:
     sessions = [s for s in sessions if s.get("turns")]
     n_q = sum(len(s["questions"]) for s in sessions)
     n_probe = sum(len(s["probes"]) for s in sessions)
-    out = {"generated_at": int(time.time()), "sessions": sessions,
-           "counts": {"sessions": len(sessions), "questions": n_q, "probes": n_probe,
-                      "live": sum(1 for s in sessions if s["live"])}}
+    out = {
+        "generated_at": int(time.time()),
+        "sessions": sessions,
+        "counts": {
+            "sessions": len(sessions),
+            "questions": n_q,
+            "probes": n_probe,
+            "live": sum(1 for s in sessions if s["live"]),
+        },
+    }
     if write:
-        lines = [f"# What guests asked (generated {time.strftime('%Y-%m-%d %H:%M')})", "",
-                 f"{len(sessions)} sessions, {n_q} questions, {n_probe} flagged as probes. Readable by the owner only; "
-                 "nothing here is injected into any session.", ""]
+        lines = [
+            f"# What guests asked (generated {time.strftime('%Y-%m-%d %H:%M')})",
+            "",
+            f"{len(sessions)} sessions, {n_q} questions, {n_probe} flagged as probes. Readable by the owner only; "
+            "nothing here is injected into any session.",
+            "",
+        ]
         for s in sessions:
             when = time.strftime("%Y-%m-%d %H:%M", time.localtime(s.get("started_at") or 0))
             lines.append(f"## {when} · {s.get('source') or 'api'} · {s['id']}{'' if s['live'] else ' (archived)'}")

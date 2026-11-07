@@ -12,6 +12,7 @@ PUBLIC_KEY_ENV = "SALTS_PUBLIC_API_KEY"
 def current() -> Path:
     try:
         from hermes_constants import get_hermes_home
+
         return Path(get_hermes_home())
     except ImportError:
         return Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))

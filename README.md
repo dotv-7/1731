@@ -13,19 +13,19 @@ one gateway, one API key. Only the context is split, and it is split by **who is
 
 | | Your session | The session strangers reach |
 |---|---|---|
-| SOUL.md | yours | its own, "Salt's assistant" |
+| SOUL.md | yours | its own, written for strangers |
 | MEMORY.md / USER.md | injected every turn | switched off; only ticked lines arrive, as rewritten facts |
 | Workspace, private/, skills | readable with read_file | no read_file, no path leads there |
 | Sessions | session_search over everything | its own state.db, holding only guest conversations |
 | Tools | every toolset | six toolsets: web, vision, image, speech, clarify, public lookup |
 | Where it runs | `/v1` on the API server | `/p/public/v1`, same gateway, same process |
 
-Everything is a plugin or a profile on top of an unmodified Hermes v0.23.0. No core file is patched.
+It is one Hermes plugin, `salts-secrets`, on top of an unmodified Hermes v0.23.0. No core file is patched.
 
 ## 30-second tour
 
 The same eight questions, asked in parallel to both sessions (owner in the first person, guest about
-"Salt", the owner's public persona). Verbatim from `dotv/chat/static/trace/`:
+"Salt", the owner's public persona). From the demo in [`demo/`](demo/) (a fictional persona):
 
 | Asked | Owner's Hermes | Public profile |
 |---|---|---|
@@ -42,119 +42,122 @@ a different boundary.
 
 ## Install
 
-Requires Hermes Agent **>= 0.23.0** with the API server enabled. One command turns a plain Hermes home
-into a two-mind install:
+Requires Hermes Agent **>= 0.23.0** with the API server enabled, and in-process plugins
+(`plugins.isolation: in_process`, see [Limits](#limits)).
 
 ```bash
-git clone https://github.com/dotv-7/salt-s-secrets.git && cd salt-s-secrets
-python3 -m dotv setup --owner-home "$HERMES_HOME" --passphrase <your-passphrase>
+hermes plugins install salts-secrets          # into your own (owner) profile
+hermes salts-secrets setup --owner-name "your handle"
+hermes gateway restart
+hermes salts-secrets check                    # ISOLATION OK · 10 checks
 ```
 
-`setup` is idempotent and prints what it changed:
+From a checkout instead of the catalog: `hermes plugins install dotv-7/salt-s-secrets/salts_secrets`.
 
-1. creates the public profile under `$HERMES_HOME/profiles/public/` (its own SOUL.md, config.yaml,
-   API key, and an empty working directory so no AGENTS.md can leak in);
-2. installs the three plugins: `dotv-guest-route` on the owner side, `dotv-guest-gate` and
-   `dotv-public-context` on the public side;
-3. turns on `gateway.multiplex_profiles` so `/p/public/v1` is served by the same gateway;
-4. narrows the public toolsets, pins its `terminal.cwd`, and runs the isolation audit;
-5. writes the chat window's start script.
+`setup` is idempotent. It:
 
-Then restart the gateway, run the start script, and open `http://127.0.0.1:8780/`. The messaging
-plugin can also be installed on its own:
+1. creates the public profile (`<HERMES_HOME>/profiles/public/`) with its own SOUL.md, config.yaml,
+   API key and an empty working directory, so no `AGENTS.md` or `.hermes.md` can be picked up;
+2. installs this same plugin there, where it acts as the guest side;
+3. turns on `gateway.multiplex_profiles`, so `/p/public/v1` is served by the same gateway;
+4. stores the public profile's key in your profile as `SALTS_PUBLIC_API_KEY` through Hermes secrets;
+5. narrows the public toolsets, writes the public projection (empty until you publish) and runs the check.
 
-```bash
-hermes plugins install dotv-7/salt-s-secrets/dotv/plugins/dotv-guest-route
-```
+Then open the **Salt's Secrets** tab in the Hermes dashboard and tick what strangers may know.
 
-Before trusting any of it, ask the install what it thinks of itself:
+## How it works
 
-```bash
-python3 -m dotv.perm check --owner-home "$HERMES_HOME"
-# ISOLATION OK · 10 checks
-```
+The plugin looks at the profile it is loaded in and plays one of two parts.
 
-That line is also printed by the start scripts, returned by `/api/health`, and shown on the context
-page. It checks the files as they are, not as they were meant to be: route plugin loaded, no
-public-context plugin on the owner side, multiplexing on, public toolsets contain nothing that can read
-a file or run a command, memory off, projection present, keys distinct and matching.
+**Owner profile** (`pre_gateway_dispatch`). Only your own DM reaches your agent. Every other inbound
+message, including yours in a group, channel or thread, is withheld and answered by the public profile
+through the local API server under its own session (`guest-<platform>-<chat>`). If the public profile
+cannot answer, the message is dropped with a short notice; it never falls through to your agent.
+Bots are ignored and each guest gets 20 messages an hour (`guest_rate_per_hour`).
 
-## The three plugins
+**Public profile** (`pre_tool_call`, a system prompt section, one tool). A default-deny tool gate with a
+hard ceiling: no terminal, files, code, memory, sessions, skills, browser, cron, delegation or messaging,
+whatever the config says. `vision_analyze` only takes http(s) URLs. The prompt gets "Notes about
+<owner_name>": the facts you approved and the titles of approved documents, whose bodies come from
+`public_notes_lookup`. Both read one file, the projection in the public profile's plugin data, and never
+open anything in your profile.
 
-**dotv-guest-route** (`pre_gateway_dispatch`, owner profile). Only the owner's own private DM reaches the
-owner agent. Every other inbound message, including the owner's own messages in a group, is withheld
-from the owner agent and answered by the public profile through the local API server. Fail-closed: if
-the public profile cannot answer, the message is dropped with a short notice. Twenty messages an hour
-per guest identity, then replies pause.
+**Dashboard** (owner only, behind the dashboard login).
 
-**dotv-public-context** (`register_system_prompt_section` + one tool, public profile). Injects "Notes
-about Salt": the facts the owner ticked, in their guest version, and the titles of the approved
-documents. Bodies are fetched on demand with `dotv_public_lookup`, which reads only the generated
-projection `dotv/public_context.json` in the public profile's home. It never opens an owner file.
+- *Context*: every source Hermes builds your prompt from (memory, user profile, SOUL.md, workspace,
+  skills, sessions, cron, providers), private by default. Tick an item to publish it, optionally with
+  a rewritten guest version. An approved item that you later edit drops out of the projection until you
+  approve it again. Unticking revokes: guest sessions that may have seen the item are archived for you
+  and deleted from the public store.
+- *Permissions*: the toolsets guests may use, inside the ceiling.
+- *Guests*: every guest conversation, live and archived, with probes (passwords, PINs, real names,
+  addresses) flagged. Never injected into any prompt.
+- *Check*: the same isolation check as `hermes salts-secrets check`.
 
-**dotv-guest-gate** (`pre_tool_call`, public profile). A per-tier tool allowlist with a hard ceiling,
-so a config slip cannot hand a guest `terminal`. Blocks everything else, and restricts
-`vision_analyze` to http(s) URLs.
+Paths are shown relative to `<HERMES_HOME>`.
 
-## The context page
+## Settings
 
-`/shelf` shows every source Hermes builds a prompt from, in injection order, as two columns: what your
-session gets, and what crosses to the public one. Each block opens into a list: raw original on the
-left with its absolute path, the guest version on the right. Ticking a line drafts a guest version
-with the policy you edit on the same page; identical text cannot be saved, so nothing crosses as-is by
-accident.
+Under `plugins.entries.salts-secrets.settings` in your profile's config.yaml:
 
-**Revoking is real.** Unticking a line regenerates the projection and, if anything was withdrawn,
-archives every guest session for you and deletes them from the public store through
-`hermes sessions delete`, compaction summaries included. A guest cannot be told tomorrow what you
-withdrew today.
+| Key | Default | |
+|---|---|---|
+| `owners` | first entry of each `<PLATFORM>_ALLOWED_USERS` | your identities, `platform:user_id` |
+| `public_profile` | `public` | the profile that answers everyone else |
+| `owner_name` | `the owner` | how the public profile refers to you; use a handle, not your real name |
+| `guest_rate_per_hour` | `20` | messages per guest per hour |
+| `workspaces` | `<HERMES_HOME>/workspace` | folders the Context tab offers |
 
-**You read everything guests said; they read nothing of each other.** The bottom of the page lists
-every guest conversation, live and archived, with probes flagged (password, PIN, wallet, real name,
-address). It is written to `dotv/guests/digest.md`, owner-readable only, and never enters any prompt.
-Guest sessions in the web chat rotate on every page load, and the public toolset has no
-`session_search`, so a guest cannot see a previous guest, or even their own previous visit.
+## Security and disclosure
 
-`/trace` runs the same questions through both sessions and shows every byte each model received and
-produced: the stored system prompt, the exact tool schemas, every message row, the chain of thought,
-the API usage per call. `/perm` is the permission board: tiers, invite codes, blocks.
+- **Credentials.** The only secret the plugin reads is `SALTS_PUBLIC_API_KEY`, through
+  `agent.secret_scope.get_secret`, so a multiplexed gateway never hands one profile another's key.
+  `setup` creates it with `hermes config set`; the plugin never opens `.env` or `auth.json` itself.
+  `check` compares the owner's copy with the public profile's `API_SERVER_KEY` through Hermes'
+  profile secret scope.
+- **Network.** The owner side calls only the local API server (`127.0.0.1:8642` by default).
+  Nothing leaves the machine except what Hermes itself sends to your model provider.
+- **Files written.** `<HERMES_HOME>/plugin-data/salts-secrets/` in both profiles (allowlist, projection,
+  tool tiers, guest archive and digest, the public profile's empty cwd), and the public profile's
+  config.yaml and SOUL.md during `setup`.
+- **Processes.** Revoking context runs `hermes sessions delete` for the affected guest sessions.
+- No self-update, no patching of Hermes, no code downloaded at runtime.
 
-## What it does not do
+## Limits
 
-- One public profile serves all guests. Guests are isolated from the owner and from each other's
-  history, but they share the same public persona and the same projection.
-- Guest sessions on Telegram and Discord are keyed by the platform account, so a returning guest on
-  those platforms does see their own earlier conversation. The web chat forgets on reload.
-- Isolation is enforced by configuration and plugins inside one process, not by a kernel boundary.
-  The self-check exists because configuration can drift; run it.
-- The persona in this repository (Lena, Salt, Low Tide) is fiction written for the demo. Every fact,
-  password and address in the demo data is invented.
+- **Needs `plugins.isolation: in_process`.** Under the plugin host, `pre_gateway_dispatch` gets a
+  placeholder gateway and cannot reply, so guest messages are dropped (safe, but nothing is answered),
+  and `hermes salts-secrets` is not wired into the CLI.
+- One public profile serves all guests. Guests are isolated from you and from each other's history, but
+  share one persona and one projection.
+- On Telegram and Discord a guest session is keyed by chat, so a returning guest sees their own earlier
+  conversation.
+- Isolation is enforced by profiles, configuration and plugins inside one process, not by a kernel
+  boundary. Configuration can drift; that is what `check` is for.
 
 ## Layout
 
 ```
-dotv/
-  plugins/dotv-guest-route/      who reaches which profile (owner side)
-  plugins/dotv-public-context/   projection into the public prompt + dotv_public_lookup (public side)
-  plugins/dotv-guest-gate/       tool allowlist, fail-closed (public side)
-  context/                       scan every context source, allowlist, projection, revocation, guest digest
-  perm/                          tiers, invite codes, blocks, isolation audit and self-check
-  chat/                          the web chat, /shelf, /perm, /trace (FastAPI, one file)
-  profiles/public/               SOUL.md and config.yaml templates for the public profile
-  dev/                           trace runner and renderer, e2e against a fake Hermes
-  tests/                         91 tests: pytest -q dotv/tests
-DOTV_MASTER.md                   the working log (Chinese): requirements, inventory of every context
-                                 source and tool, progress, every problem met and how it was handled
-RESEARCH_527.md                  the research behind it and the first design
+salts_secrets/            the plugin (catalog subdir)
+  route.py                owner side: who reaches which profile
+  gate.py                 public side: tool allowlist, fail-closed
+  public_context.py       public side: prompt section and public_notes_lookup
+  context.py              scan context sources, allowlist, projection
+  guests.py               guest archive, digest, revocation
+  tiers.py                toolset tiers, profile config, isolation check
+  cli.py                  hermes salts-secrets setup | check | sync | guests
+  dashboard/              the dashboard tab and its API
+  profile/                SOUL.md and config.yaml templates for the public profile
+  tests/                  pytest salts_secrets/tests
+demo/                     the Salt demo behind https://527.dotv.io/ (not part of the plugin)
 ```
 
 ## Why
 
 Hermes issue [#527](https://github.com/NousResearch/hermes-agent/issues/527) asks for multi-user
-permission tiers. Most proposals there tier the *tools*. This project tiers the *context*: a guest should not
-be denied the answer, they should be talking to an agent that never had it. Hence the name: Salt is the
-owner's public persona, and her secrets are not refused to you, they were never in the room. The permission matrix is
-still there (`/perm`), but it is the second line, not the first.
+permission tiers. Most proposals tier the *tools*. This tiers the *context*: a guest is not refused the
+answer, they talk to an agent that never had it. Salt, the demo's public persona, keeps her secrets
+not by refusing to tell you, but because they were never in the room.
 
 Built on [Hermes Agent](https://github.com/NousResearch/hermes-agent) v0.23.0. Branch `main` of this
 repository is that release, untouched; branch `dotv` is this project on top of it.
