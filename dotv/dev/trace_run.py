@@ -72,7 +72,11 @@ def main() -> None:
     a = ap.parse_args()
     owner_home = Path(a.owner_home)
     public_home = Path(a.public_home) if a.public_home else owner_home / "profiles" / a.public_profile
-    questions = [q.strip() for q in (Path(a.questions).read_text(encoding="utf-8") if a.questions else DEFAULT_QUESTIONS).splitlines() if q.strip()]
+    raw = [q.strip() for q in (Path(a.questions).read_text(encoding="utf-8") if a.questions else DEFAULT_QUESTIONS).splitlines() if q.strip()]
+    # "owner wording || public wording": the owner asks in the first person, a stranger asks about Salt.
+    pairs = [tuple(x.strip() for x in q.split("||", 1)) if "||" in q else (q, q) for q in raw]
+    questions = [o for o, _ in pairs]
+    questions_public = [g for _, g in pairs]
     run_id = time.strftime("%Y%m%d_%H%M%S")
     sides = {
         "owner": {"label": "Lena's own session", "url": f"{a.hermes}/v1/chat/completions",
@@ -83,12 +87,13 @@ def main() -> None:
                    "home": str(public_home), "tools": json.load(open(a.tools_public, encoding="utf-8"))},
     }
     turns = []
-    for i, q in enumerate(questions, 1):
-        turn = {"n": i, "question": q, "calls": {}}
+    for i, (q, qp) in enumerate(pairs, 1):
+        turn = {"n": i, "question": q, "question_public": qp, "calls": {}}
         for side, cfg in sides.items():
-            print(f"[{i}/{len(questions)}] {side}: {q[:40]}…", flush=True)
+            text = q if side == "owner" else qp
+            print(f"[{i}/{len(questions)}] {side}: {text[:40]}…", flush=True)
             try:
-                turn["calls"][side] = ask(cfg["url"], cfg["key"], cfg["sid"], q)
+                turn["calls"][side] = ask(cfg["url"], cfg["key"], cfg["sid"], text)
             except Exception as exc:  # noqa: BLE001
                 turn["calls"][side] = {"error": f"{type(exc).__name__}: {exc}"}
             print(f"    -> {side}: {str(turn['calls'][side].get('content') or turn['calls'][side].get('error'))[:90]!r} "
@@ -97,7 +102,7 @@ def main() -> None:
         time.sleep(1.0)  # let the gateway finish writing the rows before the next question
     time.sleep(2.0)
     bundle = {"run_id": run_id, "started": time.strftime("%Y-%m-%d %H:%M %Z"), "hermes_url": a.hermes,
-              "questions": questions, "turns": turns, "sides": {}}
+              "questions": questions, "questions_public": questions_public, "turns": turns, "sides": {}}
     for side, cfg in sides.items():
         exp = export_session(cfg["db"], cfg["sid"])
         bundle["sides"][side] = {"label": cfg["label"], "session_id": cfg["sid"], "home": cfg["home"], "endpoint": cfg["url"],

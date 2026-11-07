@@ -171,7 +171,10 @@ def prompt_txt(side: dict) -> str:
 def render(bundle: dict, out_dir: Path) -> Path:
     L, R = bundle["sides"]["owner"], bundle["sides"]["public"]
     qs = bundle["questions"]
-    tl, tr = rows_to_turns(L["messages"], qs), rows_to_turns(R["messages"], qs)
+    qps = bundle.get("questions_public") or qs
+    tl, tr = rows_to_turns(L["messages"], qs + qps), rows_to_turns(R["messages"], qs + qps)
+    def qtext(i):
+        return qs[i] if qps[i] == qs[i] else f"{qs[i]}  ⇄  {qps[i]}"
     model_api = next((c.get("model") for t in bundle["turns"] for c in t["calls"].values() if c.get("model")), "") or L["session"].get("model")
     steps = lambda rows, key: [(k, t, b, tok, ex, f"r{r['id']}-{key}") for r in rows for (k, t, b, tok, ex) in row_segments(r)]
     aligned_turns = [align(steps(tl[i] if i < len(tl) else [], "L"), steps(tr[i] if i < len(tr) else [], "R")) for i in range(len(qs))]
@@ -188,7 +191,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
     for i, q in enumerate(qs):
         rows = aligned_turns[i]
         nl, nr = sum(1 for a, b in rows if a), sum(1 for a, b in rows if b)
-        side.append(f'<a class="turn" href="#turn{i+1}"><span class="lbl">turn {i+1}</span><span class="q">{E(q)}</span><span class="cnt">{nl} vs {nr} steps</span></a>')
+        side.append(f'<a class="turn" href="#turn{i+1}"><span class="lbl">turn {i+1}</span><span class="q">{E(qtext(i))}</span><span class="cnt">{nl} vs {nr} steps</span></a>')
         for j, (a, b) in enumerate(rows):
             side.append(f'<div class="row{" diff" if not (a and b) else ""}"><span class="n">{j+1}</span>{cell(a)}{cell(b)}</div>')
     side.append('<div class="key">One outline for both sessions. Each turn is one question; the rows under it are the two sessions\' steps, aligned by kind (a tool call faces a tool call, a result faces a result); a highlighted row has a step on one side only. Numbers are Hermes\' stored token_count for assistant rows.</div>')
@@ -216,7 +219,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
     turns_html = []
     for i, q in enumerate(qs):
         call = bundle["turns"][i]["calls"] if i < len(bundle["turns"]) else {}
-        turns_html.append(f'<div class="band" id="turn{i+1}"><span class="lbl">USER · TURN {i+1} OF {len(qs)}</span><span class="q">{E(q)}</span></div>')
+        turns_html.append(f'<div class="band" id="turn{i+1}"><span class="lbl">USER · TURN {i+1} OF {len(qs)}</span><span class="q">{E(qtext(i))}</span></div>')
         for a, b in aligned_turns[i]:
             la = seg(*a[:5], anchor=a[5]) if a else '<div class="gap">no step here</div>'
             rb = seg(*b[:5], anchor=b[5]) if b else '<div class="gap">no step here</div>'
