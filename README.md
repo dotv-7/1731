@@ -52,7 +52,7 @@ hermes gateway restart
 hermes salts-secrets check                    # ISOLATION OK · 8 checks
 ```
 
-From a checkout instead of the catalog: `hermes plugins install dotv-7/salt-s-secrets/salts_secrets`.
+From a checkout instead of the catalog: `hermes plugins install dotv-7/salts-secrets/salts_secrets`.
 
 `setup` is idempotent. It:
 
