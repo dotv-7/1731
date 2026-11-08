@@ -292,8 +292,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         """Every chat message costs the owner model tokens; cap each address (or device) per hour."""
         if not s.turns_per_hour or is_owner(st):
             return
-        window = hourly_turns[client_ip(request) or st["did"]]
+        ip = client_ip(request)
+        # a proxy/LAN address is shared by every visitor behind it: count per device there
+        who = ip if perm.blockable_ip(ip) else "device:" + st["did"]
         now = time.time()
+        for k in [k for k, w in hourly_turns.items() if not w or w[-1] < now - 3600]:
+            del hourly_turns[k]
+        window = hourly_turns[who]
         while window and window[0] < now - 3600:
             window.popleft()
         if len(window) >= s.turns_per_hour:
@@ -317,7 +322,6 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         readonly = is_viewer(st)
         if readonly and len(message) > VIEWER_CHARS:
             raise HTTPException(400, f"read-only mode: messages up to {VIEWER_CHARS} chars")
-        spend_turn(request, st)
         override = {} if readonly else model_override(tier, str(body.get("model") or ""))
         sid_key = "viewer_sid" if readonly else tier + "_sid"
         if readonly and viewer_turns.get(st.get(sid_key, ""), 0) >= VIEWER_TURNS:
@@ -333,6 +337,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             if tier in ("admin", "user"):
                 raise HTTPException(503, f"the {tier} tier is planned, not implemented yet")
             raise HTTPException(503, f"Hermes key for tier '{tier}' is not configured")
+        spend_turn(request, st)
         url = f"{s.hermes_url}/v1/chat/completions" if tier == "owner" else \
             f"{s.hermes_url}/p/{s.tier_profiles[tier]}/v1/chat/completions"
         payload = {"model": "hermes-agent", "stream": True, "messages": [{"role": "user", "content": message}],

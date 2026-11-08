@@ -388,3 +388,31 @@ def test_hourly_turn_limit_spares_the_owner(tmp_path, monkeypatch):
     owner = TestClient(app, client=("203.0.113.9", 3))
     owner.post("/api/unlock", json={"passphrase": PASS})
     assert owner.post("/api/chat", json={"message": "q"}).status_code == 200
+
+
+def test_turn_limit_counts_devices_behind_a_proxy_and_skips_refused_requests(tmp_path, monkeypatch):
+    class Done:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def aiter_lines(self):
+            yield "data: [DONE]"
+
+        def stream(self, *a, **k):
+            return self
+
+    monkeypatch.setattr(server.httpx, "AsyncClient", lambda *a, **k: Done())
+    env = {"SALT_OWNER_HOME": str(tmp_path / "owner"), "SALT_PUBLIC_HOME": str(tmp_path / "public"),
+           "SALT_SECRET": "x" * 32, "SALT_OWNER_KEY": "ok", "SALT_PUBLIC_KEY": "pk", "SALT_TURNS_PER_HOUR": "1"}
+    app = server.create_app(server.Settings(env))
+    first, second = TestClient(app, client=("172.18.0.1", 1)), TestClient(app, client=("172.18.0.1", 2))
+    assert first.post("/api/chat", json={"message": "q"}).status_code == 200
+    assert first.post("/api/chat", json={"message": "q"}).status_code == 429
+    assert second.post("/api/chat", json={"message": "q"}).status_code == 200
+    keyless = TestClient(server.create_app(server.Settings(dict(env, SALT_PUBLIC_KEY=""))), client=("203.0.113.5", 1))
+    assert [keyless.post("/api/chat", json={"message": "q"}).status_code for _ in range(2)] == [503, 503]
