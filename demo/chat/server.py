@@ -482,7 +482,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             cfg = {}
         m = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
         return {"base_url": str(m.get("base_url") or "").rstrip("/"), "api_key": str(m.get("api_key") or ""),
-                "model": str(m.get("default") or "")}
+                "model": str(m.get("default") or ""), "api_mode": str(m.get("api_mode") or "")}
 
     @app.post("/api/board/draft")
     async def board_draft(request: Request):
@@ -508,14 +508,24 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                                 {"role": "user", "content": f"Source: {it.group} › {it.title}\n\n{'Skill' if it.kind == 'skill' else 'Note'}:\n{it.text[:12000]}"}]}
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                r = await client.post(f"{m['base_url']}/chat/completions", json=payload,
-                                      headers={"Authorization": f"Bearer {m['api_key']}"})
+                if m["api_mode"] == "anthropic_messages":
+                    payload["system"] = payload["messages"].pop(0)["content"]
+                    r = await client.post(f"{m['base_url']}/v1/messages", json=payload,
+                                          headers={"x-api-key": m["api_key"], "anthropic-version": "2023-06-01"})
+                else:
+                    r = await client.post(f"{m['base_url']}/chat/completions", json=payload,
+                                          headers={"Authorization": f"Bearer {m['api_key']}"})
                 r.raise_for_status()
                 j = r.json()
         except (httpx.HTTPError, ValueError) as exc:
             raise HTTPException(502, f"model call failed: {type(exc).__name__}")
-        draft = str(((j.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        tokens = int((j.get("usage") or {}).get("total_tokens") or 0)
+        if "content" in j and "choices" not in j:
+            draft = "".join(b.get("text", "") for b in j.get("content") or [] if b.get("type") == "text").strip()
+            usage = j.get("usage") or {}
+            tokens = int(usage.get("input_tokens") or 0) + int(usage.get("output_tokens") or 0)
+        else:
+            draft = str(((j.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            tokens = int((j.get("usage") or {}).get("total_tokens") or 0)
         if not draft:
             raise HTTPException(502, "model returned an empty draft (reasoning used up the budget?); not cached")
         store[item_id] = {"fingerprint": it.fingerprint, "draft": draft, "tokens": tokens, "at": int(time.time())}
