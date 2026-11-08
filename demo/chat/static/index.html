@@ -248,7 +248,7 @@ async function command(c){const [name,...rest]=c.trim().split(/\s+/);const arg=r
     if(j.role){setRole(j.role,j.name,j.models);sys(j.role==='blocked'?'This invite code is blocked.':'Switched to '+LABEL[j.role]+'.',j.role==='blocked'?'err':'sys');}
     else sys(status===429?'Too many attempts, try again in 5 minutes.':'Unlock failed: '+(j.detail||status),'err');}
   else if(name==='/lock'){try{const j=await api('/api/lock');setRole(j.role,j.name,j.models);sys('Back to guest.');}catch(e){sys('Cannot sign out: '+e.message,'err');}}
-  else if(['/board','/shelf','/perm','/trace','/docs'].includes(name)){if(role!=='owner')return sys('Owner only.','err');location.href=name;}
+  else if(['/shelf','/perm','/trace'].includes(name)){if(role!=='owner')return sys('Owner only.','err');location.href=name;}
   else sys('Unknown command: '+name,'err');}
 function submit(){const t=inp.value.trim();if(!t||busy)return;inp.value='';fit();hideMenu();
   hist=hist.filter(h=>h!==t);hist.push(t);hist=hist.slice(-100);localStorage.setItem('dotv.hist',JSON.stringify(hist));hi=-1;

@@ -591,9 +591,6 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
     return items
 
 
-# ---------------------------------------------------------------- allowlist
-
-
 def _atomic_write(path: Path, text: str, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")

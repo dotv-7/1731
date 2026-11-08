@@ -16,8 +16,6 @@ from pathlib import Path
 HERMES = "Hermes Agent v0.23.0 (local 2bd378ed, hermes-latest)"
 MODEL_NOTE = "deepseek-flash as the API reports it: the DeepSeek Flash build of 2026-10-17, set in Lena's config.yaml, the same model on both sides; chain of thought is removed before publishing"
 FOLD = {"sys": 14000, "tools": 6000, "tool": 7000, "think": 14000, "asst": 14000, "call": 6000, "user": 14000, "note": 2000}
-E = lambda s: html.escape(str(s if s is not None else ""), quote=False)
-fmt = lambda n: f"{n:,}" if isinstance(n, int) else "—"
 
 CSS = """
 :root{--paper:#f2f2f2;--sheet:#fdfdfd;--ink:#000091;--muted:#6b6bd6;--blue:#0000f2;--frame:#7f7fff;--hair:rgba(0,0,242,.18);--sel:#e6e6f4;
@@ -87,20 +85,28 @@ def headings(text: str) -> list[str]:
     return out
 
 
+def esc(value) -> str:
+    return html.escape(str(value if value is not None else ""), quote=False)
+
+
+def fmt(n) -> str:
+    return f"{n:,}" if isinstance(n, int) else "—"
+
+
 def seg(kind: str, title: str, body: str, tok=None, extra: str = "", anchor: str = "") -> str:
-    t = f'<span class="t">{E(extra)}</span>' if extra else ""
+    t = f'<span class="t">{esc(extra)}</span>' if extra else ""
     tokhtml = f'<span class="t">{fmt(tok)} tok</span>' if tok is not None else ""
     body = body if body else "(empty)"
     limit = FOLD.get(kind, 8000)
     if len(body) > limit:
         cut = body.rfind("\n", 0, limit)
         cut = cut if cut > limit // 2 else limit
-        inner = (f'<pre>{E(body[:cut])}<span class="fold">{E(body[cut:])}</span></pre>'
+        inner = (f'<pre>{esc(body[:cut])}<span class="fold">{esc(body[cut:])}</span></pre>'
                  f'<button class="more" onclick="var s=this.parentElement;s.classList.toggle(\'open\');this.textContent=s.classList.contains(\'open\')?\'Show less\':\'Show all · {len(body):,} chars\'">Show all · {len(body):,} chars</button>')
     else:
-        inner = f"<pre>{E(body)}</pre>"
+        inner = f"<pre>{esc(body)}</pre>"
     aid = f' id="{anchor}"' if anchor else ""
-    return f'<div class="seg {kind}"{aid}><div class="h"><span><i></i>{E(title)} {t}</span>{tokhtml}</div>{inner}</div>'
+    return f'<div class="seg {kind}"{aid}><div class="h"><span><i></i>{esc(title)} {t}</span>{tokhtml}</div>{inner}</div>'
 
 
 def rows_to_turns(rows: list[dict], questions: list[str]) -> list[list[dict]]:
@@ -151,11 +157,14 @@ def align(left: list, right: list) -> list[tuple]:
     rows, i, j = [], 0, 0
     while i < n or j < m:
         if i < n and j < m and left[i][0] == right[j][0]:
-            rows.append((left[i], right[j])); i += 1; j += 1
+            rows.append((left[i], right[j]))
+            i, j = i + 1, j + 1
         elif j < m and (i >= n or dp[i][j + 1] >= dp[i + 1][j]):
-            rows.append((None, right[j])); j += 1
+            rows.append((None, right[j]))
+            j += 1
         else:
-            rows.append((left[i], None)); i += 1
+            rows.append((left[i], None))
+            i += 1
     return rows
 
 
@@ -173,10 +182,10 @@ LOOPBACK = re.compile(r"https?://(?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?"
 
 def redact(bundle: dict) -> dict:
     """Drop chain of thought and replace machine paths and loopback URLs before anything is published."""
-    sides = [bundle.get(k) or {} for k in ("owner", "public")]
-    swaps = sorted({(str(sides[1].get("home") or ""), "<HERMES_HOME>/profiles/public"),
-                    (str(sides[0].get("home") or ""), "<HERMES_HOME>"), (str(Path.home()), "~")} - {("", "")},
-                   key=lambda kv: -len(kv[0]))
+    sides = bundle.get("sides") or {}
+    homes = [(str((sides.get("public") or {}).get("home") or ""), "<HERMES_HOME>/profiles/public"),
+             (str((sides.get("owner") or {}).get("home") or ""), "<HERMES_HOME>"), (str(Path.home()), "~")]
+    swaps = sorted({(old, new) for old, new in homes if old}, key=lambda kv: -len(kv[0]))
 
     def clean(value):
         if isinstance(value, dict):
@@ -198,60 +207,69 @@ def render(bundle: dict, out_dir: Path) -> Path:
     qs = bundle["questions"]
     qps = bundle.get("questions_public") or qs
     tl, tr = rows_to_turns(L["messages"], qs + qps), rows_to_turns(R["messages"], qs + qps)
+
     def qtext(i):
         return qs[i] if qps[i] == qs[i] else f"{qs[i]}  ⇄  {qps[i]}"
+
+    def steps(rows, key):
+        return [(k, t, b, tok, ex, f"r{r['id']}-{key}") for r in rows for (k, t, b, tok, ex) in row_segments(r)]
+
+    def names(tools):
+        return [t.get("function", t).get("name", "?") for t in tools]
+
+    def tools_block(tools, side_name):
+        body = "\n".join(json.dumps(t, ensure_ascii=False) for t in tools)
+        return seg("tools", f"tools · {len(tools)} schemas", body, None, f"{side_name} · one JSON object per tool, exactly as sent")
+
+    def ses(side):
+        return side["session"]
+
     model_api = next((c.get("model") for t in bundle["turns"] for c in t["calls"].values() if c.get("model")), "") or L["session"].get("model")
-    steps = lambda rows, key: [(k, t, b, tok, ex, f"r{r['id']}-{key}") for r in rows for (k, t, b, tok, ex) in row_segments(r)]
     aligned_turns = [align(steps(tl[i] if i < len(tl) else [], "L"), steps(tr[i] if i < len(tr) else [], "R")) for i in range(len(qs))]
 
-    # ---- one outline for both sessions
+    # Sidebar: one outline for both sessions.
     def cell(step):
         if not step:
             return '<span class="none">—</span>'
         kind, title, body, tok, extra, aid = step
-        return f'<a class="seg {kind}" href="#{aid}" title="{E(title)}"><b>{E(title)}</b><span>{fmt(tok) if tok else ""}</span></a>'
+        return f'<a class="seg {kind}" href="#{aid}" title="{esc(title)}"><b>{esc(title)}</b><span>{fmt(tok) if tok else ""}</span></a>'
     side = ['<div class="row head"><span class="lbl">step</span><span class="lbl">Lena</span><span class="lbl">Salt\'s assistant</span></div>',
             f'<div class="row"><span class="n">sys</span><a class="seg sys" href="#sys"><b>system</b><span>{len(L["system_prompt"]):,} ch</span></a><a class="seg sys" href="#sys"><b>system</b><span>{len(R["system_prompt"]):,} ch</span></a></div>',
             f'<div class="row"><span class="n">tools</span><a class="seg tools" href="#tools"><b>{len(L["tools"])} tools</b><span></span></a><a class="seg tools" href="#tools"><b>{len(R["tools"])} tools</b><span></span></a></div>']
     for i, q in enumerate(qs):
         rows = aligned_turns[i]
         nl, nr = sum(1 for a, b in rows if a), sum(1 for a, b in rows if b)
-        side.append(f'<a class="turn" href="#turn{i+1}"><span class="lbl">turn {i+1}</span><span class="q">{E(qtext(i))}</span><span class="cnt">{nl} vs {nr} steps</span></a>')
+        side.append(f'<a class="turn" href="#turn{i+1}"><span class="lbl">turn {i+1}</span><span class="q">{esc(qtext(i))}</span><span class="cnt">{nl} vs {nr} steps</span></a>')
         for j, (a, b) in enumerate(rows):
             side.append(f'<div class="row"><span class="n">{j+1}</span>{cell(a)}{cell(b)}</div>')
     side.append('<div class="key">One outline for both sessions. Each turn is one question; the rows under it are the two sessions\' steps, aligned by kind (a tool call faces a tool call, a result faces a result); a dash marks a step the other session does not have. Numbers are Hermes\' stored token_count for assistant rows.</div>')
 
-    # ---- diffs
     hl, hr = headings(L["system_prompt"]), headings(R["system_prompt"])
     only_l, only_r = [h for h in hl if h not in hr][:30], [h for h in hr if h not in hl][:30]
-    sys_diff = (f'<div class="diff"><div><b>Sections only in Lena\'s system prompt</b>{E(" · ".join(only_l)) or "(none)"}</div>'
-                f'<div><b>Sections only in the public system prompt</b>{E(" · ".join(only_r)) or "(none)"}</div></div>')
-    names = lambda ts: [t.get("function", t).get("name", "?") for t in ts]
+    sys_diff = (f'<div class="diff"><div><b>Sections only in Lena\'s system prompt</b>{esc(" · ".join(only_l)) or "(none)"}</div>'
+                f'<div><b>Sections only in the public system prompt</b>{esc(" · ".join(only_r)) or "(none)"}</div></div>')
     nl_, nr_ = names(L["tools"]), names(R["tools"])
-    tool_diff = (f'<div class="diff"><div><b>Tools only on the left ({len([n for n in nl_ if n not in nr_])})</b>{E(", ".join(n for n in nl_ if n not in nr_)) or "(none)"}</div>'
-                 f'<div><b>Tools only on the right ({len([n for n in nr_ if n not in nl_])})</b>{E(", ".join(n for n in nr_ if n not in nl_)) or "(none)"}</div></div>')
-    tools_block = lambda ts, s: seg("tools", f"tools · {len(ts)} schemas", "\n".join(json.dumps(t, ensure_ascii=False) for t in ts), None, f"{s} · one JSON object per tool, exactly as sent")
+    tool_diff = (f'<div class="diff"><div><b>Tools only on the left ({len([n for n in nl_ if n not in nr_])})</b>{esc(", ".join(n for n in nl_ if n not in nr_)) or "(none)"}</div>'
+                 f'<div><b>Tools only on the right ({len([n for n in nr_ if n not in nl_])})</b>{esc(", ".join(n for n in nr_ if n not in nl_)) or "(none)"}</div></div>')
 
-    # ---- turns, aligned row by row
     def usage_html(call):
         if not call:
             return ""
         if call.get("error"):
-            return f'<div class="usage"><b>API call failed</b> {E(call["error"])}</div>'
+            return f'<div class="usage"><b>API call failed</b> {esc(call["error"])}</div>'
         u = call.get("usage") or {}
-        return ('<div class="usage"><b>API usage for this turn</b>' + "".join(f'<span>{E(k)} <b>{fmt(v) if isinstance(v, int) else E(json.dumps(v))}</b></span>' for k, v in u.items())
-                + f'<span>{E(call.get("seconds"))} s</span><span>finish {E(call.get("finish_reason"))}</span></div>')
+        return ('<div class="usage"><b>API usage for this turn</b>' + "".join(f'<span>{esc(k)} <b>{fmt(v) if isinstance(v, int) else esc(json.dumps(v))}</b></span>' for k, v in u.items())
+                + f'<span>{esc(call.get("seconds"))} s</span><span>finish {esc(call.get("finish_reason"))}</span></div>')
     turns_html = []
     for i, q in enumerate(qs):
         call = bundle["turns"][i]["calls"] if i < len(bundle["turns"]) else {}
-        turns_html.append(f'<div class="band" id="turn{i+1}"><span class="lbl">USER · TURN {i+1} OF {len(qs)}</span><span class="q">{E(qtext(i))}</span></div>')
+        turns_html.append(f'<div class="band" id="turn{i+1}"><span class="lbl">USER · TURN {i+1} OF {len(qs)}</span><span class="q">{esc(qtext(i))}</span></div>')
         for a, b in aligned_turns[i]:
             la = seg(*a[:5], anchor=a[5]) if a else '<div class="gap">no step here</div>'
             rb = seg(*b[:5], anchor=b[5]) if b else '<div class="gap">no step here</div>'
             turns_html.append(f'<div class="pair"><div class="cell">{la}</div><div class="cell">{rb}</div></div>')
         turns_html.append(f'<div class="pair"><div class="cell">{usage_html(call.get("owner"))}</div><div class="cell">{usage_html(call.get("public"))}</div></div>')
 
-    ses = lambda s: s["session"]
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Trace · Hermes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,25 +278,25 @@ def render(bundle: dict, out_dir: Path) -> Path:
 {TOP.format(count=f"{len(qs)} QUESTIONS · 2 SESSIONS")}
 <div class="wrap"><aside class="side">{"".join(side)}</aside>
 <main class="main">
-<section class="hero"><div class="eyebrow"><span class="lbl">SAME QUESTIONS, TWO SESSIONS · RUN {E(bundle['run_id'])}</span></div>
+<section class="hero"><div class="eyebrow"><span class="lbl">SAME QUESTIONS, TWO SESSIONS · RUN {esc(bundle['run_id'])}</span></div>
 <h1>Same questions,<br>two sessions</h1>
 <p class="lede">{len(qs)} questions asked in one multi-turn conversation, in parallel, to Lena's own session and to the public session strangers reach. Everything each model received and produced is here, verbatim and in order: the stored system prompt, the exact tool schemas, every message row from state.db including the chain of thought, and the API usage of every call. Steps are aligned by kind so a tool call faces a tool call and a result faces a result; nothing is summarised, and nothing scrolls inside a block.</p>
-<div class="meta"><div><b>Model</b> {E(model_api)} · {E(MODEL_NOTE)}</div><div><b>Harness</b> {E(HERMES)} · gateway {E(bundle['hermes_url'])}</div>
-<div><b>Left session</b> {E(ses(L)['id'])} · {E(L['endpoint'])} · state.db {E(L['db'])}</div><div><b>Right session</b> {E(ses(R)['id'])} · {E(R['endpoint'])} · state.db {E(R['db'])}</div>
+<div class="meta"><div><b>Model</b> {esc(model_api)} · {esc(MODEL_NOTE)}</div><div><b>Harness</b> {esc(HERMES)} · gateway {esc(bundle['hermes_url'])}</div>
+<div><b>Left session</b> {esc(ses(L)['id'])} · {esc(L['endpoint'])} · state.db {esc(L['db'])}</div><div><b>Right session</b> {esc(ses(R)['id'])} · {esc(R['endpoint'])} · state.db {esc(R['db'])}</div>
 <div><b>Left totals</b> {fmt(ses(L).get('input_tokens'))} in · {fmt(ses(L).get('output_tokens'))} out · {fmt(ses(L).get('cache_read_tokens'))} cached · {ses(L).get('tool_call_count')} tool calls · {len(L['messages'])} rows</div>
 <div><b>Right totals</b> {fmt(ses(R).get('input_tokens'))} in · {fmt(ses(R).get('output_tokens'))} out · {fmt(ses(R).get('cache_read_tokens'))} cached · {ses(R).get('tool_call_count')} tool calls · {len(R['messages'])} rows</div>
-<div><b>Plain sequences</b> <a href="run_{E(bundle['run_id'])}_owner.prompt.txt" style="text-decoration:underline">left</a> · <a href="run_{E(bundle['run_id'])}_public.prompt.txt" style="text-decoration:underline">right</a> · <a href="data/run.json" style="text-decoration:underline">bundle</a></div><div><b>Run</b> {E(bundle['started'])}</div></div>
+<div><b>Plain sequences</b> <a href="run_{esc(bundle['run_id'])}_owner.prompt.txt" style="text-decoration:underline">left</a> · <a href="run_{esc(bundle['run_id'])}_public.prompt.txt" style="text-decoration:underline">right</a> · <a href="data/run.json" style="text-decoration:underline">bundle</a></div><div><b>Run</b> {esc(bundle['started'])}</div></div>
 </section>
-<div class="heads"><div><div class="who">Lena's own session</div><div class="sub">owner key · {E(L['endpoint'])} · HERMES_HOME {E(L['home'])}</div></div>
-<div class="r"><div class="who">Salt's assistant</div><div class="sub">guest key · {E(R['endpoint'])} · HERMES_HOME {E(R['home'])}</div></div></div>
+<div class="heads"><div><div class="who">Lena's own session</div><div class="sub">owner key · {esc(L['endpoint'])} · HERMES_HOME {esc(L['home'])}</div></div>
+<div class="r"><div class="who">Salt's assistant</div><div class="sub">guest key · {esc(R['endpoint'])} · HERMES_HOME {esc(R['home'])}</div></div></div>
 <div class="band" id="sys"><span class="lbl">SYSTEM PROMPT · FIRST THING EACH MODEL SEES, EVERY CALL</span><span class="q">stored by Hermes in state.db · system_prompts, keyed by the session's system_prompt_hash; assembled by Hermes' own build_system_prompt (identity and guidance, then project context, then skills, runtime, memory and user profile)</span></div>
 {sys_diff}
-<div class="pair"><div class="cell">{seg("sys", "system", L["system_prompt"], None, f"{len(L['system_prompt']):,} chars · hash {E(ses(L).get('system_prompt_hash') or '')[:12]}")}</div><div class="cell">{seg("sys", "system", R["system_prompt"], None, f"{len(R['system_prompt']):,} chars · hash {E(ses(R).get('system_prompt_hash') or '')[:12]}")}</div></div>
+<div class="pair"><div class="cell">{seg("sys", "system", L["system_prompt"], None, f"{len(L['system_prompt']):,} chars · hash {esc(ses(L).get('system_prompt_hash') or '')[:12]}")}</div><div class="cell">{seg("sys", "system", R["system_prompt"], None, f"{len(R['system_prompt']):,} chars · hash {esc(ses(R).get('system_prompt_hash') or '')[:12]}")}</div></div>
 <div class="band" id="tools"><span class="lbl">TOOL SCHEMAS · SENT WITH EVERY CALL</span><span class="q">exported from each profile exactly as the api_server platform builds them (hermes_cli.prompt_size._build_inspection_agent)</span></div>
 {tool_diff}
 <div class="pair"><div class="cell">{tools_block(L["tools"], "left")}</div><div class="cell">{tools_block(R["tools"], "right")}</div></div>
 {"".join(turns_html)}
-<div class="foot"><span class="lbl">VERBATIM · STATE.DB ORDER · EVERY ROW CARRIES ITS ROW NUMBER</span><span class="lbl">{E(HERMES)}</span></div>
+<div class="foot"><span class="lbl">VERBATIM · STATE.DB ORDER · EVERY ROW CARRIES ITS ROW NUMBER</span><span class="lbl">{esc(HERMES)}</span></div>
 </main></div></body></html>"""
     out_dir.mkdir(parents=True, exist_ok=True)
     run_page = out_dir / f"run_{bundle['run_id']}.html"

@@ -34,7 +34,6 @@ def test_guest_by_default_and_board_locked(client):
     assert client.get("/api/me").json()["role"] == "guest"
     assert client.get("/api/board/items").status_code == 403
     assert client.post("/api/board/save", json={"public_ids": []}).status_code == 403
-    assert client.get("/board", follow_redirects=False).status_code in (302, 307)
 
 
 def test_unlock_lock_and_rate_limit(client):
@@ -134,8 +133,7 @@ def test_member_codes_route_to_tier_and_blocked_cannot_chat(client, tmp_path):
     assert client.get("/api/me").json()["role"] == "blocked"  # deleting a member does not lift the block
 
 
-def test_perm_board_and_doc_owner_only(client, tmp_path):
-    assert client.get("/docs", follow_redirects=False).headers.get("location") == "/"
+def test_perm_board_owner_only(client, tmp_path):
     assert client.get("/perm", follow_redirects=False).status_code in (302, 307)
     client.post("/api/unlock", json={"passphrase": PASS})
     st = client.get("/api/perm").json()
