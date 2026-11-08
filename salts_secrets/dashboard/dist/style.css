@@ -26,3 +26,9 @@
 .ss-checks { list-style: none; padding: 0; font-family: ui-monospace, monospace; }
 .ss-turn { padding: 0.3rem 0; white-space: pre-wrap; }
 .ss-turn.ss-user strong { color: #1f3fff; }
+
+.ss-triage { border: 1px solid currentColor; padding: 8px 12px; margin: 12px 0; }
+.ss-why { font-size: 12px; margin: 2px 0 0 24px; }
+.ss-tier-A { color: #047857; }
+.ss-tier-B { color: #b45309; }
+.ss-tier-C { color: #b91c1c; }

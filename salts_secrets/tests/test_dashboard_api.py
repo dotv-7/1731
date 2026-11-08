@@ -67,3 +67,29 @@ def test_check_reports_broken_without_setup(client):
     http, _, _ = client
     body = http.get("/api/plugins/salts-secrets/check").json()
     assert body["ok"] is False and "BROKEN" in body["line"]
+
+
+def test_classify_and_bulk_publish_never_take_c(client):
+    http, owner, public = client
+    items = http.get("/api/plugins/salts-secrets/items").json()["items"]
+    res = http.post("/api/plugins/salts-secrets/classify", json={}).json()
+    assert res["model"] is False and res["counts"]["A"] == 0  # no model configured: rules only
+    wifi = next(i for i in items if "wifi" in i["title"])
+    assert res["items"][wifi["id"]]["tier"] == "C" and "credential_words" in res["items"][wifi["id"]]["rules_hit"]
+    ids = [i["id"] for i in items]
+    out = http.post("/api/plugins/salts-secrets/publish", json={
+        "public_ids": ids, "public_texts": {i: "rewritten" for i in ids},
+        "decisions": {i: {"via": "bulk-B"} for i in ids}}).json()
+    assert [r["id"] for r in out["rejected"]] == [wifi["id"]]
+    projection = (data_dir(public) / "public_context.json").read_text(encoding="utf-8")
+    assert CANARY not in projection
+    meta = json.loads(projection)["fact_meta"]
+    assert meta and all(m["decided_via"] == "bulk-B" and m["mode"] == "rewrite" for m in meta)
+    listed = http.get("/api/plugins/salts-secrets/items").json()["items"]
+    assert all(i["classification"] for i in listed if i["publishable"])
+
+
+def test_draft_needs_a_model(client):
+    http, _, _ = client
+    item = http.get("/api/plugins/salts-secrets/items").json()["items"][0]
+    assert http.post("/api/plugins/salts-secrets/draft", json={"id": item["id"]}).status_code == 503

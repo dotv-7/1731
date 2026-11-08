@@ -1,5 +1,5 @@
 name: salts-secrets
-version: "0.2.0"
+version: "0.3.0"
 requires_hermes: ">=0.23.0"
 description: >-
   Let strangers talk to your Hermes without reaching your private memory. Only your own DM reaches
@@ -23,8 +23,8 @@ config_schema:
     type: list
     default: []
     description: >-
-      Your identities as platform:user_id (e.g. telegram:123456). If empty, the first entry of each
-      <PLATFORM>_ALLOWED_USERS is treated as the owner.
+      Your identities as platform:user_id (e.g. telegram:123456), written by
+      `hermes salts-secrets setup --owner`. Never guessed: if empty, every message gets the public profile.
   public_profile:
     type: str
     default: public

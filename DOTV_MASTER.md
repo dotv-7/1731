@@ -114,18 +114,18 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 
 **关于“自传”：** 自传放在 workspace 目录里，不在 A2 的固定文件名里，所以不会自动注入。只要 Hermes 有 `read_file`/`search_files`/`terminal`，它随时能读到（B2），聊过的内容也会留在历史会话里（B1/B3）。所以看板不能只扫 memory，还要扫 workspace 文件、历史会话和 skills。
 
-## 5. 角色权限矩阵（第一版已实现，可在权限看板 `/perm` 调整）
+## 5. 角色权限矩阵（Owner / Guest 已实现；Admin / User 未实现）
 
 | 角色 | 工具 | 上下文 | 状态 |
 |---|---|---|---|
 | **Owner** | 全部（§3） | 全部（§4） | v1 |
 | **Guest** | `web_search`、`web_extract`、`clarify`、`vision_analyze`（仅 URL 或上传文件）、`image_generate`、`text_to_speech`（已定） | A1 公开人设、A5/A6 公开投影、A9 无害化、A10、B1/B8/B9 访客自己的；其余全部不给 | v1，可选项待用户定 |
-| **Admin** | 默认：Guest 的全部 + X 搜索、看视频、待办、memory、历史会话、skills（均为 Admin 档自己的，不是 Owner 的） | 公开投影 + Admin 档自己的 memory/会话 | v1，邀请码 |
-| **User** | 默认：Guest 的全部 + 待办、memory（User 档自己的） | 公开投影 + User 档自己的 memory | v1，邀请码 |
+| **Admin** | 默认：Guest 的全部 + X 搜索、看视频、待办、memory、历史会话、skills（均为 Admin 档自己的，不是 Owner 的） | 公开投影 + Admin 档自己的 memory/会话 | **未实现**（设计保留；`/perm` 灰掉标 planned，邀请码只能建 Blocked） |
+| **User** | 默认：Guest 的全部 + 待办、memory（User 档自己的） | 公开投影 + User 档自己的 memory | **未实现**（同上） |
 | **Blocked** | 无，请求在聊天服务端就被拒，碰不到 Hermes | 无 | v1 |
 
 **非 Owner 一律锁死**（看板里显示 🔒，保存时也会被剔除）：终端、文件读写、执行代码、浏览器、电脑操控、定时任务、子代理、Kanban、账号连接、对外发消息。原因：它们能碰到 Owner 的机器或代表 Owner 行事。
-**同档共享**：Admin/User 各是一个 profile，同档成员共用一份 memory 和会话库，第一版不按人隔离。
+**同档共享（设计，未实现）**：Admin/User 将各是一个 profile，同档成员共用一份 memory 和会话库。这次交付只有两个房间：Owner 与 Guest。
 
 两道闸：① **profile 隔离**，访客的 agent 物理上拿不到私密上下文；② **`pre_tool_call` 闸门插件**，不在名单里的工具一律拒绝。
 

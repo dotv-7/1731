@@ -108,15 +108,69 @@ def test_isolation_check_passes_only_when_every_condition_holds(tmp_path):
     for home in (owner, pub):
         (home / "plugins/salts-secrets").mkdir(parents=True)
         (home / "plugins/salts-secrets/__init__.py").write_text("")
-    (owner / "config.yaml").write_text("plugins:\n  enabled: [salts-secrets]\ngateway:\n  multiplex_profiles: true\n")
-    (owner / ".env").write_text("API_SERVER_KEY=owner-key\nSALTS_PUBLIC_API_KEY=public-key\n")
-    (pub / ".env").write_text("API_SERVER_KEY=public-key\n")
+    (owner / "config.yaml").write_text(
+        "plugins:\n  enabled: [salts-secrets]\n  entries:\n    salts-secrets:\n      settings:\n"
+        "        owners: [telegram:42]\ngateway:\n  multiplex_profiles: true\n"
+    )
+    (owner / ".env").write_text("API_SERVER_KEY=owner-key-0123456789\nSALTS_PUBLIC_API_KEY=public-key-0123456789\n")
+    (pub / ".env").write_text("API_SERVER_KEY=public-key-0123456789\n")
+    import json
+    import os
+
+    from salts_secrets import route
+
+    route.write_heartbeat(owner)
+    (owner / "gateway_state.json").write_text(json.dumps(
+        {"pid": os.getpid(), "start_time": route.process_start_time(os.getpid()), "gateway_state": "running"}))
     (pub / "config.yaml").write_text("platform_toolsets:\n  api_server: [web]\n")
     perm.sync(owner, {"guest": pub})
     (data_dir(pub) / "public_context.json").write_text("{}")
     res = perm.isolation_check(owner, pub)
     assert res["ok"], [c["text"] for c in res["checks"] if not c["ok"]]
     assert res["line"].startswith("ISOLATION OK")
+    # plugin enabled in config but the running gateway never registered the hook
+    (data_dir(owner) / route.HEARTBEAT_FILE).unlink()
+    res = perm.isolation_check(owner, pub)
+    assert not res["ok"] and "loaded the routing hook" in res["line"]
+    assert perm.isolation_check(owner, pub, gateway=False)["ok"]
+    route.write_heartbeat(owner, pid=os.getpid() + 1)  # a CLI process, not the gateway
+    assert not perm.isolation_check(owner, pub)["ok"]
+    route.write_heartbeat(owner)
     (pub / ".env").write_text("API_SERVER_KEY=rotated\n")
     res = perm.isolation_check(owner, pub)
     assert not res["ok"] and "SALTS_PUBLIC_API_KEY matches" in res["line"]
+
+
+def test_cli_sync_revocation_empties_public_store(tmp_path, monkeypatch):
+    """Unticking an item and running `hermes salts-secrets sync` (not the dashboard) still purges guests."""
+    import argparse
+
+    from salts_secrets import cli
+    from salts_secrets import context as core
+
+    owner, pub = tmp_path / "owner", tmp_path / "owner/profiles/public"
+    (owner / "memories").mkdir(parents=True)
+    (owner / "memories/MEMORY.md").write_text("3 April = father's death anniversary", encoding="utf-8")
+    pub.mkdir(parents=True)
+    monkeypatch.setattr(cli, "current", lambda: owner)
+    items = core.scan(owner, [])
+    core.save_allowlist(owner, items, [items[0].id])
+    cli.cmd_sync(argparse.Namespace(public=None))
+    assert core.read_projection(pub)["facts"]
+    _public_store(pub, [("s1", [("user", "What is 3 April?"), ("assistant", "Her father's anniversary.")])])
+    fake = tmp_path / "hermes"
+    fake.write_text(
+        f"#!{sys.executable}\nimport os, sqlite3, sys\n"
+        "con = sqlite3.connect(os.path.join(os.environ['HERMES_HOME'], 'state.db'))\n"
+        "con.execute('delete from messages where session_id = ?', (sys.argv[3],))\n"
+        "con.execute('delete from sessions where id = ?', (sys.argv[3],))\ncon.commit()\n"
+    )
+    fake.chmod(0o755)
+    monkeypatch.setattr(guests, "find_hermes", lambda: str(fake))
+    core.save_allowlist(owner, items, [])
+    cli.cmd_sync(argparse.Namespace(public=None))
+    assert core.read_projection(pub)["facts"] == []
+    con = sqlite3.connect(pub / "state.db")
+    assert con.execute("select count(*) from sessions").fetchone()[0] == 0
+    assert con.execute("select count(*) from messages").fetchone()[0] == 0
+    assert [s["id"] for s in guests.read_archive(owner)] == ["s1"]

@@ -10,25 +10,18 @@ message to the owner agent, so every failure on the guest path still ends in ``s
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .home import NAME, PUBLIC_KEY_ENV
+from .home import NAME, PUBLIC_KEY_ENV, current, data_dir
 
 log = logging.getLogger(__name__)
 
-PLATFORM_ENV_PREFIX = {
-    "telegram": "TELEGRAM",
-    "discord": "DISCORD",
-    "slack": "SLACK",
-    "whatsapp": "WHATSAPP",
-    "signal": "SIGNAL",
-    "matrix": "MATRIX",
-    "mattermost": "MATTERMOST",
-}
 NOTICE_UNAVAILABLE = "The guest entrance is temporarily unavailable. Please try again in a minute."
 NOTICE_RATE = "You have reached the guest message limit for this hour. Please come back later."
 NOTICE_TEXT_ONLY = "I can only read text here."
@@ -57,14 +50,37 @@ class Settings:
         return self.env(PUBLIC_KEY_ENV, "")
 
 
-def default_owners(env: Getter) -> set[str]:
-    """The first id in each ``<PLATFORM>_ALLOWED_USERS`` is taken to be the owner."""
-    owners = set()
-    for platform, prefix in PLATFORM_ENV_PREFIX.items():
-        first = env(f"{prefix}_ALLOWED_USERS", "").split(",")[0].strip()
-        if first:
-            owners.add(f"{platform}:{first}".lower())
-    return owners
+HEARTBEAT_FILE = "route_heartbeat.json"
+HEARTBEAT_KEEP = 8
+
+
+def process_start_time(pid: int) -> Optional[int]:
+    """The gateway's own (pid, start_time) fingerprint from gateway/status.py, so ``check`` can compare."""
+    try:
+        from gateway.status import get_process_start_time
+
+        return get_process_start_time(pid)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def write_heartbeat(home=None, pid: Optional[int] = None, now: Optional[float] = None) -> dict:
+    """Record that the routing hook is registered in this process. Entries are keyed by pid: CLI processes
+    load plugins too, and ``check`` only trusts the entry whose pid and start time are the gateway's."""
+    pid = pid or os.getpid()
+    entry = {"pid": pid, "start_time": process_start_time(pid), "at": int(now or time.time())}
+    path = data_dir(home or current()) / HEARTBEAT_FILE
+    try:
+        beats = json.loads(path.read_text(encoding="utf-8")).get("processes") or {}
+    except (OSError, ValueError, AttributeError):
+        beats = {}
+    beats[str(pid)] = entry
+    keep = dict(sorted(beats.items(), key=lambda kv: -int((kv[1] or {}).get("at") or 0))[:HEARTBEAT_KEEP])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{pid}")
+    tmp.write_text(json.dumps({"processes": keep}, indent=1), encoding="utf-8")
+    tmp.replace(path)
+    return entry
 
 
 def platform_name(platform: Any) -> str:
@@ -183,7 +199,7 @@ def build_settings(get_config: Callable[[str, Any], Any], env: Getter = scoped_e
     host = env("API_SERVER_HOST", "127.0.0.1") or "127.0.0.1"
     port = env("API_SERVER_PORT", "8642") or "8642"
     return Settings(
-        owners=owners or default_owners(env),
+        owners=owners,
         public_profile=get_config("public_profile", "public") or "public",
         rate_per_hour=max(1, int(get_config("guest_rate_per_hour", 20) or 20)),
         api_base=f"http://{host}:{port}",
@@ -196,3 +212,7 @@ def register(ctx) -> None:
     if not settings.owners:
         log.warning("%s: no owner identity configured; every platform message is treated as a guest", NAME)
     ctx.register_hook("pre_gateway_dispatch", make_hook(settings, RateLimiter(settings.rate_per_hour)))
+    try:
+        write_heartbeat()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("%s: could not write the routing heartbeat (%s); check will report BROKEN", NAME, exc)

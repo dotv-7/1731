@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import secrets
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from . import _yaml as yaml
@@ -56,15 +58,98 @@ def _workspaces(owner: Path, cfg: dict) -> list[Path]:
     return [Path(p).expanduser() for p in _settings(cfg).get("workspaces") or [owner / "workspace"]]
 
 
+SETUP_MARKER = "setup.json"
+OWNER_ID = "platform:user_id"
+
+
+def _owner_ids(values: list[str] | None) -> list[str]:
+    out = []
+    for value in values or []:
+        for part in str(value).split(","):
+            part = part.strip().lower()
+            platform, _, uid = part.partition(":")
+            if not (platform and uid):
+                raise SystemExit(f"--owner must look like telegram:123456, got {part!r}")
+            out.append(part)
+    return out
+
+
+def leftovers(pub: Path, owner_name: str) -> list[str]:
+    """Content in an existing public profile that ``setup`` did not write: a reused profile may already
+    hold a SOUL.md, memories or skills that guests would then get."""
+    found = []
+    soul = pub / "SOUL.md"
+    template = (TEMPLATES / "SOUL.md").read_text(encoding="utf-8").format(owner_name=owner_name).strip()
+    if soul.exists() and soul.read_text(encoding="utf-8").strip() not in ("", template):
+        found.append("SOUL.md differs from the template")
+    for path in sorted((pub / "memories").glob("*")) if (pub / "memories").is_dir() else []:
+        if path.is_file() and path.read_text(encoding="utf-8", errors="replace").strip():
+            found.append(f"memories/{path.name} is not empty")
+    skills = sorted(p.parent.name for p in (pub / "skills").rglob("SKILL.md")) if (pub / "skills").is_dir() else []
+    if skills:
+        found.append(f"skills/ holds {len(skills)} skill(s): {', '.join(skills[:5])}")
+    for name in tiers.CONTEXT_FILE_NAMES:
+        if (pub / name).exists():
+            found.append(f"{name} in the profile root")
+    return found
+
+
+def _reset_public(pub: Path, owner: Path) -> Path:
+    """Move leftovers aside (never deleted) and archive + purge any old sessions."""
+    backup = data_dir(pub) / f"reset-{int(time.time())}"
+    backup.mkdir(parents=True, exist_ok=True)
+    for rel in ["SOUL.md", "memories", "skills", *tiers.CONTEXT_FILE_NAMES]:
+        if (pub / rel).exists():
+            shutil.move(str(pub / rel), str(backup / rel))
+    guests.archive(owner, pub, reason="setup --reset-public")
+    guests.purge(pub)
+    return backup
+
+
+def _print_checks(checks: list[dict]) -> None:
+    for check in checks:
+        print(f"  {'ok  ' if check['ok'] else 'FAIL'} {check['text']}")
+        if not check["ok"] and check.get("fix"):
+            print(f"       fix: {check['fix']}")
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     owner, pub, owner_cfg = _paths(args)
     say = lambda text: print("  " + text)  # noqa: E731
     owner_name = args.owner_name or _settings(owner_cfg).get("owner_name") or "the owner"
+    owners = _owner_ids(args.owner) or [str(o).lower() for o in _settings(owner_cfg).get("owners") or []]
+
+    print("preflight")
+    problems = [c for c in tiers.preflight(owner, after_setup=False) if not c["ok"]]
+    if not owners:
+        problems.append({
+            "ok": False,
+            "text": f"no owner identity: pass --owner {OWNER_ID} (repeatable), e.g. --owner telegram:123456",
+            "fix": "hermes salts-secrets setup --owner telegram:<your id>",
+        })
+    if problems:
+        _print_checks(problems)
+        print("setup stopped: nothing was changed")
+        return 2
+    say("ok")
 
     print(f"public profile: profiles/{pub.name}")
+    marker = data_dir(pub) / SETUP_MARKER
+    if pub.is_dir() and not marker.exists():
+        found = leftovers(pub, owner_name)
+        if found and not args.reset_public:
+            for line in found:
+                say("found " + line)
+            say("this profile existed before setup; guests would get the content above.")
+            say("rerun with --reset-public to move it to plugin-data/salts-secrets/reset-<time>/ and continue")
+            return 3
+        if found:
+            say(f"moved previous content to {_reset_public(pub, owner)}")
     if not pub.is_dir():
         _hermes("profile", "create", pub.name, "--no-skills", "--no-alias")
         say("created")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps({"created_by": NAME, "at": int(time.time())}), encoding="utf-8")
     soul = pub / "SOUL.md"
     if not soul.exists() or not soul.read_text(encoding="utf-8").strip():
         soul.write_text(
@@ -93,27 +178,33 @@ def cmd_setup(args: argparse.Namespace) -> int:
     print("owner profile")
     _enable(owner_cfg)
     owner_cfg.setdefault("gateway", {})["multiplex_profiles"] = True
-    _settings(owner_cfg).update(public_profile=pub.name, owner_name=owner_name)
+    _settings(owner_cfg).update(public_profile=pub.name, owner_name=owner_name, owners=owners)
     _write_yaml(owner / "config.yaml", owner_cfg)
     say("gateway.multiplex_profiles on, plugin enabled")
+    say("owner identities: " + ", ".join(owners))
 
     public_key = tiers.profile_secrets(pub).get("API_SERVER_KEY") or f"salts-public-{secrets.token_hex(16)}"
     _hermes("config", "set", "API_SERVER_KEY", public_key, profile=pub.name)
     _hermes("config", "set", PUBLIC_KEY_ENV, public_key)
-    if not tiers.profile_secrets(owner).get("API_SERVER_KEY"):
+    if len(tiers.profile_secrets(owner).get("API_SERVER_KEY", "").strip()) < 16:
         _hermes("config", "set", "API_SERVER_KEY", f"salts-owner-{secrets.token_hex(16)}")
     say(f"public API key stored in both profiles ({PUBLIC_KEY_ENV})")
 
     print("tiers and projection")
     _sync(owner, pub, owner_cfg, say)
     print()
-    return cmd_check(args) or _next_steps(pub.name)
+    result = tiers.isolation_check(owner, pub, gateway=False)
+    _print_checks(result["checks"])
+    print(result["line"].replace("checks", "checks before restart"))
+    if not result["ok"]:
+        return 1
+    return _next_steps(pub.name)
 
 
 def _next_steps(public: str) -> int:
     print(
         "\nnext:\n  1. restart the gateway (hermes gateway restart)\n"
-        f"  2. set your own ids: hermes config set plugins.entries.{NAME}.settings.owners '[\"telegram:<id>\"]'\n"
+        "  2. hermes salts-secrets check   (also proves the running gateway loaded the routing hook)\n"
         "  3. open the dashboard (hermes dashboard) and approve what guests may know under Context"
     )
     return 0
@@ -122,10 +213,18 @@ def _next_steps(public: str) -> int:
 def _sync(owner: Path, pub: Path, owner_cfg: dict, say) -> None:
     for tier, toolsets in tiers.sync(owner, {"guest": pub}).items():
         say(f"{tier}: {', '.join(toolsets)}")
-    projection = context.sync_public(
+    result = context.publish(
         owner, pub, _workspaces(owner, owner_cfg), _settings(owner_cfg).get("owner_name") or "the owner"
     )
+    projection = result["projection"]
     say(f"published {len(projection['facts'])} facts and {len(projection['documents'])} documents")
+    if result["revoked"]:
+        say(
+            f"revoked {result['revoked']} item(s): archived {result['archived']} guest sessions, "
+            f"deleted {result['deleted']}, failed {result['failed']}"
+        )
+    if result.get("error"):
+        say("WARNING: " + result["error"])
 
 
 def cmd_sync(args: argparse.Namespace) -> int:
@@ -137,8 +236,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     owner, pub, _ = _paths(args)
     result = tiers.isolation_check(owner, pub)
-    for check in result["checks"]:
-        print(f"  {'ok  ' if check['ok'] else 'FAIL'} {check['text']}")
+    _print_checks(result["checks"])
     print(result["line"])
     return 0 if result["ok"] else 1
 
@@ -155,7 +253,18 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--public", help="public profile name (default: public)")
     sub = parser.add_subparsers(dest="salts_command", required=True)
     setup = sub.add_parser("setup", help="create the public profile and install the plugin on both sides")
+    setup.add_argument(
+        "--owner",
+        action="append",
+        metavar=OWNER_ID,
+        help="your own identity, e.g. telegram:123456 (repeatable; required on first setup)",
+    )
     setup.add_argument("--owner-name", help="how the public profile refers to you (a handle, not your real name)")
+    setup.add_argument(
+        "--reset-public",
+        action="store_true",
+        help="the public profile already exists with content setup did not write: move it aside and continue",
+    )
     setup.set_defaults(salts_handler=cmd_setup)
     sub.add_parser("check", help="verify every isolation condition").set_defaults(salts_handler=cmd_check)
     sub.add_parser("sync", help="publish approved context and tool tiers").set_defaults(salts_handler=cmd_sync)

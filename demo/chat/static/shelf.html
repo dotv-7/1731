@@ -171,6 +171,17 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .sr div:hover{background:#e6e6f4}.sr .more{justify-content:center;color:var(--muted);cursor:default;font:400 10.5px/1 var(--mono);letter-spacing:.08em}
 .hero .eyebrow button.box{color:var(--blue);height:21px;cursor:pointer}
 #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:6px 14px;font:400 12px/1.4 var(--mono);display:none;z-index:70}
+.triage{border:1px solid var(--blue);background:var(--sheet);padding:14px 16px;margin:18px 0}
+.triage .tl{display:flex;justify-content:space-between;color:var(--blue);gap:12px;flex-wrap:wrap}
+.triage .tb{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.triage button.act{height:34px;padding:0 12px;border:1px solid var(--blue);background:#fff;color:var(--blue);font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;border-radius:0;cursor:pointer}
+.triage button.act.primary{background:var(--blue);color:#fff}.triage button:disabled{opacity:.4;cursor:default}
+.triage .warn{margin-top:8px;font:500 10px/1.4 var(--mono);letter-spacing:.06em;color:#b91c1c;text-transform:uppercase}
+.triage .tnote{margin-top:8px;font:400 12.5px/1.45 var(--serif);color:var(--muted)}
+.tier{margin-top:6px;font:400 11.5px/1.45 var(--sans);color:var(--muted)}
+.tier b{font:500 9.5px/1 var(--mono);letter-spacing:.1em;padding:3px 5px;border:1px solid;margin-right:4px;background:#fff}
+.tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
+.tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
 </style></head><body>
 <div class="grain"></div>
 <div class="top"><div class="l"><span class="lbl">LENA MOREAU</span><span class="line"></span><span class="lbl">CONTEXT</span></div>
@@ -188,6 +199,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
     <div class="mid"><span class="lbl">TICKED HERE</span><span class="arrow">→</span><span class="lbl" id="m-cross"></span></div>
     <div class="ses guest"><div class="who">Salt's assistant</div><div class="meta" id="m-guest">public profile · everyone who is not Lena</div></div>
   </div>
+  <div class="triage" id="triage"></div>
   <div class="g" id="rows"></div>
   <div class="tally" id="tally"></div>
   <div class="guests" id="guests"><div class="gh"><span class="lbl">WHAT GUESTS ASKED · LENA ONLY · READ FROM THE PUBLIC STORE, NEVER ENTERS A SESSION</span><span class="lbl" id="g-count"></span></div><div id="g-rows"></div></div>
@@ -252,18 +264,18 @@ const SOURCES=[
 const DEMO_ITEMS=[['Memory · MEMORY.md','Private records live in private/personal-records.md'],['Memory · MEMORY.md','@saltwater_sats is her anonymous account'],['Memory · USER.md','Lena, 31, product designer in Lisbon'],['Memory · USER.md','Call her Lena. No emojis.'],['Persona · SOUL.md','SOUL.md'],['Workspace · workspace · journal','2026-11-05.md'],['Workspace · workspace · family','letter-to-clara.md'],['Workspace · workspace · public','issue-06 › Harbor'],['Data dir · private','personal-records.md › Home network'],['Skills','weekly-review'],['Cron · cron','Reminder — 20 Dec 2026 09:00'],['Sessions · state.db','2026-11-07 · Token holdings lookup'],['External memory / plugins','Plugin: salts-secrets']];
 const DEMO_PERM={catalog:[{id:'web',tools:['web_search','web_extract']},{id:'vision',tools:['vision_analyze']},{id:'tts',tools:['text_to_speech']},{id:'clarify',tools:['clarify']},{id:'public_notes',tools:['public_notes_lookup']},{id:'memory',tools:['memory']},{id:'session_search',tools:['session_search']},{id:'file',tools:['read_file','write_file','patch','search_files']},{id:'terminal',tools:['terminal','process_manage']},{id:'browser',tools:['browser_exec','browser_cdp','browser_dialog','browser_vault']},{id:'cronjob',tools:['cronjob_manage']}],policy:{guest:['web','vision','tts','clarify','public_notes']}};
 const PAGE=50, AUTO_TEXT=60, FOLD=6000; const unfold=new Set();
-let items=[],byId={},texts={},drafts={},pub=new Set(),demo=false,perm=null,meta={},hits=null,initial='',asIs={},busy=new Set(),draftN=0,draftTok=0,nothingSafe=new Set();
+let items=[],byId={},texts={},drafts={},pub=new Set(),demo=false,perm=null,meta={},hits=null,initial='',asIs={},busy=new Set(),draftN=0,draftTok=0,nothingSafe=new Set(),cls={},via={},combo=null,rulesInfo={},autoRan=false;
 const snapshot=()=>[...pub].sort().map(id=>id+'='+(asIs[id]?'*':(drafts[id]||''))).join('\n');
 async function load(){
   // Demo data only when asked for (?demo=1). Otherwise a locked session goes back to the chat window to unlock, instead of silently showing fake entries.
-  try{if(new URLSearchParams(location.search).get('demo'))throw 0;const r=await fetch('/api/board/items');if(r.status===403){location.href='/?locked=shelf';return;}if(!r.ok)throw 0;const j=await r.json();items=j.items;meta=j;pub=new Set();
-    for(const it of items){if(it.status==='public')pub.add(it.id);if(it.public_text)drafts[it.id]=it.public_text;else if(it.status==='public')asIs[it.id]=true;}
+  try{if(new URLSearchParams(location.search).get('demo'))throw 0;const r=await fetch('/api/board/items');if(r.status===403){location.href='/?locked=shelf';return;}if(!r.ok)throw 0;const j=await r.json();items=j.items;meta=j;pub=new Set();cls={};via={};
+    for(const it of items){if(it.classification)cls[it.id]=it.classification;if(it.status==='public')pub.add(it.id);if(it.public_text)drafts[it.id]=it.public_text;else if(it.status==='public')asIs[it.id]=true;}
   }catch{demo=true;items=DEMO_ITEMS.map((d,i)=>({id:'demo'+i,group:d[0],title:d[1],kind:'x',source:d[0],path:'/demo/'+d[0].replace(/[^a-z]/gi,'_'),publishable:!/Sessions|plugins|Cron/.test(d[0]),status:/public/.test(d[0])?'public':'private'}));
     items.forEach(it=>{texts[it.id]='(demo data) '+it.title;if(it.status==='public')pub.add(it.id);});}
   byId=Object.fromEntries(items.map(i=>[i.id,i]));
   if(!perm){try{const r=await fetch('/api/perm');if(!r.ok)throw 0;perm=await r.json();}catch{perm=DEMO_PERM;}}
   for(const s of SOURCES){s.items=s.match?items.filter(it=>s.match(it.group)):[];if(s.id==='skills')s.items.sort((a,b)=>(b.kind==='skill')-(a.kind==='skill'));}
-  initial=snapshot();build();}
+  initial=snapshot();build();drawTriage();if(!demo&&!autoRan){autoRan=true;runClassify();}}
 const sPub=s=>s.items.filter(i=>pub.has(i.id)), sLock=s=>s.locked||(s.items.length>0&&s.items.every(i=>!i.publishable));
 const short=t=>esc(String(t).replace(/^.*› /,''));
 const sHits=s=>hits?s.items.filter(i=>hits.has(i.id)).length:0;
@@ -313,7 +325,7 @@ async function text(id){if(texts[id]!==undefined)return texts[id];try{const r=aw
 async function loadTexts(ids){const q=ids.filter(id=>texts[id]===undefined);await Promise.all(Array(6).fill(0).map(async()=>{while(q.length){const id=q.shift();await text(id);fillRaw(id);}}));}
 function fillRaw(id){const it=byId[id];if(!it)return;const row=document.querySelector(`.ent[data-id="${CSS.escape(id)}"]`);if(!row)return;
   row.outerHTML=entHTML(it);fitAll();}
-function refreshCounts(){const np=sPub(cb).length,lk=cb.items.filter(i=>!i.publishable).length,ch=cb.items.filter(i=>i.status==='changed'&&!pub.has(i.id)).length;
+function refreshCounts(){if(!cb)return;drawTriage();const np=sPub(cb).length,lk=cb.items.filter(i=>!i.publishable).length,ch=cb.items.filter(i=>i.status==='changed'&&!pub.has(i.id)).length;
   $('#d-counts').innerHTML=`<span><b>${fmt(cb.items.length)}</b> entries</span><span><b>${np}</b> public</span><span><b>${fmt(cb.items.length-np-lk)}</b> private</span>`+(lk?`<span><b>${lk}</b> locked</span>`:'')+(ch?`<span style="color:#b45309"><b style="color:#b45309">${ch}</b> changed, dropped back</span>`:'')+(hits?`<span><b>${sHits(cb)}</b> search hits shown</span>`:'');
   const blocked=cb.items.filter(i=>pub.has(i.id)&&!asIs[i.id]&&texts[i.id]!==undefined&&isSame(i.id)).length;
   const empty=cb.items.filter(i=>pub.has(i.id)&&!asIs[i.id]&&texts[i.id]!==undefined&&!(drafts[i.id]!==undefined?drafts[i.id]:(texts[i.id]||'')).trim()).length;
@@ -341,7 +353,7 @@ function fit(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px'
 function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);}
 function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status==='changed'&&!on;
   const st=lk?'locked':on?'public':chg?'changed':'private';
-  const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}<span class="st ${st}">${st}</span></div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><pre class="raw ${texts[it.id]===undefined?'wait':''}">${texts[it.id]===undefined?'loading raw…':markHTML(texts[it.id]===undefined?'':(texts[it.id]||'(empty)').length>FOLD&&!unfold.has(it.id)?(texts[it.id].slice(0,FOLD)+'\n…'):(texts[it.id]||'(empty)'))}</pre>${texts[it.id]&&texts[it.id].length>FOLD?`<button class="more">${unfold.has(it.id)?'Show less':`Show all · ${fmt(texts[it.id].length)} chars`}</button>`:''}${texts[it.id]!==undefined&&on?chips(texts[it.id],'nothing flagged in the original'):''}</div></div>`;
+  const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}<span class="st ${st}">${st}</span></div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div>${tierHTML(it)}<pre class="raw ${texts[it.id]===undefined?'wait':''}">${texts[it.id]===undefined?'loading raw…':markHTML(texts[it.id]===undefined?'':(texts[it.id]||'(empty)').length>FOLD&&!unfold.has(it.id)?(texts[it.id].slice(0,FOLD)+'\n…'):(texts[it.id]||'(empty)'))}</pre>${texts[it.id]&&texts[it.id].length>FOLD?`<button class="more">${unfold.has(it.id)?'Show less':`Show all · ${fmt(texts[it.id].length)} chars`}</button>`:''}${texts[it.id]!==undefined&&on?chips(texts[it.id],'nothing flagged in the original'):''}</div></div>`;
   let right;
   if(on){const v=drafts[it.id]!==undefined?drafts[it.id]:(texts[it.id]||'');const edited=v.trim()!==(texts[it.id]||'').trim();const same=texts[it.id]!==undefined&&isSame(it.id)&&!asIs[it.id];const b=busy.has(it.id);const ns=nothingSafe.has(it.id)&&!v.trim()&&!b;
     right=`<div class="gst"><div class="k"><span>GUEST VERSION · RAW · ${cb.fact?'INJECTED AS A FACT':cb.id==='skills'?'PUBLIC SKILL, FETCHED ON USE':'SENT AS A DOCUMENT'}</span><span><label title="let the original cross unchanged"><input type="checkbox" class="asis" ${asIs[it.id]?'checked':''}> AS-IS</label><button class="draft" type="button" ${b?'disabled':''}>${b?'Drafting…':'Draft with Hermes'}</button><button class="reset" type="button">Original</button></span></div><textarea spellcheck="false" class="${edited?'edited':''} ${same?'same':''}" ${texts[it.id]===undefined?'':'data-filled="1"'} ${b?'disabled':''} placeholder="${ns?'Write the guest version yourself, or untick the entry.':'Guest version'}">${esc(b?'Hermes is drafting a guest version…':v)}</textarea>${texts[it.id]!==undefined&&!b?chips(v,asIs[it.id]?'crossing as-is, nothing flagged':'nothing flagged in the guest version'):''}${ns?`<div class="warn">HERMES DRAFTED NOTHING · IT JUDGED EVERY PART OF THIS NOTE PRIVATE (PATHS, EMPLOYER, DATES, ACCOUNTS) · WRITE A GUEST VERSION YOURSELF, OR UNTICK · NOTHING CROSSES WHILE THIS IS EMPTY</div>`:same?`<div class="warn">${!v.trim()?'EMPTY · NOTHING WOULD CROSS':'SAME AS THE ORIGINAL'} · DRAFT IT, EDIT IT, OR TICK AS-IS</div>`:''}</div>`;}
@@ -373,7 +385,8 @@ $('#rows').addEventListener('click',e=>{const c=e.target.closest('.cell.clk');if
 $('#close').onclick=closeDetail;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&open)closeDetail();});
 $('#d-list').addEventListener('change',async e=>{const row=e.target.closest('.ent');if(!row||e.target.type!=='checkbox')return;const id=row.dataset.id;
-  if(e.target.classList.contains('asis')){asIs[id]=e.target.checked;rerow(id);refreshCounts();return;}
+  if(e.target.classList.contains('asis')){via[id]='single';asIs[id]=e.target.checked;rerow(id);refreshCounts();return;}
+  via[id]='single';
   if(e.target.checked){await text(id);pub.add(id);if(cb.asis&&drafts[id]===undefined)asIs[id]=true;}else pub.delete(id);
   rerow(id);refreshCounts();
   if(e.target.checked&&!cb.asis&&!asIs[id]&&(drafts[id]===undefined||isSame(id)))draftOne(id);});
@@ -384,10 +397,13 @@ $('#d-list').addEventListener('click',e=>{
   const lp=e.target.closest('.loadraw');if(lp){const ids=[...document.querySelectorAll('.ent')].map(r=>r.dataset.id);loadTexts(ids);lp.disabled=true;lp.textContent='Loading…';return;}
   const mp=e.target.closest('.morepage');if(mp){const k=mp.dataset.ch;pages[k]=(pages[k]||PAGE)+PAGE;renderList();}});
 $('#d-list').addEventListener('input',e=>{const ta=e.target.closest('textarea');if(!ta)return;fit(ta);const id=ta.closest('.ent').dataset.id;drafts[id]=ta.value;ta.classList.toggle('edited',ta.value.trim()!==(texts[id]||'').trim());ta.classList.toggle('same',isSame(id)&&!asIs[id]);const g=ta.closest('.gst');const old=g.querySelector('.flags');if(old)old.outerHTML=chips(ta.value,'nothing flagged in the guest version');const w=g.querySelector('.warn');if(w&&!(isSame(id)&&!asIs[id]))w.remove();refreshCounts();});
-$('#d-save').onclick=async()=>{if(demo)return toast('Demo data, nothing saved');const public_texts={};for(const id of pub){if(asIs[id])continue;const dft=(drafts[id]||'').trim();if(dft&&dft!==(texts[id]||'').trim())public_texts[id]=dft;}
-  const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:[...pub],public_texts})});
-  if(!r.ok)return toast('Save failed');const j=await r.json();toast(`Synced: ${j.facts} facts, ${j.documents} documents now reach the guest`);
-  const id=cb.id;await load();cb=SOURCES.find(s=>s.id===id);renderList();if($('#detail').classList.contains('asguest'))renderGuest();};
+async function saveAll(){if(demo)return toast('Demo data, nothing saved');const public_texts={};for(const id of pub){if(asIs[id])continue;const dft=(drafts[id]||'').trim();if(dft&&dft!==(texts[id]||'').trim())public_texts[id]=dft;}
+  const ids=[...pub].filter(id=>!(via[id]==='bulk-B'&&!public_texts[id]));
+  const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:ids,public_texts,decisions:Object.fromEntries(Object.entries(via).map(([k,v])=>[k,{via:v}]))})});
+  if(!r.ok)return toast('Save failed');const j=await r.json();combo=j.combination||null;
+  toast(`Synced: ${j.facts} facts, ${j.documents} documents now reach the guest`+((j.rejected||[]).length?` · ${j.rejected.length} refused (bulk click outside its tier)`:'')+(combo&&combo.hit?' · combination warning':''));
+  const id=cb&&cb.id;await load();if(open&&id){cb=SOURCES.find(s=>s.id===id);renderList();if($('#detail').classList.contains('asguest'))renderGuest();}}
+$('#d-save').onclick=saveAll;
 // ---------- "view as guest": the raw section the plugin injects, rebuilt from the synced projection
 $('#d-guest').onclick=()=>{const det=$('#detail');const on=det.classList.toggle('asguest');$('#d-guest').classList.toggle('on',on);if(on)renderGuest();};
 async function renderGuest(){const g=$('#gview');g.innerHTML='<p class="note">Loading the synced projection…</p>';
@@ -404,6 +420,32 @@ $('#pol-open').onclick=async()=>{try{const j=await (await fetch('/api/board/poli
 $('#pol-close').onclick=()=>$('#pol').classList.remove('show');
 $('#pol-save').onclick=async()=>{const r=await fetch('/api/board/policy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('#pol-text').value})});toast(r.ok?'Policy saved; the next draft follows it':'Save failed');if(r.ok)$('#pol').classList.remove('show');};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#pol').classList.contains('show'))$('#pol').classList.remove('show');});
+// ---------- triage: rules, then Hermes, sort every entry into A/B/C; the owner still clicks every entry over
+const TIER_TXT={A:'A · AS-IS',B:'B · REWRITE',C:'C · PRIVATE'};
+function tierHTML(it){const c=cls[it.id];if(!c)return '';const rh=c.rules_hit||[];const v=via[it.id]||it.decided_via;
+  return `<div class="tier t${c.tier}" title="${esc(rh.map(r=>r+': '+((rulesInfo[r]||{}).description||'')).join('\n'))}"><b>${TIER_TXT[c.tier]}</b>${esc(c.reason)}${rh.length?` <span class="rh">${rh.map(esc).join(' · ')}</span>`:''}${v?`<span class="via">· ${esc(v)}</span>`:''}</div>`;}
+function tierCounts(){const n={A:0,B:0,C:0};for(const it of items){const c=cls[it.id];if(c)n[c.tier]++;}return n;}
+function drawTriage(){const t=$('#triage');if(!t)return;const n=tierCounts(),done=Object.keys(cls).length,dirty=snapshot()!==initial||Object.keys(via).length>0;
+  t.innerHTML=`<div class="tl"><span class="lbl">TRIAGE · RULES FIRST, THEN HERMES · NOTHING CROSSES WITHOUT YOUR CLICK</span><span class="lbl">${done?`${n.A} A · ${n.B} B · ${n.C} C`:'NOT CLASSIFIED YET'}</span></div>`+
+  `<div class="tb"><button class="act" id="t-run">${done?'Classify again':'Classify'}</button><button class="act" data-bulk="A" ${n.A?'':'disabled'}>A · adopt all ${n.A} as-is</button><button class="act" data-bulk="B" ${n.B?'':'disabled'}>B · draft guest versions for all ${n.B}</button><button class="act" data-bulk="C" ${n.C?'':'disabled'}>C · keep all ${n.C} private</button><button class="act primary" id="t-save" ${dirty?'':'disabled'}>Save &amp; sync</button></div>`+
+  (combo&&combo.hit?`<div class="warn">${esc(combo.message)} · ${combo.ids.length} entries marked B</div>`:'')+
+  `<div class="tnote">A crosses unchanged, B crosses only as a guest version, C stays here. A bulk button only ever takes entries of its own tier; C never crosses in bulk. Every entry stays editable one by one, and every click is written to the approval log.</div>`;}
+async function runClassify(){const b=$('#t-run');if(b){b.disabled=true;b.textContent='Classifying…';}const t0=Date.now();
+  try{const r=await fetch('/api/board/classify',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw new Error(r.status);const j=await r.json();rulesInfo=j.rules||{};
+    cls={};for(const [id,c] of Object.entries(j.items||{}))cls[id]=c;
+    toast(`Classified in ${Math.round((Date.now()-t0)/1000)}s · ${j.counts.A} A · ${j.counts.B} B · ${j.counts.C} C`+(j.model?'':' · no model: rules only, nothing is A')+((j.errors||[]).length?` · ${j.errors.length} batch(es) failed`:''));}
+  catch(err){toast('Classify failed: '+err.message);}
+  drawTriage();if(open)renderList();}
+document.addEventListener('click',async e=>{const t=e.target;
+  if(t.id==='t-run'){if(demo)return toast('Demo data');runClassify();return;}
+  if(t.id==='t-save'){saveAll();return;}
+  const b=t.dataset&&t.dataset.bulk;if(!b||demo)return;
+  const ids=items.filter(it=>it.publishable&&cls[it.id]&&cls[it.id].tier===b).map(it=>it.id);
+  if(b==='A'){for(const id of ids){pub.add(id);asIs[id]=true;delete drafts[id];via[id]='bulk-A';}}
+  else if(b==='C'){for(const id of ids){pub.delete(id);via[id]='bulk-C';}}
+  else{for(const id of ids){pub.add(id);asIs[id]=false;via[id]='bulk-B';}t.disabled=true;const q=[...ids];let n=0;
+    await Promise.all(Array(4).fill(0).map(async()=>{while(q.length){const id=q.shift();await draftOne(id);n++;t.textContent=`Drafting ${n}/${ids.length}…`;if(nothingSafe.has(id)||!(drafts[id]||'').trim())pub.delete(id);}}));}
+  build();drawTriage();if(open)renderList();});
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2600);}
 load();
 

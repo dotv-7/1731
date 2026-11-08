@@ -503,7 +503,7 @@ def _runtime_items(home: Path) -> list[Item]:
                 f"External memory provider: {provider}",
                 provider,
                 publishable=False,
-                note="the public profile has no external memory",
+                note="the public side configures no memory provider (check: no external memory provider); its contents are not listed here",
             )
         )
     plugins = home / "plugins"
@@ -633,34 +633,108 @@ def load_allowlist(owner_home: Path) -> dict[str, dict]:
         return {}
 
 
+APPROVAL_LOG = "approvals.jsonl"
+VIAS = ("single", "bulk-A", "bulk-B", "bulk-C")
+
+
+def approve(
+    owner_home: Path,
+    items: list[Item],
+    public_ids: Iterable[str],
+    public_texts: Optional[dict[str, str]] = None,
+    decisions: Optional[dict[str, dict]] = None,
+    classification: Optional[dict[str, dict]] = None,
+    by: str = "owner",
+) -> dict:
+    """Save what the owner approved. ``public_texts`` maps an item id to the guest-facing rewrite; guests never
+    get the original when a rewrite exists (an empty or identical rewrite means "publish the original").
+
+    ``decisions`` says how each click happened (``single`` or ``bulk-A``/``bulk-B``/``bulk-C``). A bulk click
+    only counts for items the classifier put in that tier (bulk-B only with a guest version), and never for a
+    C item: those are refused and
+    returned in ``rejected``. A single click may override the classifier (logged as an override). Every
+    change is appended to the owner's approval log, so each published item traces back to one owner click."""
+    from . import privacy
+
+    if classification is None:
+        from .classify import cached
+
+        classification = cached(owner_home, items)
+    wanted, texts, decisions = set(public_ids), public_texts or {}, decisions or {}
+    previous = load_allowlist(owner_home)
+    entries: dict[str, dict] = {}
+    rejected, log = [], []
+    now = int(time.time())
+    for it in items:
+        dec = decisions.get(it.id) if isinstance(decisions.get(it.id), dict) else {}
+        via = dec.get("via") if dec.get("via") in VIAS else "single"
+        cls = classification.get(it.id) or {}
+        tier, rules_hit = cls.get("tier", ""), list(cls.get("rules_hit") or [])
+        prev = previous.get(it.id)
+        base = {"id": it.id, "title": it.title, "fingerprint": it.fingerprint, "decided_by": by, "decided_via": via,
+                "classifier_tier": tier, "rules_hit": rules_hit}
+        if it.id not in wanted or not it.publishable:
+            if prev or dec:
+                log.append({**base, "at": now, "decision": "private"})
+            continue
+        if via.startswith("bulk-") and (tier == "C" or via != f"bulk-{tier}"):
+            rejected.append({"id": it.id, "title": it.title, "tier": tier, "via": via})
+            if prev and prev.get("fingerprint") == it.fingerprint:
+                entries[it.id] = prev
+            continue
+        rewrite = (texts.get(it.id) or "").strip()
+        public_text = rewrite if rewrite and rewrite != it.text else ""
+        if via == "bulk-B" and not public_text:
+            rejected.append({"id": it.id, "title": it.title, "tier": tier, "via": via, "why": "no guest version"})
+            continue
+        if (prev and not dec and prev.get("fingerprint") == it.fingerprint
+                and prev.get("public_text", "") == public_text):
+            entries[it.id] = {**base, "decided_via": "single", **prev}  # unchanged since the owner approved it
+            continue
+        mode = "rewrite" if public_text else "as-is"
+        entry = {**base, "kind": it.kind, "source": it.source, "approved_at": now, "mode": mode,
+                 "override": tier == "C" or (tier == "B" and mode == "as-is")}
+        if public_text:
+            entry["public_text"] = public_text
+        entries[it.id] = entry
+        log.append({**{k: v for k, v in entry.items() if k != "public_text"}, "at": now, "decision": "public"})
+    rules = privacy.load_rules(owner_home)
+    shown = {i.id: privacy.screen({"text": entries[i.id].get("public_text") or i.text, "title": ""}, rules)
+             for i in items if i.id in entries}
+    combo = privacy.combination(shown, rules)
+    for item_id in combo["ids"]:
+        entries[item_id]["combination"] = True
+    _atomic_write(
+        data_dir(owner_home) / ALLOWLIST_FILE,
+        json.dumps({"version": 2, "entries": list(entries.values())}, ensure_ascii=False, indent=2),
+    )
+    if log:
+        path = data_dir(owner_home) / APPROVAL_LOG
+        with path.open("a", encoding="utf-8") as f:
+            f.writelines(json.dumps(row, ensure_ascii=False) + "\n" for row in log)
+        os.chmod(path, 0o600)
+    return {"entries": entries, "rejected": rejected, "combination": combo, "logged": len(log)}
+
+
 def save_allowlist(
     owner_home: Path, items: list[Item], public_ids: Iterable[str], public_texts: Optional[dict[str, str]] = None
 ) -> dict[str, dict]:
-    """``public_texts`` maps an item id to the guest-facing rewrite the owner approved. Guests never get the
-    original text when a rewrite exists; an empty or identical rewrite means "publish the original"."""
-    wanted = set(public_ids)
-    texts = public_texts or {}
-    entries = {}
-    for it in items:
-        if it.id not in wanted or not it.publishable:
+    """``approve`` with single clicks only; returns the saved entries."""
+    return approve(owner_home, items, public_ids, public_texts)["entries"]
+
+
+def read_approval_log(owner_home: Path) -> list[dict]:
+    try:
+        lines = (data_dir(owner_home) / APPROVAL_LOG).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        try:
+            out.append(json.loads(line))
+        except ValueError:
             continue
-        entry = {
-            "id": it.id,
-            "kind": it.kind,
-            "source": it.source,
-            "title": it.title,
-            "fingerprint": it.fingerprint,
-            "approved_at": int(time.time()),
-        }
-        rewrite = (texts.get(it.id) or "").strip()
-        if rewrite and rewrite != it.text:
-            entry["public_text"] = rewrite
-        entries[it.id] = entry
-    _atomic_write(
-        data_dir(owner_home) / ALLOWLIST_FILE,
-        json.dumps({"version": 1, "entries": list(entries.values())}, ensure_ascii=False, indent=2),
-    )
-    return entries
+    return out
 
 
 def status(item: Item, allowlist: dict[str, dict]) -> str:
@@ -679,19 +753,60 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
     def shown(it: Item) -> str:
         return (allowlist.get(it.id, {}).get("public_text") or it.text).strip()
 
+    def origin(it: Item) -> dict:
+        entry = allowlist.get(it.id, {})
+        return {"id": it.id, "tier": entry.get("classifier_tier", ""),
+                "mode": "rewrite" if entry.get("public_text") else "as-is",
+                "decided_via": entry.get("decided_via", "single")}
+
+    facts = [it for it in public if it.kind in ("memory", "user")]
     return {
-        "version": 1,
+        "version": 2,
         "generated_at": int(time.time()),
         "owner_name": owner_name,
-        "facts": [shown(it) for it in public if it.kind in ("memory", "user")],
-        "documents": [{"title": it.title, "text": shown(it)} for it in public if it.kind not in ("memory", "user")],
+        "facts": [shown(it) for it in facts],
+        "fact_meta": [{"text": shown(it), **origin(it)} for it in facts],
+        "documents": [{"title": it.title, "text": shown(it), **origin(it)} for it in public if it not in facts],
     }
+
+
+def write_projection(
+    owner_home: Path, public_home: Path, workspace_roots: list[Path], owner_name: str = "the owner"
+) -> dict:
+    """Projection only, no revocation handling. Use ``publish`` unless the caller handles revocation itself."""
+    items = scan(owner_home, workspace_roots)
+    projection = build_projection(items, load_allowlist(owner_home), owner_name)
+    _atomic_write(data_dir(public_home) / PROJECTION_FILE, json.dumps(projection, ensure_ascii=False, indent=2), 0o644)
+    return projection
+
+
+def read_projection(public_home: Path) -> dict:
+    try:
+        data = json.loads((data_dir(public_home) / PROJECTION_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"facts": [], "documents": []}
+    return data if isinstance(data, dict) else {"facts": [], "documents": []}
+
+
+def publish(
+    owner_home: Path,
+    public_home: Path,
+    workspace_roots: list[Path],
+    owner_name: str = "the owner",
+    hermes_bin: Optional[str] = None,
+) -> dict:
+    """The one publishing path (dashboard, demo board and ``hermes salts-secrets sync``): rewrite the projection,
+    then, if anything guests could see before is gone, archive the guest sessions for the owner and delete
+    them from the public store, so a revoked fact does not live on in a guest transcript or summary."""
+    from . import guests
+
+    before = read_projection(public_home)
+    after = write_projection(owner_home, public_home, workspace_roots, owner_name)
+    return {"projection": after, **guests.revoke_and_purge(owner_home, public_home, before, after, hermes_bin)}
 
 
 def sync_public(
     owner_home: Path, public_home: Path, workspace_roots: list[Path], owner_name: str = "the owner"
 ) -> dict:
-    items = scan(owner_home, workspace_roots)
-    projection = build_projection(items, load_allowlist(owner_home), owner_name)
-    _atomic_write(data_dir(public_home) / PROJECTION_FILE, json.dumps(projection, ensure_ascii=False, indent=2), 0o644)
-    return projection
+    """``publish`` returning only the projection (revoked items still purge guest sessions)."""
+    return publish(owner_home, public_home, workspace_roots, owner_name)["projection"]
