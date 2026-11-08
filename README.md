@@ -4,10 +4,22 @@
 
 [![tests](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml/badge.svg?branch=dotv)](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml)
 
-Your Hermes got good: it knows your methods, your published work and how you think, so people want to
-talk to it. It also knows your passwords, your cat's name, your father's anniversary and the deploy key of
-your server, because you told it. The moment you hand that same Hermes to other people, through a
-Telegram bot, a Discord server or a web chat, every one of those facts is one question away.
+**The story (a fictional demo, every detail invented).** Lena Moreau is a pseudonymous crypto analyst. Online
+she is only **Salt**: [@saltwater_sats](https://salt.dotv.io), author of the Low Tide newsletter on stablecoin
+reserves, bridges and exchange risk. For two years she has been training her Hermes: every issue she wrote, her
+four bridge checks, her exchange net-outflow signal, the calls she got wrong and why. It now analyses the way she
+does, and her readers want to talk to it.
+
+The same Hermes knows her real name and her flat in Lisbon, her hot wallet and what she holds, an unpublished call
+on Lantern v2, the day her father died, and the password to her router, because she told it. Today she has two
+choices: keep her twin private and her readers get nothing, or share it and every one of those facts is one
+question away for anyone on Telegram, Discord or the web. For a pseudonymous analyst that is doxxing, front-running
+and harassment waiting to happen.
+
+Salt's Secrets is the third choice. Strangers talk to **Salt's twin**: her methods, her published work, her voice,
+able to run her bridge checks on a protocol you name. Lena's life never enters that room. Try it at
+**[salt.dotv.io](https://salt.dotv.io)**; the read-only passphrase `lena-readonly` shows Lena's side of the same
+conversation. The same goes for any expert whose Hermes got good: a researcher, a consultant, a developer.
 
 This project gives Hermes a second mind. Strangers never reach your agent. They reach a **public profile**
 that is built from nothing but what you ticked as public, rewritten in a guest-safe voice, and that
