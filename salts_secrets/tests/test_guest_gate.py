@@ -142,7 +142,7 @@ def _registrations(monkeypatch, home, settings):
 ])
 def test_role_follows_settings_then_profile_name(monkeypatch, tmp_path, home_rel, settings, public):
     calls = _registrations(monkeypatch, tmp_path / home_rel, settings)
-    assert ("register_hook" in calls and "register_tool" in calls) is public
+    assert ("register_system_prompt_section" in calls) is public
     assert ("register_cli_command" in calls) is not public
 
 
