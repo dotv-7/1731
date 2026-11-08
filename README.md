@@ -26,6 +26,8 @@ It is one Hermes plugin, `salts-secrets`, on top of an unmodified Hermes v0.23.0
 
 ## 30-second tour
 
+A 90-second demo video (the eight questions below, both sessions side by side) will be published here soon.
+
 The same eight questions, asked in parallel to both sessions (owner in the first person, guest about
 "Salt", the owner's public persona). From the demo in [`demo/`](demo/) (a fictional persona):
 
