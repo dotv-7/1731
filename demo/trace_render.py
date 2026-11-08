@@ -201,22 +201,6 @@ def redact(bundle: dict) -> dict:
     return clean(bundle)
 
 
-def projection_html(bundle: dict) -> str:
-    """What the guest was given, each fact and document with its tier and whether it is the original or a rewrite."""
-    proj = bundle.get("projection") or {}
-    rows = [("fact", m.get("text", ""), m) for m in proj.get("fact_meta") or []]
-    rows += [("document", d.get("title", ""), d) for d in proj.get("documents") or []]
-    if not rows:
-        return ""
-    body = "".join(
-        f"<tr><td>{esc(kind)}</td><td>{esc(m.get('tier') or '?')}</td><td>{esc(m.get('mode') or 'as-is')}</td>"
-        f"<td>{esc(m.get('decided_via') or 'single')}</td><td>{esc(str(text)[:200])}</td></tr>"
-        for kind, text, m in rows
-    )
-    return ('<section class="proj"><h3>What the guest was given</h3><table><tr><th>kind</th><th>tier</th>'
-            f"<th>original or rewrite</th><th>approved by</th><th>text</th></tr>{body}</table></section>")
-
-
 def render(bundle: dict, out_dir: Path) -> Path:
     bundle = redact(bundle)
     L, R = bundle["sides"]["owner"], bundle["sides"]["public"]
@@ -312,8 +296,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
 {tool_diff}
 <div class="pair"><div class="cell">{tools_block(L["tools"], "left")}</div><div class="cell">{tools_block(R["tools"], "right")}</div></div>
 {"".join(turns_html)}
-<div class="foot"><span class="lbl">VERBATIM · STATE.DB ORDER · EVERY ROW CARRIES ITS ROW NUMBER</span><span class="lbl">{esc(HERMES)}</span></div>
-{projection_html(bundle)}</main></div></body></html>"""
+</main></div></body></html>"""
     out_dir.mkdir(parents=True, exist_ok=True)
     run_page = out_dir / f"run_{bundle['run_id']}.html"
     run_page.write_text(page, encoding="utf-8")
