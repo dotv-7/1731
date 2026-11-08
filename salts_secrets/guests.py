@@ -200,8 +200,8 @@ def revoked(old_projection: dict, new_projection: dict) -> list[str]:
     """Texts that guests could see before this sync and cannot see after it."""
     old_facts = set(old_projection.get("facts") or [])
     new_facts = set(new_projection.get("facts") or [])
-    old_docs = {d.get("text", "") for d in old_projection.get("documents") or []}
-    new_docs = {d.get("text", "") for d in new_projection.get("documents") or []}
+    old_docs = {d.get("text", "") for k in ("documents", "methods") for d in old_projection.get(k) or []}
+    new_docs = {d.get("text", "") for k in ("documents", "methods") for d in new_projection.get(k) or []}
     return sorted(old_facts - new_facts) + sorted(old_docs - new_docs)
 
 
