@@ -16,8 +16,26 @@ choices: keep her twin private and her readers get nothing, or share it and ever
 question away for anyone on Telegram, Discord or the web. For a pseudonymous analyst that is doxxing, front-running
 and harassment waiting to happen.
 
+What actually goes wrong when you share an agent that knows you:
+
+- **One question doxxes you.** "Which city does Salt live in?" Her Hermes knows the street. For a pseudonymous
+  analyst the handle is the safety, and a guessing game ("is it Lisbon?") leaks as much as an answer.
+- **Your book gets front-run.** Her holdings, her hot wallet and an unpublished call on Lantern v2 are in memory.
+  One leak moves a market against her, or against the readers who trust her.
+- **Your family becomes content.** Her father's death anniversary, her mother's medication, a letter to her
+  estranged sister: all in the workspace her agent reads.
+- **Credentials are one tool call away.** Router password, where the recovery kit lives, API keys. An agent with
+  `read_file` and a terminal can be talked into opening them.
+- **"Never share this" is not a boundary.** A prompt rule can be argued with, role-played around or forgotten in a
+  long chat. A model that never had the fact cannot leak it.
+- **Unpublishing is not forgetting.** Take something back and it still lives in old guest transcripts and summaries.
+- **Copying by hand kills the twin.** Building a second bot means rewriting hundreds of notes and keeping them in
+  sync, and it loses the skills that made the first one worth talking to.
+
 Salt's Secrets is the third choice. Strangers talk to **Salt's twin**: her methods, her published work, her voice,
-able to run her bridge checks on a protocol you name. Lena's life never enters that room. Try it at
+able to run her bridge checks on a protocol you name. Lena's life never enters that room. Every item she shares
+crosses with one click from her, often as a rewrite; everything else stays on her side, unreachable by any tool,
+and taking something back purges the guest transcripts that saw it. Try it at
 **[salt.dotv.io](https://salt.dotv.io)**; the read-only passphrase `lena-readonly` shows Lena's side of the same
 conversation. The same goes for any expert whose Hermes got good: a researcher, a consultant, a developer.
 
