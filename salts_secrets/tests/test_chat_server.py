@@ -422,3 +422,29 @@ def test_negative_turn_limit_is_refused_at_startup(tmp_path):
     with pytest.raises(ValueError, match="SALT_TURNS_PER_HOUR"):
         server.Settings({"SALT_OWNER_HOME": str(tmp_path / "owner"), "SALT_PUBLIC_HOME": str(tmp_path / "public"),
                          "SALT_SECRET": "x" * 32, "SALT_TURNS_PER_HOUR": "-1"})
+
+
+def test_unanswered_message_gives_the_turn_back(tmp_path, monkeypatch):
+    class Down:
+        status_code = 502
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def aread(self):
+            return b"bad gateway"
+
+        def stream(self, *a, **k):
+            return self
+
+    monkeypatch.setattr(server.httpx, "AsyncClient", lambda *a, **k: Down())
+    app = server.create_app(server.Settings({"SALT_OWNER_HOME": str(tmp_path / "owner"),
+                                             "SALT_PUBLIC_HOME": str(tmp_path / "public"), "SALT_SECRET": "x" * 32,
+                                             "SALT_PUBLIC_KEY": "pk", "SALT_TURNS_PER_HOUR": "1"}))
+    guest = TestClient(app, client=("203.0.113.7", 1))
+    for _ in range(3):
+        r = guest.post("/api/chat", json={"message": "q"})
+        assert r.status_code == 200 and "Hermes 502" in r.text

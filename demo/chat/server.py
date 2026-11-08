@@ -290,10 +290,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     viewer_turns: dict[str, int] = {}
     hourly_turns: dict[str, deque] = defaultdict(deque)
 
-    def spend_turn(request: Request, st: dict) -> None:
-        """Every chat message costs the owner model tokens; cap each address (or device) per hour."""
+    def spend_turn(request: Request, st: dict):
+        """Every chat message costs the owner model tokens; cap each address (or device) per hour.
+        Returns a refund for a message Hermes never answered."""
         if not s.turns_per_hour or is_owner(st):
-            return
+            return lambda: None
         ip = client_ip(request)
         # a proxy/LAN address is shared by every visitor behind it: count per device there
         who = ip if perm.blockable_ip(ip) else "device:" + st["did"]
@@ -307,6 +308,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             wait = int(window[0] + 3600 - now) // 60 + 1
             raise HTTPException(429, f"{s.turns_per_hour} messages an hour reached, try again in {wait} min")
         window.append(now)
+        return lambda: now in window and window.remove(now)
 
     @app.post("/api/chat")
     async def chat(request: Request):
@@ -339,7 +341,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             if tier in ("admin", "user"):
                 raise HTTPException(503, f"the {tier} tier is planned, not implemented yet")
             raise HTTPException(503, f"Hermes key for tier '{tier}' is not configured")
-        spend_turn(request, st)
+        refund = spend_turn(request, st)
         url = f"{s.hermes_url}/v1/chat/completions" if tier == "owner" else \
             f"{s.hermes_url}/p/{s.tier_profiles[tier]}/v1/chat/completions"
         payload = {"model": "hermes-agent", "stream": True, "messages": [{"role": "user", "content": message}],
@@ -352,6 +354,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                     async with client.stream("POST", url, json=payload, headers=headers) as r:
                         if r.status_code != 200:
                             detail = (await r.aread()).decode(errors="replace")[:300]
+                            refund()
                             yield _sse({"error": f"Hermes {r.status_code}: {detail}"})
                             return
                         async for line in r.aiter_lines():
@@ -370,6 +373,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                                     yield _sse({"t": text})
                 yield _sse({"done": True})
             except httpx.HTTPError as exc:
+                refund()
                 yield _sse({"error": f"cannot reach Hermes: {type(exc).__name__}"})
 
         resp = StreamingResponse(stream(), media_type="text/event-stream",
