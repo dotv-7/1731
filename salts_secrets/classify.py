@@ -64,14 +64,14 @@ def _save_cache(owner_home: Path, cache: dict) -> None:
 
 
 def model_settings(owner_home: Path) -> dict:
-    """OpenAI-compatible endpoint from the owner's config.yaml ``model:`` block (the model that serves her)."""
+    """OpenAI-compatible or Anthropic-messages endpoint from the owner's config.yaml ``model:`` block (the model that serves her)."""
     try:
         cfg = yaml.safe_load((Path(owner_home) / "config.yaml").read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         cfg = {}
     m = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
     return {"base_url": str(m.get("base_url") or "").rstrip("/"), "api_key": str(m.get("api_key") or ""),
-            "model": str(m.get("default") or "")}
+            "model": str(m.get("default") or ""), "api_mode": str(m.get("api_mode") or "")}
 
 
 def openai_asker(settings: dict) -> Optional[Ask]:
@@ -85,6 +85,12 @@ def openai_asker(settings: dict) -> Optional[Ask]:
                    "thinking": {"type": "disabled"},
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
         async with httpx.AsyncClient(timeout=120) as client:
+            if settings.get("api_mode") == "anthropic_messages":
+                payload["system"] = payload["messages"].pop(0)["content"]
+                r = await client.post(f"{settings['base_url']}/v1/messages", json=payload,
+                                      headers={"x-api-key": settings["api_key"], "anthropic-version": "2023-06-01"})
+                r.raise_for_status()
+                return "".join(b.get("text", "") for b in r.json().get("content") or [] if b.get("type") == "text")
             r = await client.post(f"{settings['base_url']}/chat/completions", json=payload,
                                   headers={"Authorization": f"Bearer {settings['api_key']}"})
             r.raise_for_status()
