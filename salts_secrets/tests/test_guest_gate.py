@@ -46,9 +46,9 @@ def _tier(tmp_path, content: str):
 
 
 def test_tier_file_widens_within_ceiling_only(tmp_path):
-    _tier(tmp_path, json.dumps({"tier": "user", "allowed_tools": ["memory", "web_search", "terminal", "read_file"]}))
-    assert gate.on_pre_tool_call(tool_name="memory", args={}) is None
-    for tool in ("terminal", "read_file", "web_extract"):
+    _tier(tmp_path, json.dumps({"tier": "user", "allowed_tools": ["x_search", "web_search", "memory", "session_search", "skill_view", "terminal"]}))
+    assert gate.on_pre_tool_call(tool_name="x_search", args={}) is None
+    for tool in ("memory", "session_search", "skill_view", "terminal", "web_extract"):
         assert gate.on_pre_tool_call(tool_name=tool, args={})["action"] == "block"
 
 
@@ -60,7 +60,8 @@ def test_corrupt_tier_file_blocks_everything(tmp_path):
 def test_ceiling_excludes_owner_machine_tools():
     locked = {t for spec in tiers.CATALOG.values() if spec[3] for t in spec[0]}
     assert not (gate.CEILING & locked)
-    assert set(tiers.tools_for(tiers.SAFE_TOOLSETS)) <= gate.CEILING
+    assert set(tiers.tools_for(tiers.GUEST_TOOLSETS)) <= gate.CEILING
+    assert not set(tiers.tools_for(tiers.TIER_OWN)) & gate.CEILING  # memory, sessions, skills, to-dos
 
 
 @pytest.mark.parametrize("tool", DENIED)

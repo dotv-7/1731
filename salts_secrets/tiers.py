@@ -104,6 +104,9 @@ CATALOG: dict[str, tuple[tuple[str, ...], str, str, str, str]] = {
     "messaging": (("send_message",), "Outbound", "Send messages", "sends messages in your name", ""),
 }
 SAFE_TOOLSETS = frozenset(k for k, v in CATALOG.items() if not v[3])
+# A tier's own memory, sessions, skills and to-dos are for the planned Admin/User tiers; guests never get them.
+TIER_OWN = frozenset({"todo", "memory", "session_search", "skills"})
+GUEST_TOOLSETS = SAFE_TOOLSETS - TIER_OWN
 DEFAULT_TIERS = {
     "admin": [
         "web",
@@ -128,8 +131,9 @@ def tools_for(toolsets: Iterable[str]) -> list[str]:
     return sorted({t for ts in toolsets if ts in SAFE_TOOLSETS for t in CATALOG[ts][0]})
 
 
-def _clean(toolsets: Iterable[str]) -> list[str]:
-    return [k for k in CATALOG if k in set(toolsets) and k in SAFE_TOOLSETS]
+def _clean(toolsets: Iterable[str], tier: str = "") -> list[str]:
+    allowed = GUEST_TOOLSETS if tier == "guest" else SAFE_TOOLSETS
+    return [k for k in CATALOG if k in set(toolsets) and k in allowed]
 
 
 def _live_blocks(entries, now: float) -> list[dict]:
@@ -153,7 +157,7 @@ def load(owner_home: Path) -> dict:
         data = {}
     tiers = data.get("tiers") if isinstance(data.get("tiers"), dict) else {}
     return {
-        "tiers": {t: _clean(tiers.get(t, DEFAULT_TIERS[t])) for t in CONFIGURABLE},
+        "tiers": {t: _clean(tiers.get(t, DEFAULT_TIERS[t]), t) for t in CONFIGURABLE},
         "members": [m for m in data.get("members") or [] if isinstance(m, dict) and m.get("tier") in TIERS[1:]],
         "blocklist": _live_blocks(data.get("blocklist"), time.time()),
         "guest_access": data.get("guest_access", True) is not False,
@@ -170,7 +174,7 @@ def _write(path: Path, data: dict) -> None:
 
 def save(owner_home: Path, policy: dict) -> dict:
     clean = {
-        "tiers": {t: _clean((policy.get("tiers") or {}).get(t, [])) for t in CONFIGURABLE},
+        "tiers": {t: _clean((policy.get("tiers") or {}).get(t, []), t) for t in CONFIGURABLE},
         "members": policy.get("members") or [],
         "blocklist": _live_blocks(policy.get("blocklist"), time.time()),
         "guest_access": policy.get("guest_access", True) is not False,
@@ -506,7 +510,7 @@ def isolation_check(owner_home: Path, public_home: Path, gateway: bool = True) -
         loaded, detail = routing_loaded(owner_home)
         add(loaded, "owner: the running gateway loaded the routing hook" + (f" ({detail})" if loaded else f" — {detail}"))
     add(public_home.is_dir(), f"public profile exists: profiles/{public_home.name}")
-    problems = audit(public_home)
+    problems = audit(public_home, GUEST_TOOLSETS)
     add(
         not problems,
         "public: tool audit passes (no terminal, files, sessions or context files)"
@@ -518,6 +522,15 @@ def isolation_check(owner_home: Path, public_home: Path, gateway: bool = True) -
         "public: MEMORY.md and USER.md injection switched off",
     )
     add((data_dir(public_home) / "public_context.json").exists(), "public: approved projection has been published")
+    from .guests import unpurged
+
+    left = unpurged(public_home)
+    add(
+        not left,
+        "public: every guest session a revoke had to delete is gone"
+        + ("" if not left else f" — {len(left)} still stored (their guests were moved to fresh sessions)"),
+        "hermes salts-secrets sync   (retries the purge)",
+    )
     owner_secrets, public_secrets = profile_secrets(owner_home), profile_secrets(public_home)
     public_key = owner_secrets.get(PUBLIC_KEY_ENV, "")
     add(
@@ -538,7 +551,7 @@ def isolation_check(owner_home: Path, public_home: Path, gateway: bool = True) -
     return {"ok": ok, "line": line, "checks": checks, "checked_at": int(time.time())}
 
 
-def audit(home: Path) -> list[str]:
+def audit(home: Path, allowed: frozenset = SAFE_TOOLSETS) -> list[str]:
     """Isolation problems of a non-owner tier profile; an empty list means the hard isolation is in place."""
     home = Path(home)
     if not home.is_dir():
@@ -552,7 +565,7 @@ def audit(home: Path) -> list[str]:
         return [f"config.yaml cannot be parsed: {exc}"]
     problems = []
     toolsets = ((cfg.get("platform_toolsets") or {}).get("api_server")) or []
-    bad = [t for t in toolsets if t not in SAFE_TOOLSETS]
+    bad = [t for t in toolsets if t not in allowed]
     if bad:
         problems.append("toolsets that are owner-only are enabled: " + ", ".join(map(str, bad)))
     if str(((cfg.get("tools") or {}).get("tool_search") or {}).get("enabled", "")).lower() not in ("off", "false"):
