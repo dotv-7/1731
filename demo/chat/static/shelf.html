@@ -350,7 +350,10 @@ async function draftOne(id,force){if(busy.has(id)||demo)return;busy.add(id);rero
 function rerow(id){const row=document.querySelector(`.ent[data-id="${CSS.escape(id)}"]`);if(row&&byId[id]){row.outerHTML=entHTML(byId[id]);fitAll();}}
 // Guest boxes grow with their text, like the raw original on the left: no scrollbar, no resize grip.
 function fit(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px';}
-function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);}
+function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);alignAll();}
+// The guest box starts on the same line as the raw original, whatever the title, path and tier lines above it take.
+function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document.querySelectorAll('#d-list .ent').forEach(e=>{const a=e.querySelector('pre.raw'),k=e.querySelector('.gst .k'),b=e.querySelector('.gst textarea');if(!a||!k||!b)return;a.style.marginTop=k.style.marginTop='';if(!wide)return;const d=a.getBoundingClientRect().top-b.getBoundingClientRect().top;if(d>0)k.style.marginTop=d+'px';else if(d<0)a.style.marginTop=(8-d)+'px';});}
+addEventListener('resize',alignAll);
 function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status==='changed'&&!on;
   const st=lk?'locked':on?'public':chg?'changed':'private';
   const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}<span class="st ${st}">${st}</span></div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div>${tierHTML(it)}<pre class="raw ${texts[it.id]===undefined?'wait':''}">${texts[it.id]===undefined?'loading raw…':markHTML(texts[it.id]===undefined?'':(texts[it.id]||'(empty)').length>FOLD&&!unfold.has(it.id)?(texts[it.id].slice(0,FOLD)+'\n…'):(texts[it.id]||'(empty)'))}</pre>${texts[it.id]&&texts[it.id].length>FOLD?`<button class="more">${unfold.has(it.id)?'Show less':`Show all · ${fmt(texts[it.id].length)} chars`}</button>`:''}${texts[it.id]!==undefined&&on?chips(texts[it.id],'nothing flagged in the original'):''}</div></div>`;
