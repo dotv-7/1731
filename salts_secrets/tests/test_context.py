@@ -229,3 +229,21 @@ def test_rewritten_document_does_not_keep_its_private_title(tmp_path):
     proj = core.write_projection(owner, public, [ws])
     assert [d["title"] for d in proj["documents"]] == ["How Salt prices an audit"]
     assert "PrivateClientName" not in json.dumps(proj) and "PrivateClientName" not in plugin.render_section(proj)
+
+
+def test_approved_skill_becomes_a_method_the_guest_follows(tmp_path):
+    from salts_secrets import guests
+    owner, public = tmp_path / "owner", tmp_path / "public"
+    (owner / "skills/research/bridge-checks").mkdir(parents=True)
+    body = '---\nname: bridge-checks\ndescription: "Four checks on any bridge"\nauthor: Lena Moreau\n---\n# Four checks\nCount the signers.'
+    (owner / "skills/research/bridge-checks/SKILL.md").write_text(body, encoding="utf-8")
+    items = core.scan(owner, [])
+    skill = next(i for i in items if i.kind == "skill" and i.title == "bridge-checks")
+    guest = body.replace("author: Lena Moreau\n", "")
+    core.approve(owner, items, {skill.id}, {skill.id: guest})
+    proj = core.write_projection(owner, public, [], "Salt")
+    assert proj["methods"][0]["text"] == guest and proj["documents"] == []
+    section = plugin.render_section(proj)
+    assert "How Salt works" in section and "Four checks on any bridge" in section and "Lena" not in section
+    assert "Count the signers." in plugin.lookup(proj, "bridge")
+    assert guests.revoked(proj, {**proj, "methods": []}) == [guest]

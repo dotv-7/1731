@@ -37,8 +37,20 @@ def load_projection(hermes_home: Optional[Path] = None) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _methods(projection: dict) -> list[dict]:
+    return [d for d in projection.get("methods") or [] if isinstance(d, dict)]
+
+
 def _documents(projection: dict) -> list[dict]:
-    return [d for d in projection.get("documents") or [] if isinstance(d, dict)]
+    return _methods(projection) + [d for d in projection.get("documents") or [] if isinstance(d, dict)]
+
+
+def _summary(text: str) -> str:
+    for line in str(text).splitlines():
+        line = line.strip()
+        if line.startswith("description:"):
+            return line.split(":", 1)[1].strip().strip('"')[:200]
+    return ""
 
 
 def render_section(projection: dict) -> str:
@@ -46,7 +58,15 @@ def render_section(projection: dict) -> str:
     facts = [f.strip() for f in projection.get("facts") or [] if isinstance(f, str) and f.strip()]
     lines = [f"## Notes about {owner} (everything you know; say it freely)"]
     lines += [f"- {f}" for f in facts] or [f"- (no notes yet: you know what {owner} publishes, nothing more)"]
-    docs = _documents(projection)
+    methods = _methods(projection)
+    if methods:
+        lines.append(f"\n## How {owner} works (methods {owner} published for you to use)")
+        lines.append(f"When a guest asks for an analysis these fit, look the method up with {TOOL_NAME} first and "
+                     "follow its steps in order. Use public data (web tools) for the numbers, keep facts, inference "
+                     f"and risk apart, and say it is {owner}'s method applied by you, not a call {owner} has made.")
+        lines += [f"- {m.get('title', '')}" + (f": {_summary(m.get('text', ''))}" if _summary(m.get("text", "")) else "")
+                  for m in methods]
+    docs = [d for d in projection.get("documents") or [] if isinstance(d, dict)]
     if docs:
         lines.append(f"\nLonger notes you can look up with {TOOL_NAME}:")
         lines += [f"- {d.get('title', '')}" for d in docs]

@@ -783,13 +783,16 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
         return first if len(first) <= 70 else first[:69] + "…"
 
     facts = [it for it in public if it.kind in ("memory", "user", "note")]
+    methods = [it for it in public if it.kind == "skill"]
     return {
         "version": 2,
         "generated_at": int(time.time()),
         "owner_name": owner_name,
         "facts": [shown(it) for it in facts],
         "fact_meta": [{"text": shown(it), **origin(it)} for it in facts],
-        "documents": [{"title": title(it), "text": shown(it), **origin(it)} for it in public if it not in facts],
+        "methods": [{"title": title(it), "text": shown(it), **origin(it)} for it in methods],
+        "documents": [{"title": title(it), "text": shown(it), **origin(it)} for it in public
+                      if it not in facts and it not in methods],
     }
 
 
