@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import shutil
 import statistics
@@ -151,8 +152,14 @@ def run_control(control: str) -> dict:
     llm.start()
     env = tg.gateway_env()
     env.pop("TELEGRAM_ALLOWED_USERS")
+    # A `hermes` on PATH, as in an installed home: revocation deletes guest sessions through the CLI.
+    shim = root / "bin"
+    shim.mkdir()
+    (shim / "hermes").write_text(f'#!/bin/sh\nexec "{sys.executable}" -m hermes_cli.main "$@"\n')
+    (shim / "hermes").chmod(0o755)
     gw = GatewayUnderTest(root, llm_base_url=llm.base_url, config=tg.gateway_config(),
-                          env={**env, "HERMES_GATEWAY_EXTERNAL_SUPERVISOR": "1"}, ready=tg.connected)
+                          env={**env, "HERMES_GATEWAY_EXTERNAL_SUPERVISOR": "1",
+                               "PATH": f"{shim}{os.pathsep}{os.environ['PATH']}"}, ready=tg.connected)
     holder["model"] = Model(gw.hermes_home)
     can = cm._canaries()
     marker = f"METHOD-{secrets.token_hex(4)}"
