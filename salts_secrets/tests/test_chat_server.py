@@ -341,6 +341,9 @@ def test_readonly_chat_uses_tool_free_sessions(tmp_path, monkeypatch):
     assert all(sid.startswith(server.VIEWER_PREFIX) for sid in sids)
     assert len(set(sids[:server.VIEWER_TURNS])) == 1 and sids[-1] != sids[0]
     assert all("/p/" not in url and set(body) == {"model", "stream", "messages"} for url, _, body in seen)
+    c.post("/api/new", json={})
+    c.post("/api/chat", json={"message": "hi"})
+    assert seen[-1][1].startswith(server.VIEWER_PREFIX) and seen[-1][1] != sids[-1]
 
 
 def test_doc_describes_this_install(tmp_path):

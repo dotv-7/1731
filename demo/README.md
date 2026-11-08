@@ -39,9 +39,10 @@ SALT_OWNER_HOME="$PWD/.demo/owner" SALT_OWNER_PASSPHRASE_HASH=... SALT_SECRET=<r
 - The guest-version boxes on `/shelf` have a MIC button: the browser's own speech recognition (Chrome,
   Edge, Safari; Chrome sends audio to Google to transcribe) types into the box. Nothing is published
   until you click Save & sync. Browsers without speech recognition get no button.
-- `/doc` (linked as DOC) is generated from this install: where guests can talk, how many facts and which
-  documents the guest room holds, the tools guests may use, and the isolation check line. No private
-  item, path or key is read for it.
+- `/doc` (linked as DOC) is the developer reference for this install's HTTP API: copy-paste curl and
+  Python calls against the site's own origin, the SSE format, sessions, read-only sign-in, error codes,
+  and a SKILL.md another Hermes can install to talk to this one. The live part (`/api/doc`) is only
+  counts, document titles, guest tools and the isolation line; no private item, path or key.
 
 ## Traces
 
