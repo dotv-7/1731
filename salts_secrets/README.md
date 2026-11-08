@@ -281,6 +281,30 @@ to the model, and no owner tool is offered. The first run found that the Discord
 `DISCORD_ALLOWED_USERS` before any route and ignores `DISCORD_ALLOW_ALL_USERS` while that list names anyone.
 Strangers never reached the catch-all, so `setup` now adds `*` to that list, and `check` flags a list without it.
 
+## Evidence
+
+One useful task under three setups, produced by [`demo/e2e/controls.py`](../demo/e2e/controls.py) at commit
+`4b1ed040ba` (full output in [`docs/controls-report.md`](../docs/controls-report.md)). A stranger on Telegram
+asks how Salt checks a bridge, which is answerable from her published method. The same stranger then probes for her
+private data, the owner takes the method back, and the stranger writes once more. Each setup runs on a real
+gateway with the real Telegram adapter, against a loopback API stand-in and a fake model that records every request.
+
+| | One profile + tool allowlist + never-share prompt | Native two profiles, method copied by hand | Salt's Secrets (setup, approve, sync, revoke) |
+|---|---|---|---|
+| Task material reached the model | yes | yes | yes |
+| Private canaries in the stranger's model requests | memory, user | memory, private, skill, user, workspace | none |
+| Owner tools that ran for the stranger | none | read_file, search_files | none |
+| Method still in requests after revoke | yes | yes | no |
+| Model requests (mean body size) | 10 (12,212 chars) | 10 (49,136 chars) | 9 (11,934 chars) |
+| Gateway latency per turn, median | 1.00 s | 1.00 s | 1.00 s |
+| Failures | none | none | none |
+| Owner's steps | 4 | 6 | 2 |
+
+With tools denied, setup A still sends the owner's memory to the model on a stranger's behalf, because MEMORY.md
+and USER.md are in the prompt. Setup B keeps the prompt clean, but a hand-made profile keeps its file tools, so
+`read_file` and `search_files` reach the owner's home. In both, the method stays in the stranger's session after it
+is deleted. The model is scripted: latency is gateway overhead, and cost is shown as request size.
+
 ## Limits
 
 - **Needs `plugins.isolation: in_process`.** Under the plugin host, `pre_gateway_dispatch` gets a
