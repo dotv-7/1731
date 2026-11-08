@@ -464,7 +464,12 @@ def routing_loaded(owner_home: Path) -> tuple[bool, str]:
     except (OSError, ValueError):
         return False, "no gateway_state.json: the gateway has not run (hermes gateway restart)"
     pid = state.get("pid")
-    if not isinstance(pid, int) or state.get("gateway_state") in ("stopped", "startup_failed") or not _pid_alive(pid):
+    if not isinstance(pid, int) or state.get("gateway_state") in ("stopped", "startup_failed"):
+        return False, "the gateway is not running (hermes gateway restart)"
+    # A dashboard in another container sees a different pid namespace; there the matching
+    # start_time below is the proof, since a dead gateway leaves gateway_state "running" only after a crash.
+    visible = _pid_alive(pid)
+    if not visible and state.get("gateway_state") != "running":
         return False, "the gateway is not running (hermes gateway restart)"
     try:
         beats = json.loads((data_dir(owner_home) / HEARTBEAT_FILE).read_text(encoding="utf-8")).get("processes") or {}
@@ -475,7 +480,7 @@ def routing_loaded(owner_home: Path) -> tuple[bool, str]:
         return False, f"gateway pid {pid} never registered the routing hook (plugin failed to load? see gateway logs)"
     if state.get("start_time") is not None and beat.get("start_time") != state.get("start_time"):
         return False, f"routing heartbeat is from an older process with pid {pid}; restart the gateway"
-    return True, f"gateway pid {pid}"
+    return True, f"gateway pid {pid}" + ("" if visible else ", seen from another container")
 
 
 def isolation_check(owner_home: Path, public_home: Path, gateway: bool = True) -> dict:
