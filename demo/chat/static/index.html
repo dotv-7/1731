@@ -161,7 +161,7 @@ textarea::placeholder{color:var(--dim);opacity:.8}
 </div></div>
 <script>
 const $=s=>document.querySelector(s), log=$('#log'), inp=$('#in'), menu=$('#menu');
-let role='guest', models=[], mi=0, busy=null, hist=JSON.parse(localStorage.getItem('dotv.hist')||'[]'), hi=-1, menuIdx=0;
+let role='guest', models=[], mi=0, busy=null, hist=JSON.parse(localStorage.getItem('salt.hist')||'[]'), hi=-1, menuIdx=0;
 const CMDS=[['/help','show this help'],['/new','start a new session'],['/clear','clear the screen'],['/whoami','who am I right now'],
   ['/unlock','unlock with the passphrase or an invite code'],['/lock','back to guest'],['/shelf','context page (owner)'],['/perm','permissions (owner)'],['/trace','trace: same questions, two sessions (owner)'],['/docs','global document (owner)']];
 const LABEL={owner:'Owner',admin:'Admin',user:'User',guest:'Guest',blocked:'Blocked'};
@@ -190,7 +190,7 @@ function md(src){
     if(!buf.length)buf.push(lines[i++]);
     out.push(`<p>${buf.map(inline).join('<br>')}</p>`);}
   return out.join('');}
-const key=()=> 'dotv.log.'+role;
+const key=()=> 'salt.log.'+role;
 let transcript=[];
 function save(){if(role==='guest')return;localStorage.setItem(key(),JSON.stringify(transcript.slice(-300)));}
 function render(e){const d=document.createElement('div');d.className='msg '+e.k;
@@ -251,7 +251,7 @@ async function command(c){const [name,...rest]=c.trim().split(/\s+/);const arg=r
   else if(['/shelf','/perm','/trace'].includes(name)){if(role!=='owner')return sys('Owner only.','err');location.href=name;}
   else sys('Unknown command: '+name,'err');}
 function submit(){const t=inp.value.trim();if(!t||busy)return;inp.value='';fit();hideMenu();
-  hist=hist.filter(h=>h!==t);hist.push(t);hist=hist.slice(-100);localStorage.setItem('dotv.hist',JSON.stringify(hist));hi=-1;
+  hist=hist.filter(h=>h!==t);hist.push(t);hist=hist.slice(-100);localStorage.setItem('salt.hist',JSON.stringify(hist));hi=-1;
   if(t.startsWith('/'))command(t);else send(t);}
 function fit(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,160)+'px';}
 function matches(){const v=inp.value;return v.startsWith('/')&&!v.includes(' ')?CMDS.filter(([c])=>c.startsWith(v)):[];}

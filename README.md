@@ -149,7 +149,7 @@ salts_secrets/            the plugin (catalog subdir)
   dashboard/              the dashboard tab and its API
   profile/                SOUL.md and config.yaml templates for the public profile
   tests/                  pytest salts_secrets/tests
-demo/                     the Salt demo behind https://527.dotv.io/ (not part of the plugin)
+demo/                     the Salt demo behind https://salt.dotv.io/ (not part of the plugin)
 ```
 
 ## Why

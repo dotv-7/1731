@@ -1,4 +1,4 @@
-# Test/runtime deps for dotv add-ons (dotv-chat + tests); Hermes itself is not needed.
+# Test/runtime deps for the demo chat and the plugin tests; Hermes itself is not needed.
 pytest>=8,<10
 pyyaml>=6,<7
 fastapi>=0.110,<1

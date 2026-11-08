@@ -1,4 +1,4 @@
-"""Local stand-in for Hermes' OpenAI-compatible API, for previewing dotv-chat without a model.
+"""Local stand-in for Hermes' OpenAI-compatible API, for previewing the demo chat without a model.
 Owner (/v1) answers from the owner home; guest (/p/<profile>/v1) answers ONLY from the public projection."""
 
 import asyncio
@@ -13,9 +13,9 @@ from fastapi.responses import StreamingResponse
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import context as ctx
 
-OWNER_HOME = Path(os.environ["DOTV_OWNER_HOME"])
-PUBLIC_HOME = Path(os.environ["DOTV_PUBLIC_HOME"])
-KEYS = {"owner": os.environ["DOTV_OWNER_KEY"], "guest": os.environ["DOTV_PUBLIC_KEY"]}
+OWNER_HOME = Path(os.environ["SALT_OWNER_HOME"])
+PUBLIC_HOME = Path(os.environ["SALT_PUBLIC_HOME"])
+KEYS = {"owner": os.environ["SALT_OWNER_KEY"], "guest": os.environ["SALT_PUBLIC_KEY"]}
 app = FastAPI()
 
 

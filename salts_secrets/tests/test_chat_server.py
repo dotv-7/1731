@@ -13,12 +13,12 @@ def client(tmp_path):
     (tmp_path / "owner/memories/MEMORY.md").write_text("a\n§\nb", encoding="utf-8")
     s = server.Settings(
         {
-            "DOTV_OWNER_HOME": str(tmp_path / "owner"),
-            "DOTV_PUBLIC_HOME": str(tmp_path / "public"),
-            "DOTV_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS),
-            "DOTV_SECRET": "x" * 32,
-            "DOTV_OWNER_KEY": "ok",
-            "DOTV_PUBLIC_KEY": "pk",
+            "SALT_OWNER_HOME": str(tmp_path / "owner"),
+            "SALT_PUBLIC_HOME": str(tmp_path / "public"),
+            "SALT_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS),
+            "SALT_SECRET": "x" * 32,
+            "SALT_OWNER_KEY": "ok",
+            "SALT_PUBLIC_KEY": "pk",
         }
     )
     return TestClient(server.create_app(s))
@@ -61,7 +61,7 @@ def test_board_list_is_light_and_bodies_load_on_demand(client):
 
 
 def test_forged_cookie_is_guest(client):
-    client.cookies.set("dotv", "eyJvd25lcl9leHAiOjk5OTk5OTk5OTl9.deadbeef")
+    client.cookies.set("salt", "eyJvd25lcl9leHAiOjk5OTk5OTk5OTl9.deadbeef")
     assert client.get("/api/me").json()["role"] == "guest"
 
 
@@ -113,7 +113,7 @@ def test_chat_routes_by_role(client, monkeypatch):
     (g_url, g_h), (o_url, o_h) = seen
     assert g_url.endswith("/p/public/v1/chat/completions") and g_h["Authorization"] == "Bearer pk"
     assert o_url.endswith("/v1/chat/completions") and "/p/" not in o_url and o_h["Authorization"] == "Bearer ok"
-    assert g_h["X-Hermes-Session-Id"].startswith("dotv-g-") and o_h["X-Hermes-Session-Id"].startswith("dotv-o-")
+    assert g_h["X-Hermes-Session-Id"].startswith("salt-g-") and o_h["X-Hermes-Session-Id"].startswith("salt-o-")
 
 
 def test_member_codes_route_to_tier_and_blocked_cannot_chat(client, tmp_path):
@@ -238,7 +238,7 @@ def test_only_owner_can_switch_models(client, tmp_path, monkeypatch):
 
 
 def test_pages_use_configured_names(tmp_path):
-    s = server.Settings({"DOTV_OWNER_HOME": str(tmp_path), "DOTV_OWNER_NAME": "Ada", "DOTV_PUBLIC_NAME": "Byte"})
+    s = server.Settings({"SALT_OWNER_HOME": str(tmp_path), "SALT_OWNER_NAME": "Ada", "SALT_PUBLIC_NAME": "Byte"})
     html = TestClient(server.create_app(s)).get("/").text
     assert "Byte's assistant" in html and "Hi Ada." in html
     assert "Salt" not in html and "Lena" not in html
