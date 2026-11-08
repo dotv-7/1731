@@ -170,7 +170,7 @@ open anything in your profile.
   a rewritten guest version. An approved item that you later edit drops out of the projection until you
   approve it again. Unticking revokes: guest sessions that may have seen the item are archived for you
   and deleted from the public store, whether you publish from the dashboard or with
-  `hermes salts-secrets sync` (both go through `context.publish`). A session that cannot be deleted is marked stale: its guest is moved to a fresh session at once, the publish result says the revoke is incomplete, and `check` fails until a later publish deletes it. A guest version replaces the title as well, so a file name or heading never crosses with a rewrite.
+  `hermes salts-secrets sync` (both go through `context.publish`). A session that cannot be deleted is marked stale: its guest is moved to a fresh session at once on both ingress paths (the native route resets the gateway's session for that chat before the turn, and refuses the turn with a "send it again" notice when it cannot), the publish result says the revoke is incomplete, and `check` fails until a later publish deletes it. A guest version replaces the title as well, so a file name or heading never crosses with a rewrite.
 - *Triage* (on the Context tab): rules first, then your model, sort every publishable item into
   **A** publish as-is, **B** needs a guest rewrite, **C** never public. The rules
   ([`privacy_rules.yaml`](privacy_rules.yaml): credentials, identity and contact, assets,
@@ -285,8 +285,8 @@ Revocation is covered by `test_cli_sync_revocation_empties_public_store`. Untick
   The web chat forgets on every page load.
 - **The second-line path is text only**: your own Discord server messages and guests on unrouted
   platforms are forwarded as text to the local API and get one reply, without streaming or media.
-- **Revocation is not atomic for a request already running**: a reply being generated while you untick
-  an item can still use it; the session is purged right after.
+- **Revocation is not atomic for a request already running**: revocation purges stored guest sessions;
+  text already sent to the model provider or already delivered cannot be recalled.
 - **External memory provider contents are not listed** on the Context tab. The tab shows whether your
   profile uses one; the public side configures none (a `check` condition), so nothing from it reaches guests.
 - **Inference across facts** is only partly covered: the combination rule flags a batch that publishes two
