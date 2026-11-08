@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERMES = "Hermes Agent v0.23.0 (local 2bd378ed, hermes-latest)"
 MODEL_NOTE = "deepseek-flash as the API reports it: the DeepSeek Flash build of 2026-10-17, set in Lena's config.yaml, the same model on both sides; chain of thought is removed before publishing"
-FOLD = {"sys": 14000, "tools": 6000, "tool": 7000, "think": 14000, "asst": 14000, "call": 6000, "user": 14000, "meta": 2000}
+FOLD = {"sys": 14000, "tools": 6000, "tool": 7000, "think": 14000, "asst": 14000, "call": 6000, "user": 14000, "note": 2000}
 E = lambda s: html.escape(str(s if s is not None else ""), quote=False)
 fmt = lambda n: f"{n:,}" if isinstance(n, int) else "—"
 
@@ -36,14 +36,13 @@ a{color:inherit;text-decoration:none}
 .side .row{display:grid;grid-template-columns:26px 1fr 1fr;gap:4px;align-items:stretch;margin:2px 0}
 .side .row.head{margin:0 0 6px;color:var(--blue)}.side .row.head .lbl{font-size:9px}
 .side .row .n{font:400 9.5px/1 var(--mono);color:var(--muted);padding-top:5px;text-align:right;padding-right:4px}
-.side .row.diff{background:#eeeefc;outline:1px solid var(--hair)}
 .side .none{display:block;border:1px dashed rgba(0,0,242,.35);color:var(--muted);text-align:center;font:400 10px/1 var(--mono);padding:4px 0}
 .side .turn{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;margin:14px 0 4px;padding:6px 6px;border-top:1px solid var(--blue);color:var(--blue)}
 .side .turn .q{font:400 12px/1.3 var(--serif);color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.side .turn .cnt{font:400 9.5px/1 var(--mono);color:var(--muted)}
 .side .turn:hover .q{white-space:normal}
 .side .seg{display:flex;justify-content:space-between;gap:4px;padding:3px 5px;border-left:2px solid transparent;color:var(--ink);white-space:nowrap;overflow:hidden;font:400 10px/1.4 var(--mono);background:var(--sheet);border-top:1px solid var(--hair);border-right:1px solid var(--hair);border-bottom:1px solid var(--hair);min-width:0}
 .side .seg:hover{background:var(--sel)}.side .seg b{font-weight:500;overflow:hidden;text-overflow:ellipsis}.side .seg span{color:var(--muted);flex:none}
-.side .seg.sys{border-color:#047857}.side .seg.tools{border-color:#0ea5e9}.side .seg.user{border-color:var(--blue)}.side .seg.think{border-color:#a855f7}.side .seg.call{border-color:#f97316}.side .seg.tool{border-color:#b45309}.side .seg.asst{border-color:#1a1a1a}.side .seg.meta{border-color:#9ca3af}
+.side .seg.sys{border-color:#047857}.side .seg.tools{border-color:#0ea5e9}.side .seg.user{border-color:var(--blue)}.side .seg.think{border-color:#a855f7}.side .seg.call{border-color:#f97316}.side .seg.tool{border-color:#b45309}.side .seg.asst{border-color:#1a1a1a}.side .seg.note{border-color:#9ca3af}
 .side .key{margin-top:14px;font:400 10px/1.6 var(--mono);color:var(--muted)}
 .main{padding:28px 36px 90px;min-width:0}
 .hero .eyebrow{color:var(--blue);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
@@ -66,7 +65,7 @@ a{color:inherit;text-decoration:none}
 .seg .h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);font:500 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
 .seg .h .t{color:var(--muted);font-weight:400;letter-spacing:.06em;text-transform:none}
 .seg .h i{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-align:-1px}
-.seg.sys .h i{background:#047857}.seg.tools .h i{background:#0ea5e9}.seg.user .h i{background:var(--blue)}.seg.think .h i{background:#a855f7}.seg.call .h i{background:#f97316}.seg.tool .h i{background:#b45309}.seg.asst .h i{background:#1a1a1a}.seg.meta .h i{background:#9ca3af}
+.seg.sys .h i{background:#047857}.seg.tools .h i{background:#0ea5e9}.seg.user .h i{background:var(--blue)}.seg.think .h i{background:#a855f7}.seg.call .h i{background:#f97316}.seg.tool .h i{background:#b45309}.seg.asst .h i{background:#1a1a1a}.seg.note .h i{background:#9ca3af}
 .seg pre{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font:400 11.5px/1.5 var(--mono);color:#1a1a1a}
 .seg.asst pre{color:var(--ink)}.seg.think pre{color:#5b21b6;background:#faf5ff}.seg.user pre{color:var(--blue);font-size:12.5px}
 .seg .fold{display:none}.seg.open .fold{display:inline}.seg .more{display:block;width:100%;border:0;border-top:1px solid var(--hair);background:#fff;color:var(--blue);font:500 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;padding:8px;cursor:pointer}
@@ -133,14 +132,12 @@ def row_segments(r: dict) -> list[tuple[str, str, str, object, str]]:
             out.append(("call", "assistant · tool_calls", r["tool_calls"], tok if not r.get("content") else None, f"row {r['id']} · tool_calls, raw JSON as stored"))
         if r.get("content"):
             out.append(("asst", "assistant", r["content"], tok, f"row {r['id']}"))
-        if not (r.get("tool_calls") or r.get("content") or r.get("reasoning_content")):
-            out.append(("asst", "assistant", "", tok, f"row {r['id']} · empty"))
     elif role == "tool":
         body = r.get("api_content") if r.get("api_content") else (r.get("content") or "")
         out.append(("tool", f"tool result · {r.get('tool_name') or ''}", body, None,
                     f"row {r['id']} · Hermes ran the tool and appended this as role=tool" + (" (api_content)" if r.get("api_content") else "")))
     else:
-        out.append(("meta", role, r.get("content") or "", None, f"row {r['id']} · {r.get('display_kind') or ''}"))
+        out.append(("note", role, r.get("content") or "", None, f"row {r['id']} · {r.get('display_kind') or ''}"))
     return out
 
 
@@ -221,8 +218,8 @@ def render(bundle: dict, out_dir: Path) -> Path:
         nl, nr = sum(1 for a, b in rows if a), sum(1 for a, b in rows if b)
         side.append(f'<a class="turn" href="#turn{i+1}"><span class="lbl">turn {i+1}</span><span class="q">{E(qtext(i))}</span><span class="cnt">{nl} vs {nr} steps</span></a>')
         for j, (a, b) in enumerate(rows):
-            side.append(f'<div class="row{" diff" if not (a and b) else ""}"><span class="n">{j+1}</span>{cell(a)}{cell(b)}</div>')
-    side.append('<div class="key">One outline for both sessions. Each turn is one question; the rows under it are the two sessions\' steps, aligned by kind (a tool call faces a tool call, a result faces a result); a highlighted row has a step on one side only. Numbers are Hermes\' stored token_count for assistant rows.</div>')
+            side.append(f'<div class="row"><span class="n">{j+1}</span>{cell(a)}{cell(b)}</div>')
+    side.append('<div class="key">One outline for both sessions. Each turn is one question; the rows under it are the two sessions\' steps, aligned by kind (a tool call faces a tool call, a result faces a result); a dash marks a step the other session does not have. Numbers are Hermes\' stored token_count for assistant rows.</div>')
 
     # ---- diffs
     hl, hr = headings(L["system_prompt"]), headings(R["system_prompt"])
