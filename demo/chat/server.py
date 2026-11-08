@@ -64,6 +64,8 @@ class Settings:
         self.owner_name = e.get("SALT_OWNER_NAME", "Lena")
         self.public_name = e.get("SALT_PUBLIC_NAME", "Salt")
         self.turns_per_hour = int(e.get("SALT_TURNS_PER_HOUR", "20"))  # per address, everyone but the owner; 0 = no limit
+        if self.turns_per_hour < 0:
+            raise ValueError("SALT_TURNS_PER_HOUR must be 0 (no limit) or a positive number of messages")
 
     def tier_homes(self) -> dict[str, Path]:
         homes = {t: self.owner_home / "profiles" / name for t, name in self.tier_profiles.items()}

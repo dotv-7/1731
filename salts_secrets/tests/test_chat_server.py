@@ -416,3 +416,9 @@ def test_turn_limit_counts_devices_behind_a_proxy_and_skips_refused_requests(tmp
     assert second.post("/api/chat", json={"message": "q"}).status_code == 200
     keyless = TestClient(server.create_app(server.Settings(dict(env, SALT_PUBLIC_KEY=""))), client=("203.0.113.5", 1))
     assert [keyless.post("/api/chat", json={"message": "q"}).status_code for _ in range(2)] == [503, 503]
+
+
+def test_negative_turn_limit_is_refused_at_startup(tmp_path):
+    with pytest.raises(ValueError, match="SALT_TURNS_PER_HOUR"):
+        server.Settings({"SALT_OWNER_HOME": str(tmp_path / "owner"), "SALT_PUBLIC_HOME": str(tmp_path / "public"),
+                         "SALT_SECRET": "x" * 32, "SALT_TURNS_PER_HOUR": "-1"})
