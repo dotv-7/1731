@@ -82,6 +82,8 @@ the gateway named in `gateway_state.json`. Every failing line prints the command
 
 ## How it works
 
+![Two profiles in one Hermes: the route hook sends your DM to your agent and everyone else to the guest agent, which only reads what you approved](docs/diagrams/overview.svg)
+
 The plugin looks at the profile it is loaded in and plays one of two parts.
 
 **Owner profile** (`pre_gateway_dispatch`). Only your own DM reaches your agent. Every other inbound
@@ -127,6 +129,13 @@ open anything in your profile.
 The owner profile also registers one `pre_tool_call` hook that refuses every tool in sessions whose id
 starts with `salt-v-`; the demo chat uses those ids for its read-only owner passphrase
 ([demo/README.md](demo/README.md)).
+
+What happens to one stranger's question:
+
+![A stranger's message goes through the route hook to the guest agent and its tool gate; the route hook returns skip, so your agent never sees it](docs/diagrams/question.svg)
+
+The diagrams are PlantUML with the handwritten skin; sources in [`docs/diagrams/`](docs/diagrams/)
+(`java -jar plantuml.jar -tsvg docs/diagrams/*.puml`).
 
 Paths are shown relative to `<HERMES_HOME>`.
 
