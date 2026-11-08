@@ -1,8 +1,8 @@
-"""dotv-chat: independent terminal-style chat window + owner-only context dashboard.
+"""Web chat in front of Hermes, with owner-only Context, Permissions and Trace pages.
 
-The browser never sees a Hermes API key. Each permission tier (#527) is its own Hermes profile:
-Guests -> ``/p/<public>/v1``, Admin/User members (invite code) -> ``/p/<tier profile>/v1``, the owner
-(passphrase) -> the default profile. Blocked members never reach Hermes.
+The browser never sees a Hermes API key. Each tier talks to its own profile: guests to
+``/p/<public>/v1``, invited members to ``/p/<tier profile>/v1``, the owner (passphrase) to the
+default profile. Blocked visitors never reach Hermes.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from salts_secrets import _yaml as yaml
 from salts_secrets import context as ctx
 from salts_secrets import guests
 from salts_secrets import tiers as perm
+from salts_secrets.home import data_dir
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "dotv"
@@ -54,7 +55,6 @@ class Settings:
                               "user": e.get("DOTV_USER_PROFILE", "dotv-user"), "guest": self.public_profile}
         self.tier_keys = {"admin": e.get("DOTV_ADMIN_KEY", ""), "user": e.get("DOTV_USER_KEY", ""),
                           "guest": self.public_key, "owner": self.owner_key}
-        self.docs_url = e.get("DOTV_DOCS_URL", "")
         self.owner_name = e.get("DOTV_OWNER_NAME", "Lena")
         self.public_name = e.get("DOTV_PUBLIC_NAME", "Salt")
 
@@ -209,15 +209,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/shelf")
     def shelf():
-        """Memory shelf: the showcase view of the always-injected memory entries (falls back to demo data for guests)."""
+        """Context page; guests see demo data, the owner sees the real scan."""
         return render_page("shelf.html", s)
-
-    @app.get("/board")
-    def board(request: Request):
-        """The two-column board was folded into /shelf (one entry per row, raw original vs raw guest version)."""
-        if not is_owner(state(request)):
-            return RedirectResponse("/")
-        return RedirectResponse("/shelf")
 
     @app.get("/api/health")
     def health():
@@ -326,8 +319,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         set_cookie(resp, request, st)
         return resp
 
-    # ------------------------------------------------------------ owner-only context dashboard
-    board_cache: dict[str, ctx.Item] = {}  # latest scan by id; item text is served from here on demand
+    board_cache: dict[str, ctx.Item] = {}  # latest scan by id; bodies are served from here
 
     def board_scan() -> list[ctx.Item]:
         items = ctx.scan(s.owner_home, s.workspace_roots)
@@ -386,13 +378,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         for home in s.tier_homes().values():
             if home.is_dir() or home == s.public_home:
                 projection = ctx.sync_public(s.owner_home, home, s.workspace_roots)
-        # Revocation is only real if the guest store forgets too: archive for Lena, then purge.
+        # Revoking only counts if guest sessions forget too: archive them for the owner, then purge.
         purge = guests.revoke_and_purge(s.owner_home, s.public_home, before, projection)
         return {"facts": len(projection["facts"]), "documents": len(projection["documents"]), **purge}
 
     def _projection_on_disk(home: Path) -> dict:
         try:
-            return json.loads((home / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
+            return json.loads((data_dir(home) / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {"facts": [], "documents": []}
 
@@ -409,10 +401,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         archived = guests.archive(s.owner_home, s.public_home, reason="owner cleared")
         return {"archived": archived, **guests.purge(s.public_home)}
 
-    # ------------------------------------------------------------ guest-version drafts (rewrite before anything crosses)
+    # Public versions are drafted by the owner's model from a disclosure policy the owner edits.
     DRAFT_FILE = "dotv/public_drafts.json"
     POLICY_FILE = "dotv/disclosure_policy.md"
-    DEFAULT_POLICY = """# What may be shared about Salt (read by the drafter, edited by Lena)
+    DEFAULT_POLICY = """# What may be shared about Salt (read by the drafter, edited by the owner)
 
 ## Fine to share
 - That she is a pseudonymous on-chain analyst who writes Low Tide; her methods, thresholds and checklists
@@ -474,8 +466,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def _model_cfg() -> dict:
         """Hermes' own model settings from the owner profile (same model that serves her sessions)."""
         try:
-            from salts_secrets import _yaml
-            cfg = _yaml.safe_load((s.owner_home / "config.yaml").read_text(encoding="utf-8")) or {}
+            cfg = yaml.safe_load((s.owner_home / "config.yaml").read_text(encoding="utf-8")) or {}
         except (OSError, ValueError):
             cfg = {}
         m = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
@@ -498,8 +489,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         m = _model_cfg()
         if not (m["base_url"] and m["api_key"] and m["model"]):
             raise HTTPException(503, "no model configured in the owner profile")
-        # thinking off: deepseek-flash otherwise spends the whole max_tokens budget on reasoning and returns an
-        # empty content (P34). The DeepSeek chat API takes {"thinking": {"type": "disabled"}}; other providers ignore it.
+        # Reasoning models can spend the whole budget thinking and return nothing; DeepSeek honours
+        # "thinking: disabled", other providers ignore the field.
         payload = {"model": m["model"], "temperature": 0.2, "max_tokens": 2000 if it.kind == "skill" else 800, "stream": False,
                    "thinking": {"type": "disabled"},
                    "messages": [{"role": "system", "content": _draft_system(it.kind)},
@@ -531,11 +522,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def board_preview(request: Request):
         require_owner(request)
         try:
-            return json.loads((s.public_home / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
+            return json.loads((data_dir(s.public_home) / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {"facts": [], "documents": []}
 
-    # ------------------------------------------------------------ owner-only permission board (#527)
     @app.get("/perm")
     def perm_page(request: Request):
         if not is_owner(state(request)):
@@ -604,8 +594,6 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(400, "bad request")
         return perm_state()
 
-    # ------------------------------------------------------------ owner-only global doc
-    # ------------------------------------------------------------ trace: the same questions in both sessions, verbatim
     TRACE_DIR = STATIC / "trace"
 
     @app.get("/trace")
@@ -624,13 +612,6 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if not str(target).startswith(str(TRACE_DIR.resolve())) or not target.is_file():
             raise HTTPException(404, "no such trace file")
         return FileResponse(target, headers={"Cache-Control": "no-cache"})
-
-    @app.get("/docs")
-    def doc_page(request: Request):
-        """The global document lives on the hub (8806) together with the rest of the reference material."""
-        if not is_owner(state(request)):
-            return RedirectResponse("/")
-        return RedirectResponse(s.docs_url)
 
     return app
 

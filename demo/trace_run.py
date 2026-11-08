@@ -5,7 +5,7 @@ message row, per-call API usage. Output: one JSON bundle for trace_render.py.
 
 usage: trace_run.py <bundle.json> --tools-owner tools_owner.json --tools-public tools_public.json
        [--questions questions.txt] [--owner-home DIR] [--public-home DIR] [--hermes URL]
-Keys come from <owner-home>/.env (API_SERVER_KEY, DOTV_PUBLIC_KEY). Questions: one per line, blank lines ignored.
+Keys come from <owner-home>/.env (API_SERVER_KEY, SALTS_PUBLIC_API_KEY). Questions: one per line, blank lines ignored.
 """
 import argparse
 import json
@@ -70,7 +70,7 @@ def main() -> None:
     ap.add_argument("--tools-owner", required=True)
     ap.add_argument("--tools-public", required=True)
     ap.add_argument("--questions")
-    ap.add_argument("--owner-home", default=str(Path.home() / "code/hermes_workspace_1105"))
+    ap.add_argument("--owner-home", default=str(Path.home() / ".hermes"))
     ap.add_argument("--public-home")
     ap.add_argument("--hermes", default="http://127.0.0.1:8642")
     ap.add_argument("--public-profile", default="public")
