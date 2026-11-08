@@ -243,6 +243,7 @@ def test_approved_skill_becomes_a_method_the_guest_follows(tmp_path):
     core.approve(owner, items, {skill.id}, {skill.id: guest})
     proj = core.write_projection(owner, public, [], "Salt")
     assert proj["methods"][0]["text"] == guest and proj["documents"] == []
+    assert proj["methods"][0]["title"] == "bridge-checks"
     section = plugin.render_section(proj)
     assert "How Salt works" in section and "Four checks on any bridge" in section and "Lena" not in section
     assert "Count the signers." in plugin.lookup(proj, "bridge")

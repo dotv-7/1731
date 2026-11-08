@@ -779,7 +779,12 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
         rewrite = allowlist.get(it.id, {}).get("public_text", "").strip()
         if not rewrite:
             return it.title
-        first = rewrite.splitlines()[0].lstrip("#").strip()
+        lines = rewrite.splitlines()
+        if lines[0].strip() == "---" and "---" in (l.strip() for l in lines[1:]):
+            end = next(n for n, l in enumerate(lines[1:], 1) if l.strip() == "---")
+            name = next((l.split(":", 1)[1].strip().strip("\"'") for l in lines[1:end] if l.startswith("name:")), "")
+            lines = ([name] if name else []) + lines[end + 1:]
+        first = next((l.lstrip("#").strip() for l in lines if l.strip()), "") or "Note"
         return first if len(first) <= 70 else first[:69] + "…"
 
     facts = [it for it in public if it.kind in ("memory", "user", "note")]
