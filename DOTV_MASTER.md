@@ -30,7 +30,7 @@
 | D2 | **527 操作权限分级** | Owner/Guest 分级（User/Admin 留接口）；按工具名单拦截调用（`pre_tool_call` 闸门插件）；命令权限；在会话上下文里注入当前身份 | 第一版已实现（PR #6）：五级 Owner/Admin/User/Guest/Blocked、权限看板 `/perm`、邀请码，真实 Hermes 验证；封禁按设备 + IP 记录，清 cookie 也回不来；可关闭不登录访客；平台账号识别、命令权限、群聊混合未做 |
 | D3 | **独立 UI** | 终端风格网页聊天（**已定：风格 1“Hermes 同款”**，样稿见 `mockups/hermes-chat-mockups.html`），Owner 口令解锁，后端小服务持有 API key，访客和 Owner 走不同 profile，满足 R9 的指标 | 已实现（PR #6：`dotv/chat/`）；已用演示后端预览，未接生产 |
 | D4 | **全局说明文档** | 本文件：要求、成品、工具清单、上下文来源、角色权限矩阵、上游改动清单 | 本文件；实现进度见 §9 |
-| D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 已实现：Gemini 补丁在 `agent/gemini_native_adapter.py`（`HERMES_GEMINI_GOOGLE_SEARCH=on` 才生效），镜像工作流 `.github/workflows/dotv-image.yml`（手动触发，tag 不覆盖）；还没在生产换上 |
+| D5 | 附带：Gemini Google Search 补丁、GHCR 镜像 | `ghcr.io/dotv-io/hermes-agent:v0.22.2-dotv.N`，详见 `RESEARCH_527.md` §7 | 已实现，2026-11-08 移出 dotv（插件分支只留官方 Hermes + 插件）：Gemini 补丁现在只在 `dotv-gemini` 分支的 `agent/gemini_native_adapter.py`（`HERMES_GEMINI_GOOGLE_SEARCH=on` 才生效），镜像工作流 `.github/workflows/dotv-image.yml`（手动触发，tag 不覆盖）；还没在生产换上 |
 
 ## 2. 527 管什么，我们管什么
 
@@ -194,7 +194,7 @@ Hermes 的上下文由两部分组成：A 是**自动注入**的 system prompt�
 | 封禁清 cookie 也绕不过（设备 id + 公网 IP，IP 90 天过期，`/perm` 可解除）；可关闭不登录访客 | ✅ | 行为测试：封禁后清 cookie 仍 403，解除后恢复；反代/内网地址不按 IP 封 |
 | 消息平台分流插件 `dotv-guest-route`（只有主人私聊走主人 profile，其余全部转 public profile） | ✅ 2026-11-06 | 真实 Telegram 群 + Discord 频道：访客版回答，主人 state.db 无记录；9 个单元测试；validate 通过。细节见本地说明 §14 |
 | 群聊混合（同一群里按发送者分不同 profile） | 已定：群就是公开场合，一律访客 | — |
-| Gemini 补丁、GHCR 镜像（D5） | ✅ 代码已有 | 生产未换镜像 |
+| Gemini 补丁、GHCR 镜像（D5） | ✅ 代码在 `dotv-gemini` 分支 | 生产未换镜像；dotv 分支不再含核心文件改动 |
 | 真实模型越狱测试、生产安装 | ❌ 未做 | 需要生产或真实模型 key |
 
 ### 真实 Hermes 端到端结果（脚本：`dotv/dev/e2e/`）
