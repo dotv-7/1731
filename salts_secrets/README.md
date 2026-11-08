@@ -264,6 +264,16 @@ On every row that ends in the public profile, each probe below is refused:
 Revocation is covered by `test_cli_sync_revocation_empties_public_store`. Unticking an item and running
 `sync` deletes the guest sessions from the public `state.db`.
 
+The full chain is covered by [`demo/e2e/canary_matrix.py`](../demo/e2e/canary_matrix.py), with results in
+[`docs/isolation-report.md`](../docs/isolation-report.md). It runs one real `hermes gateway run`, set up by
+`setup` and `sync`, with the real Telegram and Discord adapters talking to loopback stand-ins of the platform
+APIs, the web ingress, and a fake model that records every request body, auxiliary calls included. Fresh
+canaries go into MEMORY.md, USER.md, the workspace, a private folder, a skill and an owner session, and only
+a small subset is approved. On every guest row, no unapproved canary appears in any request the gateway sent
+to the model, and no owner tool is offered. The first run found that the Discord adapter checks
+`DISCORD_ALLOWED_USERS` before any route and ignores `DISCORD_ALLOW_ALL_USERS` while that list names anyone.
+Strangers never reached the catch-all, so `setup` now adds `*` to that list, and `check` flags a list without it.
+
 ## Limits
 
 - **Needs `plugins.isolation: in_process`.** Under the plugin host, `pre_gateway_dispatch` gets a
