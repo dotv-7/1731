@@ -774,6 +774,14 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
                 "mode": "rewrite" if entry.get("public_text") else "as-is",
                 "decided_via": entry.get("decided_via", "single")}
 
+    def title(it: Item) -> str:
+        # A rewrite replaces the title too: the original's file name and headings are the owner's, not the guest's.
+        rewrite = allowlist.get(it.id, {}).get("public_text", "").strip()
+        if not rewrite:
+            return it.title
+        first = rewrite.splitlines()[0].lstrip("#").strip()
+        return first if len(first) <= 70 else first[:69] + "…"
+
     facts = [it for it in public if it.kind in ("memory", "user", "note")]
     return {
         "version": 2,
@@ -781,7 +789,7 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
         "owner_name": owner_name,
         "facts": [shown(it) for it in facts],
         "fact_meta": [{"text": shown(it), **origin(it)} for it in facts],
-        "documents": [{"title": it.title, "text": shown(it), **origin(it)} for it in public if it not in facts],
+        "documents": [{"title": title(it), "text": shown(it), **origin(it)} for it in public if it not in facts],
     }
 
 

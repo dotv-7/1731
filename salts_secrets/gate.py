@@ -34,12 +34,6 @@ CEILING = DEFAULT_ALLOWED_TOOLS | frozenset(
         "video_generate",
         "xai_video_edit",
         "xai_video_extend",
-        "todo_list",
-        "memory",
-        "session_search",
-        "skills_list",
-        "skill_view",
-        "skill_manage",
     }
 )
 TIER_FILE = "tier.json"

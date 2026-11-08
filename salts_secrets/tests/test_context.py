@@ -216,3 +216,16 @@ def test_workspace_inside_home_is_listed_as_workspace(tmp_path):
     assert agents.group == "Workspace · workspace · root" and "system prompt" in agents.note
     assert log.group == "Data dir · logs" and not log.publishable
     assert not any(i.group == "Data dir · workspace" for i in items)
+
+
+def test_rewritten_document_does_not_keep_its_private_title(tmp_path):
+    owner, public, ws = tmp_path / "owner", tmp_path / "public", tmp_path / "ws"
+    owner.mkdir()
+    ws.mkdir()
+    (ws / "PrivateClientName-budget.md").write_text("# Budget\nAcme pays 40k for the Q3 audit\n", encoding="utf-8")
+    items = core.scan(owner, [ws])
+    doc = next(i for i in items if "PrivateClientName" in i.title)
+    core.approve(owner, items, {doc.id}, {doc.id: "How Salt prices an audit\nA flat fee per report."})
+    proj = core.write_projection(owner, public, [ws])
+    assert [d["title"] for d in proj["documents"]] == ["How Salt prices an audit"]
+    assert "PrivateClientName" not in json.dumps(proj) and "PrivateClientName" not in plugin.render_section(proj)

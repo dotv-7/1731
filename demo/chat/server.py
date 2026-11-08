@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import _yaml as yaml
-from salts_secrets import classify, gate
+from salts_secrets import classify, gate, guests
 from salts_secrets import context as ctx
 from salts_secrets import guests
 from salts_secrets import tiers as perm
@@ -306,6 +306,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         sid_key = "viewer_sid" if readonly else tier + "_sid"
         if readonly and viewer_turns.get(st.get(sid_key, ""), 0) >= VIEWER_TURNS:
             st[sid_key] = ""
+        if tier == "guest" and st.get(sid_key) in guests.stale_ids(s.public_home):
+            st[sid_key] = ""  # a revoke could not delete it: never answer from it again
         if not st.get(sid_key):
             st[sid_key] = (VIEWER_PREFIX if readonly else f"salt-{tier[0]}-") + secrets.token_hex(16)
         if readonly:

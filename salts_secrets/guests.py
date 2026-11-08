@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import subprocess
@@ -128,26 +129,71 @@ def find_hermes() -> Optional[str]:
     return None
 
 
-def purge(public_home: Path, hermes_bin: Optional[str] = None, keep_ids: Optional[set[str]] = None) -> dict:
-    """Delete every guest session in the public profile through ``hermes sessions delete``. Returns counts;
-    ``error`` is set when the Hermes CLI is not available (nothing is deleted in that case)."""
+STALE_FILE = "stale_sessions.json"
+
+
+def _stale(public_home: Path) -> dict[str, str]:
+    try:
+        data = json.loads((data_dir(public_home) / STALE_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+
+
+def _save_stale(public_home: Path, stale: dict[str, str]) -> None:
+    path = data_dir(public_home) / STALE_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(stale, indent=2), encoding="utf-8")
+
+
+def stale_ids(public_home: Path) -> set[str]:
+    """Guest sessions a revoke could not delete. Nobody is served from them again (``live_session_id``)."""
+    return set(_stale(public_home))
+
+
+def live_session_id(public_home: Path, session_id: str) -> str:
+    """The session a guest is answered in: a fresh one when their old session survived a failed purge."""
+    stale, seen = _stale(public_home), set()
+    while session_id in stale and session_id not in seen:
+        seen.add(session_id)
+        session_id = stale[session_id]
+    return session_id
+
+
+def unpurged(public_home: Path) -> list[str]:
+    """Stale sessions that are still stored in the public profile."""
+    stale = stale_ids(public_home)
+    return [s["id"] for s in read_sessions(public_home) if s["id"] in stale]
+
+
+def purge(public_home: Path, hermes_bin: Optional[str] = None, keep_ids: Optional[set[str]] = None,
+          only_ids: Optional[set[str]] = None) -> dict:
+    """Delete guest sessions in the public profile through ``hermes sessions delete`` (all of them, or
+    ``only_ids``). A session that cannot be deleted is marked stale: its guest moves to a fresh session and
+    the next publish retries. ``error`` is set when the Hermes CLI is not available."""
     hermes = hermes_bin or find_hermes()
-    ids = [s["id"] for s in read_sessions(public_home) if s["id"] not in (keep_ids or set())]
+    ids = [s["id"] for s in read_sessions(public_home)
+           if s["id"] not in (keep_ids or set()) and (only_ids is None or s["id"] in only_ids)]
+    stale = _stale(public_home)
     if not ids:
+        if only_ids:
+            _save_stale(public_home, {k: v for k, v in stale.items() if k not in only_ids})
         return {"deleted": 0, "failed": 0}
-    if not hermes:
-        return {"deleted": 0, "failed": len(ids), "error": "hermes CLI not found; guest sessions were NOT purged"}
+    failed_ids: list[str] = []
+    error = "" if hermes else "hermes CLI not found; guest sessions were NOT purged"
     env = {**os.environ, "HERMES_HOME": str(public_home)}
-    deleted = failed = 0
     for sid in ids:
-        r = subprocess.run(
+        ok = bool(hermes) and subprocess.run(
             [hermes, "sessions", "delete", sid, "--yes"], env=env, capture_output=True, text=True, timeout=120
-        )
-        if r.returncode == 0:
-            deleted += 1
+        ).returncode == 0
+        if ok:
+            stale.pop(sid, None)
         else:
-            failed += 1
-    return {"deleted": deleted, "failed": failed}
+            failed_ids.append(sid)
+            stale.setdefault(sid, f"{sid}-r{secrets.token_hex(4)}")
+    _save_stale(public_home, stale)
+    out = {"deleted": len(ids) - len(failed_ids), "failed": len(failed_ids)}
+    return {**out, "error": error} if error else out
 
 
 def revoked(old_projection: dict, new_projection: dict) -> list[str]:
@@ -165,7 +211,10 @@ def revoke_and_purge(
     """If anything was revoked, archive the guest sessions for the owner and purge them from the public store."""
     gone = revoked(old_projection, new_projection)
     if not gone:
-        return {"revoked": 0, "archived": 0, "deleted": 0, "failed": 0}
+        leftover = set(unpurged(public_home))
+        if not leftover:
+            return {"revoked": 0, "archived": 0, "deleted": 0, "failed": 0}
+        return {"revoked": 0, "archived": 0, **purge(public_home, hermes_bin, only_ids=leftover)}
     archived = archive(owner_home, public_home, reason=f"revoked {len(gone)} item(s)")
     result = purge(public_home, hermes_bin)
     return {"revoked": len(gone), "archived": archived, **result}

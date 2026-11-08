@@ -156,6 +156,13 @@ async def _reply(gateway: Any, event: Any, content: str) -> None:
     await adapter.send(src.chat_id, content[:REPLY_MAX], reply_to=getattr(event, "message_id", None))
 
 
+def _live_session(settings: Settings, session_id: str) -> str:
+    from . import guests
+    from .home import current
+
+    return guests.live_session_id(current() / "profiles" / settings.public_profile, session_id)
+
+
 def make_hook(settings: Settings, limiter: RateLimiter, asker=ask_public_profile):
     def skip(reason: str) -> dict:
         return {"action": "skip", "reason": f"{NAME}: {reason}"}
@@ -180,7 +187,7 @@ def make_hook(settings: Settings, limiter: RateLimiter, asker=ask_public_profile
             if not settings.public_key:
                 await _reply(gateway, event, NOTICE_UNAVAILABLE)
                 return skip(f"{PUBLIC_KEY_ENV} is not set")
-            reply = await asker(settings, guest_session_id(event), text)
+            reply = await asker(settings, _live_session(settings, guest_session_id(event)), text)
             await _reply(gateway, event, reply or "(no reply)")
             return skip("answered by the public profile")
         except Exception as exc:  # noqa: BLE001

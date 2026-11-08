@@ -108,7 +108,7 @@ open anything in your profile.
   a rewritten guest version. An approved item that you later edit drops out of the projection until you
   approve it again. Unticking revokes: guest sessions that may have seen the item are archived for you
   and deleted from the public store, whether you publish from the dashboard or with
-  `hermes salts-secrets sync` (both go through `context.publish`).
+  `hermes salts-secrets sync` (both go through `context.publish`). A session that cannot be deleted is marked stale: its guest is moved to a fresh session at once, the publish result says the revoke is incomplete, and `check` fails until a later publish deletes it. A guest version replaces the title as well, so a file name or heading never crosses with a rewrite.
 - *Triage* (on the Context tab): rules first, then your model, sort every publishable item into
   **A** publish as-is, **B** needs a guest rewrite, **C** never public. The rules
   ([`privacy_rules.yaml`](salts_secrets/privacy_rules.yaml): credentials, identity and contact, assets,

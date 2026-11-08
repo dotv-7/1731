@@ -74,7 +74,13 @@ def test_revoked_and_revoke_without_hermes_cli_archives_but_reports(tmp_path, mo
     monkeypatch.setattr(guests, "find_hermes", lambda: None)
     res = guests.revoke_and_purge(owner, pub, old, new)
     assert res["revoked"] == 1 and res["archived"] == 1 and res["deleted"] == 0 and "error" in res
-    assert guests.revoke_and_purge(owner, pub, new, new) == {"revoked": 0, "archived": 0, "deleted": 0, "failed": 0}
+    # the session survived: its guest is answered from a fresh one, and the next publish retries the purge
+    fresh = guests.live_session_id(pub, "s1")
+    assert fresh != "s1" and guests.live_session_id(pub, fresh) == fresh and guests.unpurged(pub) == ["s1"]
+    again = guests.revoke_and_purge(owner, pub, new, new)
+    assert again["revoked"] == 0 and again["failed"] == 1 and "error" in again
+    assert any("revoke had to delete" in c["text"] and not c["ok"]
+               for c in perm.isolation_check(owner, pub, gateway=False)["checks"])
 
 
 def test_purge_calls_hermes_sessions_delete_per_session(tmp_path):
@@ -199,3 +205,17 @@ def test_routing_proof_from_another_pid_namespace(tmp_path, monkeypatch):
     beat.write_text(json.dumps({"processes": {"221": {"start_time": "boot-1"}}}))
     (tmp_path / "gateway_state.json").write_text(json.dumps({**state, "gateway_state": "stopped"}))
     assert not tiers.routing_loaded(tmp_path)[0]
+
+
+def test_failed_delete_moves_the_guest_and_a_retry_clears_it(tmp_path):
+    pub = tmp_path / "public"
+    _public_store(pub, [("s1", [("user", "a"), ("assistant", "b")])])
+    broken, fixed = tmp_path / "broken", tmp_path / "fixed"
+    broken.write_text("#!/bin/sh\nexit 1\n")
+    fixed.write_text("#!/bin/sh\nexit 0\n")
+    broken.chmod(0o755)
+    fixed.chmod(0o755)
+    assert guests.purge(pub, hermes_bin=str(broken)) == {"deleted": 0, "failed": 1}
+    assert guests.live_session_id(pub, "s1") != "s1" and guests.stale_ids(pub) == {"s1"}
+    assert guests.purge(pub, hermes_bin=str(fixed), only_ids={"s1"}) == {"deleted": 1, "failed": 0}
+    assert guests.stale_ids(pub) == set() and guests.live_session_id(pub, "s1") == "s1"
