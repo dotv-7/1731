@@ -69,6 +69,13 @@ guests read, revocation that deletes the guest sessions that may have seen an it
 every platform, an isolation self-check and the dashboard to run it all. A prompt or a skill can ask an
 agent to keep a secret; this builds an agent that never had it.
 
+**Tool gates are a different layer, and they stack.** A per-sender tool gate such as
+[hermes-clearance](https://github.com/yuzuru99/hermes-clearance) decides which tools each sender may call
+inside one profile; by its own README it is "not a sandbox". It stops a guest's tool call, but the owner's
+MEMORY.md and USER.md are still in that profile's system prompt, so a guest who simply asks is answered or
+refused by the model's discretion. Salt's Secrets moves guests to a profile that never loaded that context.
+The two compose: Clearance for who may use which tool, Salt's Secrets for what a stranger can know.
+
 ![Two profiles in one Hermes: the route hook sends your DM to your agent and everyone else to the guest agent, which only reads what you approved](../docs/diagrams/overview.svg)
 
 ## 30-second tour
