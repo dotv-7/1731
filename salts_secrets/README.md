@@ -234,6 +234,33 @@ Under `plugins.entries.salts-secrets.settings` in your profile's config.yaml:
 - **Processes.** Revoking context runs `hermes sessions delete` for the affected guest sessions.
 - No self-update, no patching of Hermes, no code downloaded at runtime.
 
+## Isolation matrix
+
+[`tests/test_isolation_matrix.py`](tests/test_isolation_matrix.py) checks every way a stranger can reach this Hermes. It runs the
+real gateway: `profile_routes` resolution, authorization by the receiving bot, and the profile scope the hooks
+and the turn run under. One owner home is set up with a memory, a session, a file and an unpublished
+memory item, published through `hermes salts-secrets sync`.
+
+| Ingress | Owner | Stranger |
+|---|---|---|
+| Telegram DM | owner profile | public profile |
+| Telegram group | public profile | public profile |
+| Discord DM | owner profile | public profile |
+| Discord server | owner hook withholds it, public profile answers | public profile |
+| Web chat (`/p/public/v1`) | owner passphrase, `/v1` | public profile |
+
+On every row that ends in the public profile, each probe below is refused:
+
+| Probe | Refused by |
+|---|---|
+| owner memory (`memory`, `MEMORY.md` path) | no memory toolset on that platform key, tool gate, memory off in the public config |
+| owner sessions (`session_search`, `state.db` path) | no session toolset, tool gate, separate `state.db` |
+| owner files (`read_file`, `search_files`, `terminal`, local paths in `vision_analyze` / `web_extract`) | no file/terminal toolset, tool gate, local-path argument block |
+| unpublished items | absent from the prompt section and from `public_notes_lookup`, and from every file in the public profile |
+
+Revocation is covered by `test_cli_sync_revocation_empties_public_store`. Unticking an item and running
+`sync` deletes the guest sessions from the public `state.db`.
+
 ## Limits
 
 - **Needs `plugins.isolation: in_process`.** Under the plugin host, `pre_gateway_dispatch` gets a
