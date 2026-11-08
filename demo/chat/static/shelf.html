@@ -183,7 +183,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
 .robar{position:sticky;top:0;z-index:20;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
-.ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk="B"]{display:none!important}
+.ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
 </style></head><body>
 <div class="grain"></div>
@@ -442,7 +442,7 @@ async function runClassify(){const b=$('#t-run');if(b){b.disabled=true;b.textCon
 document.addEventListener('click',async e=>{const t=e.target;
   if(t.id==='t-run'){if(demo)return toast('Demo data');runClassify();return;}
   if(t.id==='t-save'){saveAll();return;}
-  const b=t.dataset&&t.dataset.bulk;if(!b||demo)return;
+  const b=t.dataset&&t.dataset.bulk;if(!b||demo||document.body.classList.contains('ro'))return;
   const ids=items.filter(it=>it.publishable&&cls[it.id]&&cls[it.id].tier===b).map(it=>it.id);
   if(b==='A'){for(const id of ids){pub.add(id);asIs[id]=true;delete drafts[id];via[id]='bulk-A';}}
   else if(b==='C'){for(const id of ids){pub.delete(id);via[id]='bulk-C';}}
