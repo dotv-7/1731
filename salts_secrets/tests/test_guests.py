@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -174,3 +175,27 @@ def test_cli_sync_revocation_empties_public_store(tmp_path, monkeypatch):
     assert con.execute("select count(*) from sessions").fetchone()[0] == 0
     assert con.execute("select count(*) from messages").fetchone()[0] == 0
     assert [s["id"] for s in guests.read_archive(owner)] == ["s1"]
+
+
+def test_routing_proof_from_another_pid_namespace(tmp_path, monkeypatch):
+    from salts_secrets import tiers
+    from salts_secrets.home import data_dir
+    from salts_secrets.route import HEARTBEAT_FILE
+
+    monkeypatch.setattr(tiers, "_pid_alive", lambda pid: False)
+    state = {"pid": 221, "start_time": "boot-1", "gateway_state": "running"}
+    (tmp_path / "gateway_state.json").write_text(json.dumps(state))
+    assert not tiers.routing_loaded(tmp_path)[0]
+
+    beat = data_dir(tmp_path) / HEARTBEAT_FILE
+    beat.parent.mkdir(parents=True, exist_ok=True)
+    beat.write_text(json.dumps({"processes": {"221": {"start_time": "boot-1"}}}))
+    ok, note = tiers.routing_loaded(tmp_path)
+    assert ok and "another container" in note
+
+    beat.write_text(json.dumps({"processes": {"221": {"start_time": "boot-0"}}}))
+    assert not tiers.routing_loaded(tmp_path)[0]
+
+    beat.write_text(json.dumps({"processes": {"221": {"start_time": "boot-1"}}}))
+    (tmp_path / "gateway_state.json").write_text(json.dumps({**state, "gateway_state": "stopped"}))
+    assert not tiers.routing_loaded(tmp_path)[0]
