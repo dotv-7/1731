@@ -139,8 +139,7 @@ textarea::placeholder{color:var(--dim);opacity:.8}
           </g>
         </svg>
       </div>
-      <div class="cap"><b id="whoName">Salt's assistant</b><br><span id="whoLine">knows only what Salt has published</span></div>
-      <div class="mem"><i></i><span id="memLine">her memory: not here</span></div>
+      <div class="cap"><b id="whoName">Salt's assistant</b></div>
     </aside>
   </div>
   <div class="dock">
@@ -209,9 +208,7 @@ function blinkLoop(){clearTimeout(blinkTimer);blinkTimer=setTimeout(()=>{portrai
 function talking(on){portrait.classList.toggle('talk',on);}
 function sealed(){clearTimeout(sealTimer);portrait.classList.remove('seal');void portrait.offsetWidth;portrait.classList.add('seal');sealTimer=setTimeout(()=>portrait.classList.remove('seal'),4500);}
 function whoCaption(r){const owner=r==='owner';whoBox.classList.toggle('owner',owner);
-  $('#whoName').textContent=owner?'Lena\'s Hermes':'Salt\'s assistant';
-  $('#whoLine').textContent=owner?'all memory, all tools':'knows only what Salt has published';
-  $('#memLine').textContent=owner?'her memory: here':'her memory: not here';}
+  $('#whoName').textContent=owner?'Lena\'s Hermes':'Salt\'s assistant';}
 blinkLoop();
 // demo/dev: force a portrait state from the URL hash (#seal, #talk, #blink)
 if(['#seal','#talk','#blink'].includes(location.hash)){portrait.classList.add(location.hash.slice(1));clearTimeout(blinkTimer);}
