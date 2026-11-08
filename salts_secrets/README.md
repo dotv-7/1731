@@ -76,7 +76,7 @@ MEMORY.md and USER.md are still in that profile's system prompt, so a guest who 
 refused by the model's discretion. Salt's Secrets moves guests to a profile that never loaded that context.
 The two compose: Clearance for who may use which tool, Salt's Secrets for what a stranger can know.
 
-![Two profiles in one Hermes: the route hook sends your DM to your agent and everyone else to the guest agent, which only reads what you approved](../docs/diagrams/overview.svg)
+![Two profiles in one Hermes: Hermes' own profile_routes send your DM to your agent and every stranger to the guest agent, which only reads what you approved; the owner hook catches what the routes leave behind](../docs/diagrams/overview.svg)
 
 ## 30-second tour
 
@@ -170,19 +170,27 @@ whatever the config says. No allowed tool takes a local path: any argument that 
 `public_notes_lookup`. Both read one file, the projection in the public profile's plugin data, and never
 open anything in your profile.
 
+**Public profile, at the end of the turn** (`pre_llm_call`, `transform_llm_output`). A reply whose turn
+started before the owner's last revocation is replaced by a short "ask again" notice before it is stored,
+and before it is sent where the reply is not streamed. Text a platform already streamed cannot be taken
+back; it still never enters the transcript.
+
 **Dashboard** (owner only, behind the dashboard login).
 
 - *Context*: every source Hermes builds your prompt from (memory, user profile, SOUL.md, workspace,
   skills, sessions, cron, providers), private by default. Tick an item to publish it, optionally with
   a rewritten guest version. An approved item that you later edit drops out of the projection until you
-  approve it again. Unticking revokes: guest sessions that may have seen the item are archived for you
-  and deleted from the public store, whether you publish from the dashboard or with
-  `hermes salts-secrets sync` (both go through `context.publish`). A session that cannot be deleted is marked stale: its guest is moved to a fresh session at once on both ingress paths (the native route resets the gateway's session for that chat before the turn, and refuses the turn with a "send it again" notice when it cannot), the publish result says the revoke is incomplete, and `check` fails until a later publish deletes it. A guest version replaces the title as well, so a file name or heading never crosses with a rewrite.
+  approve it again. Unticking revokes: every guest session in the public store is archived for you and
+  deleted (all of them, since the store does not record which session saw which item), whether you publish
+  from the dashboard or with `hermes salts-secrets sync` (both go through `context.publish`). Every session
+  is marked stale before the first delete and unmarked when its delete succeeds, so a timeout or crash
+  halfway leaves the rest stale. A session that cannot be deleted is marked stale: its guest is moved to a fresh session at once on both ingress paths (the native route resets the gateway's session for that chat before the turn, and refuses the turn with a "send it again" notice when it cannot), the publish result says the revoke is incomplete (`sync` exits 1), and `check` fails until a later publish deletes it. A guest version replaces the title as well, so a file name or heading never crosses with a rewrite.
 - *Triage* (on the Context tab): rules first, then your model, sort every publishable item into
   **A** publish as-is, **B** needs a guest rewrite, **C** never public. The rules
   ([`privacy_rules.yaml`](privacy_rules.yaml): credentials, identity and contact, assets,
   health and family, file origin, dates, plus a cross-item combination rule) set a floor the model can
-  only raise; an item is A only if no rule hits and the model says A. One button per tier (adopt all A
+  only raise; an item is A only if no rule hits and the model says A. Opening the tab applies the rules
+  only; item text goes to your model when you click Classify (items changed since the last run) or Draft. One button per tier (adopt all A
   as-is, draft guest versions for all B, keep all C private); a bulk click only takes items of its own
   tier and C never crosses in bulk. A single click may override the classifier, with one exception: text the
   author marked "do not publish" (`hard: true` rules) is refused on any click and kept out of the projection even
@@ -210,7 +218,7 @@ starts with `salt-v-`; the demo chat uses those ids for its read-only owner pass
 
 What happens to one stranger's question:
 
-![A stranger's message goes through the route hook to the guest agent and its tool gate; the route hook returns skip, so your agent never sees it](../docs/diagrams/question.svg)
+![A stranger's message is routed by profile_routes straight to the public profile: guest hook, guest agent, tool gate, reply check; your agent never sees it](../docs/diagrams/question.svg)
 
 The diagrams are PlantUML with the handwritten skin; sources in [`docs/diagrams/`](../docs/diagrams/)
 (`java -jar plantuml.jar -tsvg docs/diagrams/*.puml`).
@@ -236,12 +244,13 @@ Under `plugins.entries.salts-secrets.settings` in your profile's config.yaml:
   `setup` creates it with `hermes config set`; the plugin never opens `.env` or `auth.json` itself.
   `check` compares the owner's copy with the public profile's `API_SERVER_KEY` through Hermes'
   profile secret scope.
-- **Network.** The owner side calls only the local API server (`127.0.0.1:8642` by default).
-  Nothing leaves the machine except what Hermes itself sends to your model provider.
+- **Network.** The owner side calls only the local API server (`127.0.0.1:8642` by default) and, when
+  you click Classify or Draft, your own configured model with the item text.
+  Nothing else leaves the machine except what Hermes itself sends to your model provider.
 - **Files written.** `<HERMES_HOME>/plugin-data/salts-secrets/` in both profiles (allowlist, projection,
   tool tiers, guest archive and digest, the public profile's empty cwd), and the public profile's
   config.yaml and SOUL.md during `setup`.
-- **Processes.** Revoking context runs `hermes sessions delete` for the affected guest sessions.
+- **Processes.** Revoking context runs `hermes sessions delete` for every guest session in the public profile.
 - No self-update, no patching of Hermes, no code downloaded at runtime.
 
 ## Isolation matrix
