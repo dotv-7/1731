@@ -120,7 +120,7 @@ textarea::placeholder{color:var(--dim);opacity:.8}
 </style></head>
 <body>
 <div class="bar"><div class="l"><span class="lbl" id="brandWho">SALT'S ASSISTANT</span><span class="line"></span><span class="lbl">CHAT</span></div>
-  <div class="r"><span id="ownerLinks" hidden><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/perm">PERMISSIONS</a><a class="lbl" href="/trace">TRACE</a></span><span id="badge" class="badge guest">GUEST</span><span id="conn" class="conn">CONNECTED</span><button id="model" class="lbl" title="Switch model (owner only)" hidden></button><button id="auth" class="lbl">SIGN IN</button></div></div>
+  <div class="r"><span id="ownerLinks" hidden><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/perm">PERMISSIONS</a><a class="lbl" href="/trace">TRACE</a></span><a class="lbl" href="/doc">DOC</a><span id="badge" class="badge guest">GUEST</span><span id="conn" class="conn">CONNECTED</span><button id="model" class="lbl" title="Switch model (owner only)" hidden></button><button id="auth" class="lbl">SIGN IN</button></div></div>
 <div class="app">
   <div class="main">
     <div id="log" class="log"></div>
@@ -160,9 +160,9 @@ textarea::placeholder{color:var(--dim);opacity:.8}
 </div></div>
 <script>
 const $=s=>document.querySelector(s), log=$('#log'), inp=$('#in'), menu=$('#menu');
-let role='guest', models=[], mi=0, busy=null, hist=JSON.parse(localStorage.getItem('salt.hist')||'[]'), hi=-1, menuIdx=0;
+let RO=false,role='guest', models=[], mi=0, busy=null, hist=JSON.parse(localStorage.getItem('salt.hist')||'[]'), hi=-1, menuIdx=0;
 const CMDS=[['/help','show this help'],['/new','start a new session'],['/clear','clear the screen'],['/whoami','who am I right now'],
-  ['/unlock','unlock with the passphrase or an invite code'],['/lock','back to guest'],['/shelf','context page (owner)'],['/perm','permissions (owner)'],['/trace','trace: same questions, two sessions (owner)'],['/docs','global document (owner)']];
+  ['/unlock','unlock with the passphrase or an invite code'],['/lock','back to guest'],['/shelf','context page (owner)'],['/perm','permissions (owner)'],['/trace','trace: same questions, two sessions (owner)'],['/doc','how to talk to this assistant']];
 const LABEL={owner:'Owner',admin:'Admin',user:'User',guest:'Guest',blocked:'Blocked'};
 const HELLO={owner:'Hi Lena. This is your own session: all of your memory, all of your tools.',admin:'Admin session: tools as set on the permissions page.',user:'User session: tools as set on the permissions page.',
   blocked:'You are blocked and cannot talk to Hermes any more.',guest:'Hi, I am Salt\'s assistant. Ask about what Salt has written, leave her a message, or just chat.'};
@@ -189,7 +189,7 @@ function md(src){
     if(!buf.length)buf.push(lines[i++]);
     out.push(`<p>${buf.map(inline).join('<br>')}</p>`);}
   return out.join('');}
-const key=()=> 'salt.log.'+role;
+const key=()=> 'salt.log.'+role+(RO?'.ro':'');
 let transcript=[];
 function save(){if(role==='guest')return;localStorage.setItem(key(),JSON.stringify(transcript.slice(-300)));}
 function render(e){const d=document.createElement('div');d.className='msg '+e.k;
@@ -212,8 +212,8 @@ function whoCaption(r){const owner=r==='owner';whoBox.classList.toggle('owner',o
 blinkLoop();
 // demo/dev: force a portrait state from the URL hash (#seal, #talk, #blink)
 if(['#seal','#talk','#blink'].includes(location.hash)){portrait.classList.add(location.hash.slice(1));clearTimeout(blinkTimer);}
-function setRole(r,name,ms){role=r;who=name||'';whoCaption(r);$('#brandWho').textContent=r==='owner'?'LENA MOREAU':"SALT'S ASSISTANT";models=r==='owner'&&ms||[];mi=0;showModel();const b=$('#badge');b.className='badge '+r;b.textContent=(LABEL[r]||r)+(who?' · '+who:'');
-  $('#ownerLinks').hidden=r!=='owner';const ab=$('#auth');if(ab)ab.textContent=['owner','admin','user'].includes(r)?'SIGN OUT':'SIGN IN';if(r==='guest')api('/api/new').catch(()=>{});restore();}
+function setRole(r,name,ms,ro){RO=!!ro;role=r;who=name||'';whoCaption(r);$('#brandWho').textContent=r==='owner'?'LENA MOREAU':"SALT'S ASSISTANT";models=r==='owner'&&ms||[];mi=0;showModel();const b=$('#badge');b.className='badge '+r;b.textContent=(LABEL[r]||r)+(RO?' · READ ONLY':'')+(who?' · '+who:'');
+  $('#ownerLinks').hidden=r!=='owner';const ab=$('#auth');if(ab)ab.textContent=['owner','admin','user'].includes(r)?'SIGN OUT':'SIGN IN';if(r==='guest')api('/api/new').catch(()=>{});restore();if(RO)sys('Read-only mode: you see what Lena\'s own session sees, but nothing can be saved, and her assistant runs no tools for you.');}
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
   let j={};try{j=await r.json()}catch{}; if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function me(){try{const r=await fetch('/api/me');const j=await r.json();online(true);return j;}catch{online(false);return null;}}
@@ -242,9 +242,10 @@ async function command(c){const [name,...rest]=c.trim().split(/\s+/);const arg=r
   else if(name==='/whoami'){sys('You are: '+LABEL[role]+(who?' ('+who+')':''));}
   else if(name==='/unlock'){if(!arg)return sys('Usage: /unlock <passphrase or invite code>');
     const {j,status}=await doUnlock(arg);
-    if(j.role){setRole(j.role,j.name,j.models);sys(j.role==='blocked'?'This invite code is blocked.':'Switched to '+LABEL[j.role]+'.',j.role==='blocked'?'err':'sys');}
+    if(j.role){setRole(j.role,j.name,j.models,j.readonly);sys(j.role==='blocked'?'This invite code is blocked.':'Switched to '+LABEL[j.role]+'.',j.role==='blocked'?'err':'sys');}
     else sys(status===429?'Too many attempts, try again in 5 minutes.':'Unlock failed: '+(j.detail||status),'err');}
-  else if(name==='/lock'){try{const j=await api('/api/lock');setRole(j.role,j.name,j.models);sys('Back to guest.');}catch(e){sys('Cannot sign out: '+e.message,'err');}}
+  else if(name==='/lock'){try{const j=await api('/api/lock');setRole(j.role,j.name,j.models,j.readonly);sys('Back to guest.');}catch(e){sys('Cannot sign out: '+e.message,'err');}}
+  else if(name==='/doc'||name==='/docs'){location.href='/doc';}
   else if(['/shelf','/perm','/trace'].includes(name)){if(role!=='owner')return sys('Owner only.','err');location.href=name;}
   else sys('Unknown command: '+name,'err');}
 function submit(){const t=inp.value.trim();if(!t||busy)return;inp.value='';fit();hideMenu();
@@ -279,7 +280,7 @@ function closeAuth(){authModal.classList.remove('show');}
 async function submitAuth(){const code=authInput.value.trim();if(!code)return;authErr.textContent='Signing in…';
   try{const {ok,status,j}=await doUnlock(code);
     if(j.role==='blocked'){authErr.textContent='This invite code is blocked.';return;}
-    if(ok&&j.role){closeAuth();setRole(j.role,j.name,j.models);sys('Switched to '+LABEL[j.role]+(j.name?' ('+j.name+')':'')+'.');return;}
+    if(ok&&j.role){closeAuth();setRole(j.role,j.name,j.models,j.readonly);sys('Switched to '+LABEL[j.role]+(j.name?' ('+j.name+')':'')+'.');return;}
     authErr.textContent=status===429?'Too many attempts, try again in 5 minutes.':'Wrong passphrase or invite code.';
   }catch(e){authErr.textContent='Sign-in failed, try again.';}}
 $('#auth').addEventListener('click',()=>{if(['owner','admin','user'].includes(role))command('/lock');else openAuth();});
@@ -289,6 +290,6 @@ authInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();
 authModal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeAuth();}});
 authModal.addEventListener('mousedown',e=>{if(e.target===authModal)closeAuth();});
 $('#model').addEventListener('click',()=>{if(models.length<2)return;mi=(mi+1)%models.length;showModel();sys('Model: '+models[mi].label+'.');});
-me().then(j=>{setRole((j&&j.role)||'guest',j&&j.name,j&&j.models);
+me().then(j=>{setRole((j&&j.role)||'guest',j&&j.name,j&&j.models,j&&j.readonly);
   if(j&&j.role==='guest'&&j.guest_access===false)sys('Guest access is closed; sign in with /unlock <invite code>.','err');});
 </script></body></html>

@@ -3,7 +3,8 @@
 The same plugin is installed in two profiles and plays a different part in each:
 
 - owner profile: routes every message that is not the owner's own DM to the public profile, adds the
-  ``hermes salts-secrets`` command and the Context / Permissions / Trace dashboard tabs;
+  ``hermes salts-secrets`` command and the Context / Permissions / Trace dashboard tabs, and refuses every
+  tool in sessions opened with the demo's read-only passphrase;
 - public profile: refuses every tool outside the guest allowlist and injects only what the owner
   approved for strangers.
 """
@@ -27,8 +28,9 @@ def register(ctx) -> None:
         public_context.register(ctx)
         log.info("salts-secrets: public role")
         return
-    from . import cli, route
+    from . import cli, readonly, route
 
     route.register(ctx)
+    readonly.register(ctx)
     cli.register(ctx)
     log.info("salts-secrets: owner role")

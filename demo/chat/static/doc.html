@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doc · Salt's assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,"PingFang SC",monospace;--disp:"Antonio",Impact,"PingFang SC",sans-serif;--bg:#f2f2f2;--text:#000091;--dim:#6b6bd6;--accent:#0000f2;--hair:rgba(0,0,242,.15)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13.5px/1.7 var(--mono)}
+body::before{content:"";position:fixed;inset:0;border:6px solid var(--accent);pointer-events:none}
+.wrap{max-width:860px;margin:0 auto;padding:0 24px 80px}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:16px 0 12px;border-bottom:1px solid var(--accent)}
+.brand{color:var(--accent);font:400 26px/1 var(--disp);text-transform:uppercase;flex:1}
+a{color:var(--accent)}.bar a{font-size:12px;letter-spacing:.06em;border:1px solid var(--accent);padding:3px 10px;text-decoration:none}
+h2{font:400 20px/1.2 var(--disp);text-transform:uppercase;color:var(--accent);margin:34px 0 8px;letter-spacing:.03em}
+.dim{color:var(--dim)}code,.pass{background:#fff;border:1px solid var(--hair);padding:1px 6px}
+ul{padding-left:20px}.tools span{display:inline-block;border:1px solid var(--hair);background:#fff;padding:0 6px;margin:2px}
+</style></head><body><div class="wrap">
+<div class="bar"><span class="brand">Salt's assistant · how to talk to her</span><a href="/">CHAT</a><a href="/shelf">CONTEXT</a></div>
+<p>This is the public assistant of <b>Salt</b>. Behind it is one Hermes with two rooms: Lena's own room, with all of her memory and tools, and a guest room that only holds what Lena approved for strangers, one click per item. Everything below is read from this install, so it describes this assistant and no other.</p>
+<h2>Where to talk</h2><ul id="where"></ul>
+<h2>What the guest room knows</h2><div id="knows" class="dim">loading…</div>
+<h2>What it can do for you</h2><div id="tools" class="tools"></div>
+<h2>What it will not tell you</h2>
+<p>Anything Lena did not approve: her real name, where she lives, accounts, health, the people around her, anything she marked private. Ask anyway; it says no instead of guessing. Each chat in the browser is forgotten when you reload.</p>
+<h2>Seeing the owner's side</h2><div id="owner"></div>
+<h2>Is the guest room really separate?</h2><p id="iso" class="dim"></p>
+</div><script>
+const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+fetch('/api/doc').then(r=>r.json()).then(d=>{
+  $('#where').innerHTML=(d.guest_access?'<li>Right here: open <a href="/">Chat</a> and type. You do not need an account.</li>':'<li>Web chat is invite-only right now; ask Lena for a code.</li>')+
+    d.platforms.map(p=>`<li>${esc(p)}: message the bot. Everyone except Lena lands in the guest room; group chats share one guest session.</li>`).join('');
+  const docs=d.documents.filter(Boolean);
+  $('#knows').innerHTML=`<p>${d.facts} short ${d.facts===1?'fact':'facts'} about Salt and ${docs.length} ${docs.length===1?'document':'documents'}${docs.length?':':'.'}</p>`+(docs.length?'<ul>'+docs.slice(0,40).map(t=>`<li>${esc(t)}</li>`).join('')+(docs.length>40?`<li>… and ${docs.length-40} more</li>`:'')+'</ul>':'');
+  $('#tools').innerHTML=d.tools.length?d.tools.map(t=>`<span>${esc(t)}</span>`).join(''):'<span>no tools: it only talks</span>';
+  $('#owner').innerHTML=d.viewer?`<p>Sign in on the chat page with the read-only passphrase${d.viewer_hint?` <span class="pass">${esc(d.viewer_hint)}</span>`:''} to talk to Lena's own assistant and browse her Context page. Read-only means nothing can be saved or published, and her assistant runs no tools for you.</p>`:'<p>Only Lena can sign in to her own room.</p>';
+  $('#iso').textContent=d.isolation||'';
+}).catch(()=>{$('#knows').textContent='could not load';});
+</script></body></html>

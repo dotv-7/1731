@@ -124,6 +124,10 @@ open anything in your profile.
   addresses) flagged. Never injected into any prompt.
 - *Check*: the same isolation check as `hermes salts-secrets check`.
 
+The owner profile also registers one `pre_tool_call` hook that refuses every tool in sessions whose id
+starts with `salt-v-`; the demo chat uses those ids for its read-only owner passphrase
+([demo/README.md](demo/README.md)).
+
 Paths are shown relative to `<HERMES_HOME>`.
 
 ## Settings
