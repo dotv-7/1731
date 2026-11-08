@@ -358,3 +358,33 @@ def test_doc_describes_this_install(tmp_path):
     d = c.get("/api/doc").json()
     assert d["viewer"] and d["viewer_hint"] == VIEW and d["facts"] == 0 and d["documents"] == []
     assert "web_search" in d["tools"] and "terminal" not in d["tools"]
+
+
+def test_hourly_turn_limit_spares_the_owner(tmp_path, monkeypatch):
+    class Done:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def aiter_lines(self):
+            yield "data: [DONE]"
+
+        def stream(self, *a, **k):
+            return self
+
+    monkeypatch.setattr(server.httpx, "AsyncClient", lambda *a, **k: Done())
+    s = server.Settings({"SALT_OWNER_HOME": str(tmp_path / "owner"), "SALT_PUBLIC_HOME": str(tmp_path / "public"),
+                         "SALT_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS), "SALT_SECRET": "x" * 32,
+                         "SALT_OWNER_KEY": "ok", "SALT_PUBLIC_KEY": "pk", "SALT_TURNS_PER_HOUR": "2"})
+    app = server.create_app(s)
+    guest = TestClient(app, client=("203.0.113.9", 1))
+    assert [guest.post("/api/chat", json={"message": "q"}).status_code for _ in range(3)] == [200, 200, 429]
+    assert TestClient(app, client=("203.0.113.9", 2)).post("/api/chat", json={"message": "q"}).status_code == 429
+    assert TestClient(app, client=("198.51.100.4", 1)).post("/api/chat", json={"message": "q"}).status_code == 200
+    owner = TestClient(app, client=("203.0.113.9", 3))
+    owner.post("/api/unlock", json={"passphrase": PASS})
+    assert owner.post("/api/chat", json={"message": "q"}).status_code == 200

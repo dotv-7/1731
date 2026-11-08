@@ -63,6 +63,7 @@ class Settings:
                           "guest": self.public_key, "owner": self.owner_key}
         self.owner_name = e.get("SALT_OWNER_NAME", "Lena")
         self.public_name = e.get("SALT_PUBLIC_NAME", "Salt")
+        self.turns_per_hour = int(e.get("SALT_TURNS_PER_HOUR", "20"))  # per address, everyone but the owner; 0 = no limit
 
     def tier_homes(self) -> dict[str, Path]:
         homes = {t: self.owner_home / "profiles" / name for t, name in self.tier_profiles.items()}
@@ -285,6 +286,20 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return respond(request, st, {"ok": True})
 
     viewer_turns: dict[str, int] = {}
+    hourly_turns: dict[str, deque] = defaultdict(deque)
+
+    def spend_turn(request: Request, st: dict) -> None:
+        """Every chat message costs the owner model tokens; cap each address (or device) per hour."""
+        if not s.turns_per_hour or is_owner(st):
+            return
+        window = hourly_turns[client_ip(request) or st["did"]]
+        now = time.time()
+        while window and window[0] < now - 3600:
+            window.popleft()
+        if len(window) >= s.turns_per_hour:
+            wait = int(window[0] + 3600 - now) // 60 + 1
+            raise HTTPException(429, f"{s.turns_per_hour} messages an hour reached, try again in {wait} min")
+        window.append(now)
 
     @app.post("/api/chat")
     async def chat(request: Request):
@@ -302,6 +317,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         readonly = is_viewer(st)
         if readonly and len(message) > VIEWER_CHARS:
             raise HTTPException(400, f"read-only mode: messages up to {VIEWER_CHARS} chars")
+        spend_turn(request, st)
         override = {} if readonly else model_override(tier, str(body.get("model") or ""))
         sid_key = "viewer_sid" if readonly else tier + "_sid"
         if readonly and viewer_turns.get(st.get(sid_key, ""), 0) >= VIEWER_TURNS:
