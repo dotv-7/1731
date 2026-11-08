@@ -82,6 +82,40 @@ the gateway named in `gateway_state.json`. Every failing line prints the command
 
 ## How it works
 
+```mermaid
+flowchart LR
+    you["You<br/>(your DM)"]
+    guest["Strangers<br/>(Telegram, Discord, groups, web chat)"]
+
+    subgraph hermes["One Hermes: one gateway, one process, one API key"]
+        direction LR
+        subgraph owner["Owner profile"]
+            route{{"pre_gateway_dispatch<br/>who is asking?"}}
+            oagent["Your agent<br/>SOUL, MEMORY, USER, workspace,<br/>skills, sessions, every tool"]
+            board["Context page<br/>rules + model sort A / B / C<br/>owner clicks to approve"]
+            log[("approvals.jsonl<br/>every click")]
+        end
+        subgraph public["Public profile"]
+            gate{{"pre_tool_call<br/>default-deny gate,<br/>no local paths"}}
+            pagent["Guest agent<br/>own SOUL + approved notes<br/>web, vision, image, speech"]
+            proj[("projection<br/>approved facts and documents only")]
+            pdb[("own state.db<br/>guest sessions")]
+        end
+    end
+
+    you --> route
+    guest --> route
+    route -- "owner DM" --> oagent
+    route -- "everyone else, via /p/public/v1" --> pagent
+    oagent -. "private sources" .-> board
+    board -- "publish: one click per item" --> proj
+    board --> log
+    board -- "revoke: archive + purge" --> pdb
+    proj --> pagent
+    pagent --- gate
+    pagent --> pdb
+```
+
 The plugin looks at the profile it is loaded in and plays one of two parts.
 
 **Owner profile** (`pre_gateway_dispatch`). Only your own DM reaches your agent. Every other inbound
@@ -127,6 +161,29 @@ open anything in your profile.
 The owner profile also registers one `pre_tool_call` hook that refuses every tool in sessions whose id
 starts with `salt-v-`; the demo chat uses those ids for its read-only owner passphrase
 ([demo/README.md](demo/README.md)).
+
+What happens to one stranger's question:
+
+```mermaid
+sequenceDiagram
+    participant S as Stranger
+    participant G as Gateway
+    participant R as Owner plugin (route)
+    participant P as Public profile
+    participant T as Tool gate
+    participant O as Your agent
+    S->>G: message in a group or DM
+    G->>R: pre_gateway_dispatch
+    R->>R: not the owner's DM, rate limit 20/h
+    R->>P: local API, session guest-platform-chat
+    P->>P: prompt = public SOUL + approved notes
+    P->>T: tool call (web, image...)
+    T-->>P: allowed, or refused if off-list or a local path
+    P-->>R: answer
+    R-->>S: reply
+    R-->>G: skip, the owner's agent never sees it
+    Note over O: no path from S to O, even when P fails (dropped with a notice)
+```
 
 Paths are shown relative to `<HERMES_HOME>`.
 
