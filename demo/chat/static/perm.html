@@ -59,8 +59,8 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
   <div class="r"><a class="lbl" href="/">CHAT</a><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/trace">TRACE</a><button id="save" class="primary" disabled>Save &amp; sync</button></div></div>
 <div class="wrap">
 <p class="dim" style="margin:16px 0 0">Who can do what. Who can know what is set on the CONTEXT page.</p>
-<div class="card"><b>Five tiers</b>　<span class="tiers">
-  <span><b class="ok">Owner</b> you, unlocked with the passphrase, every tool</span><span><b>Admin</b> invite code</span><span><b>User</b> invite code</span>
+<div class="card"><b>Two tiers today</b>　<span class="tiers">
+  <span><b class="ok">Owner</b> you, unlocked with the passphrase, every tool</span><span class="dim"><b>Admin</b> planned, not implemented</span><span class="dim"><b>User</b> planned, not implemented</span>
   <span><b>Guest</b> everyone who does not sign in</span><span><b class="lk">Blocked</b> never reaches Hermes (device + IP)</span></span>
   <div class="dim" id="files"></div></div>
 <details open><summary>Tool access<span class="dim">tick = allowed for that tier; red lock = never for anyone but the owner</span></summary><div style="overflow-x:auto"><table class="m" id="matrix"></table></div></details>
@@ -69,7 +69,7 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
   <span class="dim">(off: only people with an invite code can chat; the most complete block there is)</span>
   <table class="m" id="blocks"></table>
   <p class="dim">Setting a member to Blocked puts the devices and IPs they used on the blocklist (IPs expire after 90 days so a shared network is not punished); the owner passphrase is never blocked.</p></div></details>
-<details open><summary>Members and invite codes<span class="dim" id="mcount"></span></summary><div style="padding:8px 12px">
+<details open><summary>Members and invite codes<span class="dim"> Admin and User are planned; today a code can only mark someone Blocked</span><span class="dim" id="mcount"></span></summary><div style="padding:8px 12px">
   <div><input id="mname" type="text" placeholder="name, e.g. Tomás"> <select id="mtier"></select> <button id="madd">Create invite code</button></div>
   <div id="newcode"></div><table class="m" id="members"></table>
   <p class="dim">They type <code>/unlock &lt;code&gt;</code> in the chat to get their tier; tier changes, blocks and deletions apply at once. Guests need no code.</p></div></details>
@@ -78,6 +78,7 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
 const $=s=>document.querySelector(s);let S=null,policy={},initial='';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const COLS=['owner','admin','user','guest','blocked'],CFG=['admin','user','guest'];
+const planned=t=>(S.planned||[]).includes(t);
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000);}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
   if(r.status===403){location.href='/';throw 0;}if(!r.ok){toast('Failed: '+r.status);throw 0;}return r.json();}
@@ -91,18 +92,18 @@ function draw(){
   $('#blocks').innerHTML=(S.blocklist||[]).length?'<tr><th>Kind</th><th>Value</th><th>Member</th><th>Until</th><th></th></tr>'+S.blocklist.map(b=>
     `<tr><td>${b.kind==='ip'?'IP':'device'}</td><td class="dim">${esc(b.value)}</td><td>${esc(b.name)}</td><td class="dim">${new Date(b.until*1000).toLocaleDateString()}</td>
     <td><button data-ub="${esc(b.kind)}" data-v="${esc(b.value)}">Unblock</button></td></tr>`).join(''):'<tr><td class="dim">Blocklist is empty</td></tr>';
-  let h='<tr><th>Toolset</th>'+COLS.map(c=>`<th class="c">${esc(S.labels[c])}</th>`).join('')+'</tr>',cat='';
+  let h='<tr><th>Toolset</th>'+COLS.map(c=>`<th class="c${planned(c)?' dim':''}">${esc(S.labels[c])}${planned(c)?'<div style="font-size:11px">planned</div>':''}</th>`).join('')+'</tr>',cat='';
   for(const r of S.catalog){if(r.category!==cat){cat=r.category;h+=`<tr class="cat"><td colspan="6">${esc(cat)}</td></tr>`;}
     h+=`<tr><td>${esc(r.label)}<div class="dim" style="font-size:12px">${r.tools.map(esc).join(', ')}</div>`+
       (r.locked?`<div class="lk">🔒 ${esc(r.locked)}</div>`:r.warn?`<div class="wn">⚠ ${esc(r.warn)}</div>`:'')+'</td>'+
-      '<td class="c ok">✓</td>'+CFG.map(t=>r.locked?'<td class="c lk">🔒</td>':
+      '<td class="c ok">✓</td>'+CFG.map(t=>r.locked?'<td class="c lk">🔒</td>':planned(t)?'<td class="c dim" title="planned">–</td>':
         `<td class="c"><input type="checkbox" data-t="${t}" data-id="${r.id}" ${policy[t].has(r.id)?'checked':''}></td>`).join('')+
       '<td class="c no">✗</td></tr>';}
   $('#matrix').innerHTML=h;
-  $('#mtier').innerHTML=COLS.slice(1).map(t=>`<option value="${t}" ${t==='user'?'selected':''}>${esc(S.labels[t])}</option>`).join('');
+  $('#mtier').innerHTML=COLS.slice(1).map(t=>`<option value="${t}" ${planned(t)?'disabled':''} ${t==='blocked'?'selected':''}>${esc(S.labels[t])}${planned(t)?' (planned)':''}</option>`).join('');
   $('#mcount').textContent=S.members.length+(S.members.length===1?' member':' members');
   $('#members').innerHTML=S.members.length?'<tr><th>Name</th><th>Tier</th><th>Created</th><th></th></tr>'+S.members.map(m=>
-    `<tr><td>${esc(m.name)}</td><td><select data-m="${m.id}">${COLS.slice(1).map(t=>`<option value="${t}" ${t===m.tier?'selected':''}>${esc(S.labels[t])}</option>`).join('')}</select></td>
+    `<tr><td>${esc(m.name)}</td><td><select data-m="${m.id}">${COLS.slice(1).map(t=>`<option value="${t}" ${t===m.tier?'selected':''} ${planned(t)&&t!==m.tier?'disabled':''}>${esc(S.labels[t])}${planned(t)?' (planned)':''}</option>`).join('')}</select></td>
     <td class="dim">${new Date(m.created*1000).toLocaleString()}</td><td><button data-del="${m.id}">Delete</button></td></tr>`).join(''):'<tr><td class="dim">No members yet</td></tr>';
   $('#save').disabled=snap()===initial;}
 document.addEventListener('change',async e=>{const t=e.target;

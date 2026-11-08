@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+import pytest
+
 from salts_secrets import route as route
 
 
@@ -147,9 +149,10 @@ def test_adapter_lookup_by_platform_value():
     assert gw.tg.sent and gw.tg.sent[0][0] == "999"
 
 
-def test_default_owners_use_first_allowed_user():
+def test_allowed_users_are_never_owners_implicitly():
     env = {"TELEGRAM_ALLOWED_USERS": "111, 222", "DISCORD_ALLOWED_USERS": "333"}
-    assert route.default_owners(lambda name, default: env.get(name, default)) == {"telegram:111", "discord:333"}
+    settings = route.build_settings(lambda key, default: default, lambda name, default: env.get(name, default))
+    assert settings.owners == set()
 
 
 def test_configured_owners_win_and_key_is_read_per_call():
@@ -159,3 +162,59 @@ def test_configured_owners_win_and_key_is_read_per_call():
     assert settings.owners == {"telegram:42"} and settings.public_key == ""
     env[route.PUBLIC_KEY_ENV] = "rotated"
     assert settings.public_key == "rotated"
+
+
+class Broken:
+    """Attribute access raises, like a half-built or foreign event object."""
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        raise RuntimeError(f"no {name}")
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        Event("hi", Source(Platform.TELEGRAM, "999", "dm", "999")),  # public profile unreachable
+        Event("hi", None),  # source missing
+        Event("hi", Broken()),  # every source field raises
+        Broken(),  # the event itself raises
+        None,
+    ],
+)
+def test_hook_never_raises_and_always_skips(event):
+    """The gateway dispatches normally when this hook raises, i.e. hands the message to the owner agent."""
+
+    async def unreachable(s, sid, text):
+        raise OSError("connection refused")
+
+    hook, _ = make(asker=unreachable)
+    assert run(hook, event, Gateway())["action"] == "skip"
+
+
+@pytest.mark.parametrize("gateway", [None, object(), Broken()])
+def test_hook_skips_when_reply_path_is_broken(gateway):
+    hook, _ = make()
+    ev = Event("hi", Source(Platform.TELEGRAM, "999", "dm", "999"))
+    assert asyncio.run(hook(ev, gateway=gateway))["action"] == "skip"
+
+
+def test_hook_skips_when_public_key_lookup_raises():
+    def env(name, default):
+        raise KeyError(name)
+
+    s = route.Settings(owners={f"telegram:{OWNER}"}, env=env)
+    hook = route.make_hook(s, route.RateLimiter(3))
+    ev = Event("hi", Source(Platform.TELEGRAM, "999", "dm", "999"))
+    assert run(hook, ev, Gateway())["action"] == "skip"
+
+
+def test_heartbeat_keeps_one_entry_per_process(tmp_path):
+    route.write_heartbeat(tmp_path, pid=111, now=1)
+    route.write_heartbeat(tmp_path, pid=222, now=2)
+    route.write_heartbeat(tmp_path, pid=111, now=3)
+    import json
+
+    beats = json.loads((route.data_dir(tmp_path) / route.HEARTBEAT_FILE).read_text())["processes"]
+    assert set(beats) == {"111", "222"} and beats["111"]["at"] == 3

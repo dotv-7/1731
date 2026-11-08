@@ -403,20 +403,103 @@ def profile_secrets(home: Path) -> dict[str, str]:
         return {}
 
 
-def isolation_check(owner_home: Path, public_home: Path) -> dict:
-    """Every condition the isolation relies on, checked against the profiles as they are right now."""
+def _truthy(value) -> Optional[bool]:
+    if value is None or value == "":
+        return None
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def preflight(owner_home: Path, after_setup: bool = True) -> list[dict]:
+    """The three gateway settings the isolation needs, each with the command that fixes it.
+
+    ``after_setup=False`` (start of ``setup``) only fails on values the owner set explicitly the wrong way:
+    ``setup`` itself switches on multiplexing and writes an API key when they are merely missing."""
+    cfg = _profile_config(owner_home)
+    owner_secrets = profile_secrets(owner_home)
+    out = []
+    isolation = str((cfg.get("plugins") or {}).get("isolation") or "in_process").strip().lower().replace("-", "_")
+    out.append({
+        "ok": isolation == "in_process",
+        "text": f"owner: plugins.isolation is in_process (now {isolation}); under the plugin host the routing "
+        "hook cannot reply and the CLI command is not wired",
+        "fix": "hermes config set plugins.isolation in_process",
+    })
+    api_cfg = ((cfg.get("platforms") or {}).get("api_server") or {})
+    disabled = _truthy(api_cfg.get("enabled")) is False or _truthy(owner_secrets.get("API_SERVER_ENABLED")) is False
+    key = owner_secrets.get("API_SERVER_KEY", "")
+    out.append({
+        "ok": not disabled and (len(key.strip()) >= 16 or not after_setup),
+        "text": "owner: API server is enabled with a key of 16+ characters (guests are answered through /p/<profile>/v1)",
+        "fix": "hermes config set API_SERVER_ENABLED true  # and remove platforms.api_server.enabled: false"
+        if disabled
+        else "hermes config set API_SERVER_KEY <random 32 characters>",
+    })
+    multiplex = (cfg.get("gateway") or {}).get("multiplex_profiles")
+    out.append({
+        "ok": bool(multiplex) if after_setup else multiplex is not False,
+        "text": "owner: gateway.multiplex_profiles is on (the /p/<profile> entrance exists)",
+        "fix": "hermes config set gateway.multiplex_profiles true",
+    })
+    return out
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, OSError):
+        return True
+    return True
+
+
+def routing_loaded(owner_home: Path) -> tuple[bool, str]:
+    """Proof that the running gateway registered the routing hook: a heartbeat written by ``route.register``
+    in the process ``gateway_state.json`` names (same pid, same start time). A config file can say the
+    plugin is enabled while the plugin failed to load; then the owner agent would answer strangers."""
+    from .route import HEARTBEAT_FILE
+
+    try:
+        state = json.loads((Path(owner_home) / "gateway_state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False, "no gateway_state.json: the gateway has not run (hermes gateway restart)"
+    pid = state.get("pid")
+    if not isinstance(pid, int) or state.get("gateway_state") in ("stopped", "startup_failed") or not _pid_alive(pid):
+        return False, "the gateway is not running (hermes gateway restart)"
+    try:
+        beats = json.loads((data_dir(owner_home) / HEARTBEAT_FILE).read_text(encoding="utf-8")).get("processes") or {}
+    except (OSError, ValueError, AttributeError):
+        beats = {}
+    beat = beats.get(str(pid)) or {}
+    if not beat:
+        return False, f"gateway pid {pid} never registered the routing hook (plugin failed to load? see gateway logs)"
+    if state.get("start_time") is not None and beat.get("start_time") != state.get("start_time"):
+        return False, f"routing heartbeat is from an older process with pid {pid}; restart the gateway"
+    return True, f"gateway pid {pid}"
+
+
+def isolation_check(owner_home: Path, public_home: Path, gateway: bool = True) -> dict:
+    """Every condition the isolation relies on, checked against the profiles as they are right now.
+    ``gateway=False`` skips the running-gateway proof (used by ``setup``, before the restart)."""
     owner_home, public_home = Path(owner_home), Path(public_home)
     checks: list[dict] = []
 
-    def add(ok: bool, text: str) -> None:
-        checks.append({"ok": bool(ok), "text": text})
+    def add(ok: bool, text: str, fix: str = "") -> None:
+        checks.append({"ok": bool(ok), "text": text, **({"fix": fix} if fix and not ok else {})})
 
     owner_cfg, public_cfg = _profile_config(owner_home), _profile_config(public_home)
     add(plugin_ready(owner_home), f"owner: {NAME} installed and enabled (strangers never reach the owner agent)")
+    for item in preflight(owner_home):
+        add(item["ok"], item["text"], item["fix"])
+    owners = (((owner_cfg.get("plugins") or {}).get("entries") or {}).get(NAME) or {}).get("settings", {}).get("owners")
     add(
-        bool((owner_cfg.get("gateway") or {}).get("multiplex_profiles")),
-        "owner: gateway.multiplex_profiles is on (the /p/<profile> entrance exists)",
+        bool(owners),
+        "owner: your identity is set explicitly (settings.owners); without it even your own DM gets the public profile",
+        "hermes salts-secrets setup --owner telegram:<your id>",
     )
+    if gateway:
+        loaded, detail = routing_loaded(owner_home)
+        add(loaded, "owner: the running gateway loaded the routing hook" + (f" ({detail})" if loaded else f" — {detail}"))
     add(public_home.is_dir(), f"public profile exists: profiles/{public_home.name}")
     problems = audit(public_home)
     add(
@@ -441,7 +524,7 @@ def isolation_check(owner_home: Path, public_home: Path) -> dict:
         "keys: public key differs from the owner key",
     )
     ok = all(c["ok"] for c in checks)
-    failing = [c["text"].split(" — ")[0] for c in checks if not c["ok"]]
+    failing = [c["text"].split(" — ")[0].split(" (")[0] for c in checks if not c["ok"]]
     line = (
         f"ISOLATION OK · {len(checks)} checks"
         if ok

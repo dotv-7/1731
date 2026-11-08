@@ -138,8 +138,14 @@ def test_perm_board_owner_only(client, tmp_path):
     client.post("/api/unlock", json={"passphrase": PASS})
     st = client.get("/api/perm").json()
     assert st["policy"]["guest"] and any(r["locked"] for r in st["catalog"])
-    j = client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "admin"}).json()
-    assert j["code"].startswith("inv-") and j["members"][0]["tier"] == "admin" and "code_hash" not in j["members"][0]
+    assert st["planned"] == ["admin", "user"]
+    for tier in ("admin", "user"):
+        r = client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": tier})
+        assert r.status_code == 400 and "planned" in r.json()["detail"]
+    j = client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "blocked"}).json()
+    assert j["code"].startswith("inv-") and j["members"][0]["tier"] == "blocked" and "code_hash" not in j["members"][0]
+    r = client.post("/api/perm/members", json={"action": "update", "id": j["members"][0]["id"], "tier": "user"})
+    assert r.status_code == 400
     assert client.post("/api/perm/members", json={"action": "add", "name": "a", "tier": "owner"}).status_code == 400
 
 
@@ -149,10 +155,17 @@ def _owner_client(client):
     return owner
 
 
-def test_blocked_member_cannot_come_back_by_clearing_cookie(client):
+def _member_code(tmp_path, tier="user"):
+    """A member from an older policy file: the dashboard no longer creates planned tiers, blocking still works."""
+    from salts_secrets import tiers as perm
+
+    return perm.add_member(tmp_path / "owner", "x", tier)[1]
+
+
+def test_blocked_member_cannot_come_back_by_clearing_cookie(client, tmp_path):
     owner = _owner_client(client)
     client = TestClient(client.app, client=("203.0.113.7", 50000))
-    code = owner.post("/api/perm/members", json={"action": "add", "name": "x", "tier": "user"}).json()["code"]
+    code = _member_code(tmp_path)
     assert client.post("/api/unlock", json={"passphrase": code}).json()["role"] == "user"
     mid = owner.get("/api/perm").json()["members"][0]["id"]
     owner.post("/api/perm/members", json={"action": "update", "id": mid, "tier": "blocked"})
@@ -168,9 +181,9 @@ def test_blocked_member_cannot_come_back_by_clearing_cookie(client):
     assert TestClient(client.app, client=("203.0.113.7", 50001)).get("/api/me").json()["role"] == "guest"
 
 
-def test_proxy_address_is_never_ip_blocked(client):
+def test_proxy_address_is_never_ip_blocked(client, tmp_path):
     owner = _owner_client(client)
-    code = owner.post("/api/perm/members", json={"action": "add", "name": "x", "tier": "user"}).json()["code"]
+    code = _member_code(tmp_path)
     proxied = TestClient(client.app, client=("172.18.0.1", 50000))
     proxied.post("/api/unlock", json={"passphrase": code})
     mid = owner.get("/api/perm").json()["members"][0]["id"]
@@ -242,3 +255,16 @@ def test_pages_use_configured_names(tmp_path):
     html = TestClient(server.create_app(s)).get("/").text
     assert "Byte's assistant" in html and "Hi Ada." in html
     assert "Salt" not in html and "Lena" not in html
+
+
+def test_board_classify_and_save_with_decisions(client):
+    client.post("/api/unlock", json={"passphrase": PASS})
+    res = client.post("/api/board/classify", json={}).json()
+    assert set(res["counts"]) == {"A", "B", "C"} and res["model"] is False
+    items = client.get("/api/board/items").json()["items"]
+    assert all("classification" in i for i in items)
+    ids = [i["id"] for i in items if i["publishable"]]
+    out = client.post("/api/board/save", json={"public_ids": ids, "decisions": {i: {"via": "bulk-A"} for i in ids}}).json()
+    assert len(out["rejected"]) == len(ids) and out["facts"] == 0  # nothing is A without a model
+    out = client.post("/api/board/save", json={"public_ids": ids[:1], "decisions": {ids[0]: {"via": "single"}}}).json()
+    assert out["facts"] == 1 and out["rejected"] == []

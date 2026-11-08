@@ -7,7 +7,6 @@ profile is the one named in this plugin's settings.
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 from pathlib import Path
 
@@ -26,10 +25,10 @@ def _load_package():
         package = importlib.util.module_from_spec(spec)
         sys.modules[name] = package
         spec.loader.exec_module(package)
-    return [importlib.import_module(f"{name}.{m}") for m in ("_yaml", "context", "guests", "tiers", "home")]
+    return [importlib.import_module(f"{name}.{m}") for m in ("_yaml", "context", "guests", "tiers", "home", "classify")]
 
 
-yaml, context, guests, tiers, home = _load_package()
+yaml, context, guests, tiers, home, classify = _load_package()
 NAME, data_dir = home.NAME, home.data_dir
 
 
@@ -57,16 +56,15 @@ def _homes() -> tuple[Path, Path, list[Path], str]:
 
 
 def _projection(public: Path) -> dict:
-    try:
-        return json.loads((data_dir(public) / context.PROJECTION_FILE).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"facts": [], "documents": []}
+    return context.read_projection(public)
 
 
 @router.get("/items")
 def items():
     owner, _, workspaces, owner_name = _homes()
     allowlist = context.load_allowlist(owner)
+    scanned = context.scan(owner, workspaces)
+    tiers_by_id = classify.cached(owner, scanned)
     return {
         "owner_name": owner_name,
         "items": [
@@ -74,8 +72,10 @@ def items():
                 item.to_dict(with_text=False),
                 status=context.status(item, allowlist),
                 public_text=allowlist.get(item.id, {}).get("public_text", ""),
+                decided_via=allowlist.get(item.id, {}).get("decided_via", ""),
+                classification=tiers_by_id.get(item.id),
             )
-            for item in context.scan(owner, workspaces)
+            for item in scanned
         ],
     }
 
@@ -92,17 +92,56 @@ def item_text(item_id: str):
 class Publish(BaseModel):
     public_ids: list[str] = []
     public_texts: dict[str, str] = {}
+    decisions: dict[str, dict] = {}
+
+
+class Classify(BaseModel):
+    force: bool = False
+
+
+@router.post("/classify")
+def run_classify(body: Classify):
+    """Rules + the owner's model sort every publishable item into A/B/C. Nothing is published here."""
+    owner, _, workspaces, _ = _homes()
+    ask = classify.openai_asker(classify.model_settings(owner))
+    return classify.run(owner, context.scan(owner, workspaces), ask, body.force)
+
+
+class Draft(BaseModel):
+    id: str
+
+
+@router.post("/draft")
+def draft(body: Draft):
+    """Guest version of one item from the owner's model (used by "B: draft all"). Nothing is saved."""
+    import asyncio
+
+    owner, _, workspaces, _ = _homes()
+    ask = classify.openai_asker(classify.model_settings(owner))
+    if ask is None:
+        raise HTTPException(503, "no model configured in the owner profile")
+    item = next((i for i in context.scan(owner, workspaces) if i.id == body.id), None)
+    if item is None:
+        raise HTTPException(404, "item changed or was removed; reload")
+    return {"draft": asyncio.run(classify.draft(item, ask))}
 
 
 @router.post("/publish")
 def publish(body: Publish):
     """Save the allowlist, rewrite the public projection, and purge guest sessions that saw revoked items."""
     owner, public, workspaces, owner_name = _homes()
-    context.save_allowlist(owner, context.scan(owner, workspaces), body.public_ids, body.public_texts)
-    before = _projection(public)
-    after = context.sync_public(owner, public, workspaces, owner_name)
-    purge = guests.revoke_and_purge(owner, public, before, after)
-    return {"facts": len(after["facts"]), "documents": len(after["documents"]), **purge}
+    approved = context.approve(
+        owner, context.scan(owner, workspaces), body.public_ids, body.public_texts, body.decisions
+    )
+    result = context.publish(owner, public, workspaces, owner_name)
+    after = result.pop("projection")
+    return {
+        "facts": len(after["facts"]),
+        "documents": len(after["documents"]),
+        "rejected": approved["rejected"],
+        "combination": approved["combination"],
+        **result,
+    }
 
 
 @router.get("/preview")

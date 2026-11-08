@@ -2,6 +2,8 @@
 
 ### Identity-based context isolation for Hermes Agent. One Hermes, two minds.
 
+[![tests](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml/badge.svg?branch=dotv)](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml)
+
 Your Hermes knows your passwords, your cat's name, your father's anniversary and the deploy key of
 your server, because you told it. The moment you hand that same Hermes to other people, through a
 Telegram bot, a Discord server or a web chat, every one of those facts is one question away.
@@ -47,12 +49,19 @@ Requires Hermes Agent **>= 0.23.0** with the API server enabled, and in-process 
 
 ```bash
 hermes plugins install salts-secrets          # into your own (owner) profile
-hermes salts-secrets setup --owner-name "your handle"
+hermes salts-secrets setup --owner telegram:123456 --owner-name "your handle"
 hermes gateway restart
-hermes salts-secrets check                    # ISOLATION OK · 8 checks
+hermes salts-secrets check                    # ISOLATION OK · 13 checks
 ```
 
 From a checkout instead of the catalog: `hermes plugins install dotv-7/salts-secrets/salts_secrets`.
+
+`--owner` is required: the plugin never guesses who you are (an empty list means even your own DM gets
+the public profile). `setup` first checks three gateway settings and stops, changing nothing, with the
+command to fix whichever is wrong: `plugins.isolation: in_process`, the API server not switched off, and
+`gateway.multiplex_profiles` not switched off. If `profiles/public` already exists and was not created by
+`setup`, it lists any SOUL.md, memories, skills or context files in it and stops; `--reset-public` moves
+them to `plugin-data/salts-secrets/reset-<time>/` and continues.
 
 `setup` is idempotent. It:
 
@@ -64,6 +73,10 @@ From a checkout instead of the catalog: `hermes plugins install dotv-7/salts-sec
 5. narrows the public toolsets, writes the public projection (empty until you publish) and runs the check.
 
 Then open the **Salt's Secrets** tab in the Hermes dashboard and tick what strangers may know.
+
+`check` also proves the plugin is live, not just configured: the routing hook writes a heartbeat (pid and
+process start time) when the gateway registers it, and `check` is BROKEN unless that heartbeat belongs to
+the gateway named in `gateway_state.json`. Every failing line prints the command that fixes it.
 
 ## How it works
 
@@ -77,7 +90,9 @@ Bots are ignored and each guest gets 20 messages an hour (`guest_rate_per_hour`)
 
 **Public profile** (`pre_tool_call`, a system prompt section, one tool). A default-deny tool gate with a
 hard ceiling: no terminal, files, code, memory, sessions, skills, browser, cron, delegation or messaging,
-whatever the config says. `vision_analyze` only takes http(s) URLs. The prompt gets "Notes about
+whatever the config says. No allowed tool takes a local path: any argument that starts with `/`, `~`,
+`./`, `file:`, `\\` or a drive letter is refused, and location arguments (`image_url(s)`, `url(s)`,
+`source`, `path`, `file`...) only take http(s), so `image_generate` cannot be pointed at a local photo. The prompt gets "Notes about
 <owner_name>": the facts you approved and the titles of approved documents, whose bodies come from
 `public_notes_lookup`. Both read one file, the projection in the public profile's plugin data, and never
 open anything in your profile.
@@ -88,7 +103,20 @@ open anything in your profile.
   skills, sessions, cron, providers), private by default. Tick an item to publish it, optionally with
   a rewritten guest version. An approved item that you later edit drops out of the projection until you
   approve it again. Unticking revokes: guest sessions that may have seen the item are archived for you
-  and deleted from the public store.
+  and deleted from the public store, whether you publish from the dashboard or with
+  `hermes salts-secrets sync` (both go through `context.publish`).
+- *Triage* (on the Context tab): rules first, then your model, sort every publishable item into
+  **A** publish as-is, **B** needs a guest rewrite, **C** never public. The rules
+  ([`privacy_rules.yaml`](salts_secrets/privacy_rules.yaml): credentials, identity and contact, assets,
+  health and family, file origin, dates, plus a cross-item combination rule) set a floor the model can
+  only raise; an item is A only if no rule hits and the model says A. One button per tier (adopt all A
+  as-is, draft guest versions for all B, keep all C private); a bulk click only takes items of its own
+  tier and C never crosses in bulk. Nothing crosses without an owner click, and every click is appended
+  to `plugin-data/salts-secrets/approvals.jsonl` with `decided_by`, `decided_via`
+  (single / bulk-A / bulk-B / bulk-C), `classifier_tier`, `rules_hit` and whether it overrode the
+  classifier. Projected facts and documents carry their tier and whether they are as-is or rewritten.
+  Add your own words (real name, family, places) in `<HERMES_HOME>/plugin-data/salts-secrets/privacy_rules.yaml`
+  under the same `dictionary:` keys.
 - *Permissions*: the toolsets guests may use, inside the ceiling.
 - *Guests*: every guest conversation, live and archived, with probes (passwords, PINs, real names,
   addresses) flagged. Never injected into any prompt.
@@ -102,7 +130,7 @@ Under `plugins.entries.salts-secrets.settings` in your profile's config.yaml:
 
 | Key | Default | |
 |---|---|---|
-| `owners` | first entry of each `<PLATFORM>_ALLOWED_USERS` | your identities, `platform:user_id` |
+| `owners` | none (set by `setup --owner`) | your identities, `platform:user_id`; never guessed from `<PLATFORM>_ALLOWED_USERS` |
 | `public_profile` | `public` | the profile that answers everyone else |
 | `owner_name` | `the owner` | how the public profile refers to you; use a handle, not your real name |
 | `guest_rate_per_hour` | `20` | messages per guest per hour |
@@ -135,6 +163,27 @@ Under `plugins.entries.salts-secrets.settings` in your profile's config.yaml:
 - Isolation is enforced by profiles, configuration and plugins inside one process, not by a kernel
   boundary. Configuration can drift; that is what `check` is for.
 
+## What it does not do
+
+- **Groups share one guest session**, and the owner counts as a guest there: only your own DM reaches
+  your profile.
+- **Telegram and Discord guests keep their history** per chat (Hermes keys platform sessions by chat).
+  The web chat forgets on every page load.
+- **Guest messages skip the normal reply pipeline**: the routing hook forwards text to the local API and
+  sends one reply, so guests get no streaming and no media (images, voice). Next step.
+- **Revocation is not atomic for a request already running**: a reply being generated while you untick
+  an item can still use it; the session is purged right after.
+- **External memory provider contents are not listed** on the Context tab. The tab shows whether your
+  profile uses one; the public side configures none (a `check` condition), so nothing from it reaches guests.
+- **Inference across facts** is only partly covered: the combination rule flags a batch that publishes two
+  or more of city, profession and age/birthday, but harmless facts can still add up in ways no rule sees.
+
+## Future work
+
+Admin and User tiers (invited people with their own profile, memory and sessions) are designed but not
+implemented: this release has two rooms, Owner and Guest. `/perm` in the demo shows them greyed out as
+planned. Also next: streaming and media for platform guests.
+
 ## Layout
 
 ```
@@ -142,13 +191,15 @@ salts_secrets/            the plugin (catalog subdir)
   route.py                owner side: who reaches which profile
   gate.py                 public side: tool allowlist, fail-closed
   public_context.py       public side: prompt section and public_notes_lookup
-  context.py              scan context sources, allowlist, projection
+  context.py              scan context sources, approvals, projection, publish (revocation)
+  privacy.py              privacy screening rules engine; rules in privacy_rules.yaml
+  classify.py             A/B/C triage: rules, then the owner's model (cached per fingerprint)
   guests.py               guest archive, digest, revocation
   tiers.py                toolset tiers, profile config, isolation check
   cli.py                  hermes salts-secrets setup | check | sync | guests
   dashboard/              the dashboard tab and its API
   profile/                SOUL.md and config.yaml templates for the public profile
-  tests/                  pytest salts_secrets/tests
+  tests/                  pytest salts_secrets/tests demo (CI: Python 3.11 to 3.14)
 demo/                     the Salt demo behind https://salt.dotv.io/ (not part of the plugin)
 ```
 

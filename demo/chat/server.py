@@ -27,6 +27,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import _yaml as yaml
+from salts_secrets import classify
 from salts_secrets import context as ctx
 from salts_secrets import guests
 from salts_secrets import tiers as perm
@@ -281,6 +282,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             st[sid_key] = f"salt-{tier[0]}-" + secrets.token_hex(16)
         key = s.tier_keys.get(tier, "")
         if not key:
+            if tier in ("admin", "user"):
+                raise HTTPException(503, f"the {tier} tier is planned, not implemented yet")
             raise HTTPException(503, f"Hermes key for tier '{tier}' is not configured")
         url = f"{s.hermes_url}/v1/chat/completions" if tier == "owner" else \
             f"{s.hermes_url}/p/{s.tier_profiles[tier]}/v1/chat/completions"
@@ -340,9 +343,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         require_owner(request)
         items = board_scan()
         allow = ctx.load_allowlist(s.owner_home)
+        tiers = classify.cached(s.owner_home, items)
         return json_gz(request, {
             "items": [dict(it.to_dict(with_text=False), status=ctx.status(it, allow),
-                           public_text=allow.get(it.id, {}).get("public_text", "")) for it in items],
+                           public_text=allow.get(it.id, {}).get("public_text", ""),
+                           decided_via=allow.get(it.id, {}).get("decided_via", ""),
+                           classification=tiers.get(it.id)) for it in items],
             "owner_home": str(s.owner_home.resolve()), "public_home": str(s.public_home.resolve()),
             "workspace_roots": [str(Path(r).resolve()) for r in s.workspace_roots]})
 
@@ -368,25 +374,30 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         body = await request.json()
         ids = body.get("public_ids") or []
         texts = body.get("public_texts") or {}
-        if not isinstance(texts, dict):
-            raise HTTPException(400, "public_texts must be an object")
+        decisions = body.get("decisions") or {}
+        if not isinstance(texts, dict) or not isinstance(decisions, dict):
+            raise HTTPException(400, "public_texts and decisions must be objects")
         items = board_scan()
-        ctx.save_allowlist(s.owner_home, items, [str(i) for i in ids],
-                           {str(k): str(v) for k, v in texts.items()})
-        before = _projection_on_disk(s.public_home)
-        projection = {"facts": [], "documents": []}
+        approved = ctx.approve(s.owner_home, items, [str(i) for i in ids],
+                               {str(k): str(v) for k, v in texts.items()},
+                               {str(k): v for k, v in decisions.items() if isinstance(v, dict)})
         for home in s.tier_homes().values():
-            if home.is_dir() or home == s.public_home:
-                projection = ctx.sync_public(s.owner_home, home, s.workspace_roots)
-        # Revoking only counts if guest sessions forget too: archive them for the owner, then purge.
-        purge = guests.revoke_and_purge(s.owner_home, s.public_home, before, projection)
+            if home.is_dir() and home != s.public_home:
+                ctx.publish(s.owner_home, home, s.workspace_roots)
+        # Revoking only counts if guest sessions forget too: publish archives them for the owner, then purges.
+        purge = ctx.publish(s.owner_home, s.public_home, s.workspace_roots)
+        projection = purge.pop("projection")
+        purge.update(rejected=approved["rejected"], combination=approved["combination"])
         return {"facts": len(projection["facts"]), "documents": len(projection["documents"]), **purge}
 
-    def _projection_on_disk(home: Path) -> dict:
-        try:
-            return json.loads((data_dir(home) / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {"facts": [], "documents": []}
+    @app.post("/api/board/classify")
+    async def board_classify(request: Request):
+        """Rules + the owner's model sort every publishable item into A/B/C. Nothing is published here."""
+        require_json(request)
+        require_owner(request)
+        force = bool((await request.json()).get("force"))
+        ask = classify.openai_asker(classify.model_settings(s.owner_home))
+        return await classify.classify(s.owner_home, board_scan(), ask, force)
 
     @app.get("/api/board/guests")
     def board_guests(request: Request):
@@ -546,7 +557,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "profiles": {t: {"name": s.tier_profiles[t], "home": str(homes[t].resolve()), "deployed":
                              homes[t].is_dir() and bool(s.tier_keys.get(t))} for t in perm.CONFIGURABLE},
             "policy_file": str((s.owner_home / perm.POLICY_FILE).resolve()),
+            "planned": planned_tiers(),
         }
+
+    def planned_tiers() -> list[str]:
+        """Admin and User are designed but not shipped: no profile or key, so they stay greyed out."""
+        homes = s.tier_homes()
+        return [t for t in ("admin", "user") if not (homes[t].is_dir() and s.tier_keys.get(t))]
 
     @app.get("/api/perm")
     def perm_get(request: Request):
@@ -570,11 +587,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         body = await request.json()
         action = body.get("action")
         if action == "add":
+            if str(body.get("tier", "")) in planned_tiers():
+                raise HTTPException(400, "Admin and User tiers are planned, not implemented yet")
             try:
                 member, code = perm.add_member(s.owner_home, str(body.get("name", "")), str(body.get("tier", "")))
             except ValueError:
                 raise HTTPException(400, "bad tier")
             return dict(perm_state(), code=code, added=perm.public_member(member))
+        if action == "update" and body.get("tier") in planned_tiers():
+            raise HTTPException(400, "Admin and User tiers are planned, not implemented yet")
         if action in ("update", "delete") and perm.update_member(
                 s.owner_home, str(body.get("id", "")), body.get("tier"), delete=action == "delete"):
             return perm_state()

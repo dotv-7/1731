@@ -144,3 +144,47 @@ def test_role_follows_settings_then_profile_name(monkeypatch, tmp_path, home_rel
     calls = _registrations(monkeypatch, tmp_path / home_rel, settings)
     assert ("register_hook" in calls and "register_tool" in calls) is public
     assert ("register_cli_command" in calls) is not public
+
+
+LOCAL = ["/home/lena/private/photo.png", "~/Pictures/me.jpg", "file:///etc/passwd", "./secret.png",
+         "../up.png", "\\\\nas\\share\\a.png", "C:\\Users\\lena\\a.png", "c:/x.png"]
+
+
+@pytest.mark.parametrize("value", LOCAL)
+@pytest.mark.parametrize(
+    "tool,key",
+    [
+        ("image_generate", "image_url"),
+        ("image_generate", "source"),
+        ("vision_analyze", "image_url"),
+        ("text_to_speech", "output_path"),
+        ("web_extract", "url"),
+        ("web_search", "query"),
+    ],
+)
+def test_local_paths_refused_in_every_allowed_tool(tool, key, value):
+    result = gate.on_pre_tool_call(tool_name=tool, args={"prompt": "x", key: value})
+    assert result and result["action"] == "block"
+
+
+@pytest.mark.parametrize("value", LOCAL)
+def test_local_paths_refused_inside_lists_and_nested_args(value):
+    for args in ({"prompt": "edit", "image_urls": ["https://ok.example/a.png", value]},
+                 {"urls": [value]}, {"options": {"reference": {"file": value}}}):
+        tool = "web_extract" if "urls" in args else "image_generate"
+        assert gate.on_pre_tool_call(tool_name=tool, args=args)["action"] == "block"
+
+
+@pytest.mark.parametrize("key", ["image_url", "image_urls", "source", "path", "file", "url", "urls"])
+def test_location_keys_only_take_http(key):
+    assert gate.on_pre_tool_call(tool_name="image_generate", args={key: "data:image/png;base64,AAA"})["action"] == "block"
+    assert gate.on_pre_tool_call(tool_name="image_generate", args={key: "photo.png"})["action"] == "block"
+    assert gate.on_pre_tool_call(tool_name="image_generate", args={key: "https://cdn.example/a.png"}) is None
+    assert gate.on_pre_tool_call(tool_name="image_generate", args={key: ["https://cdn.example/a.png"]}) is None
+
+
+def test_ordinary_text_with_slashes_passes():
+    assert gate.on_pre_tool_call(tool_name="image_generate",
+                                 args={"prompt": "a cat at 3/4 view, w/ hat", "aspect_ratio": "16:9"}) is None
+    assert gate.on_pre_tool_call(tool_name="web_extract", args={"urls": ["https://a.example/x"]}) is None
+    assert gate.on_pre_tool_call(tool_name="text_to_speech", args={"text": "Read /this aloud"}) is None
