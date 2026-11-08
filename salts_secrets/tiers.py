@@ -589,7 +589,7 @@ def audit(home: Path, allowed: frozenset = SAFE_TOOLSETS) -> list[str]:
     unset = [key for key in platform_keys() if not isinstance(pinned.get(key), list)]
     if unset:
         problems.append("platform_toolsets not pinned (full default toolset): " + ", ".join(unset))
-    toolsets = {t for key in platform_keys() for t in (pinned.get(key) if isinstance(pinned.get(key), list) else [])}
+    toolsets = {t for key in platform_keys() if isinstance(pinned.get(key), list) for t in pinned[key]}
     bad = sorted(str(t) for t in toolsets if t not in allowed)
     if bad:
         problems.append("toolsets that are owner-only are enabled: " + ", ".join(map(str, bad)))

@@ -80,7 +80,7 @@ def test_setup_writes_routes_and_opens_the_routed_platforms(tmp_path, monkeypatc
     cli.cmd_setup(argparse.Namespace(public=None, owner=OWNERS + ["slack:U1"], owner_name="salt", reset_public=False))
     cfg = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8"))
     assert cfg["gateway"]["profile_routes"] == routes.guest_routes(OWNERS, "default", "public")
-    opened = {args[2] for profile, args in calls if args[:2] == ("config", "set") and args[2].endswith("_ALLOW_ALL_USERS")}
+    opened = {args[2] for _, args in calls if args[:2] == ("config", "set") and args[2].endswith("_ALLOW_ALL_USERS")}
     assert opened == {"TELEGRAM_ALLOW_ALL_USERS", "DISCORD_ALLOW_ALL_USERS"}
 
 
@@ -146,7 +146,8 @@ def gateway(tmp_path, monkeypatch):
     (home / ".env").write_text("TELEGRAM_ALLOWED_USERS=42\nTELEGRAM_ALLOW_ALL_USERS=true\n")
     (home / "profiles" / "public" / ".env").write_text("")
     monkeypatch.setenv("HERMES_HOME", str(home))
-    for key in ("TELEGRAM_ALLOWED_USERS", "TELEGRAM_ALLOW_ALL_USERS", "GATEWAY_ALLOW_ALL_USERS", "GATEWAY_ALLOWED_USERS"):
+    for key in ("TELEGRAM_ALLOWED_USERS", "TELEGRAM_ALLOW_ALL_USERS",
+                "GATEWAY_ALLOW_ALL_USERS", "GATEWAY_ALLOWED_USERS"):
         monkeypatch.delenv(key, raising=False)
     prev = secret_scope.is_multiplex_active()
     secret_scope.set_multiplex_active(True)
