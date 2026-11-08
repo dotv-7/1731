@@ -11,7 +11,6 @@ import base64
 import contextlib
 import json
 import logging
-import os
 import re
 import time
 import uuid
@@ -586,18 +585,7 @@ def build_gemini_request(
                      "tool_choice forces function calling (mode ANY)" if forced_call else "pre-Gemini-3 model with tools")
         json_output = {}
     request["generationConfig"] = {**{k: v for k, v in generation if v is not None}, **json_output}
-    _apply_dotv_google_search(request)
     return request
-
-
-def _apply_dotv_google_search(request: dict[str, Any]) -> None:
-    """dotv fork patch: opt-in Google Search grounding next to function calling (see DOTV_MASTER.md)."""
-    if os.environ.get("HERMES_GEMINI_GOOGLE_SEARCH", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        return
-    has_functions = any("functionDeclarations" in t for t in request.get("tools", []))
-    request["tools"] = [*request.get("tools", []), {"googleSearch": {}}]
-    if has_functions:
-        request.setdefault("toolConfig", {})["includeServerSideToolInvocations"] = True
 
 
 # ── Gemini → OpenAI response translation ─────────────────────────────────────
