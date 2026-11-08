@@ -112,6 +112,11 @@ def main() -> None:
         exp = export_session(cfg["db"], cfg["sid"])
         bundle["sides"][side] = {"label": cfg["label"], "session_id": cfg["sid"], "home": cfg["home"], "endpoint": cfg["url"],
                                  "db": str(cfg["db"]), "tools": cfg["tools"], **exp}
+        if side != "owner":
+            try:
+                bundle["projection"] = json.loads((Path(cfg["home"]) / "plugin-data/salts-secrets/public_context.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(bundle, ensure_ascii=False, indent=1), encoding="utf-8")
