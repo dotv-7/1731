@@ -281,7 +281,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def new_session(request: Request):
         require_json(request)
         st = state(request)
-        st[identity(request, st)[0] + "_sid"] = ""
+        st["viewer_sid" if is_viewer(st) else identity(request, st)[0] + "_sid"] = ""
         return respond(request, st, {"ok": True})
 
     viewer_turns: dict[str, int] = {}
