@@ -230,6 +230,11 @@ def digest(owner_home: Path, public_home: Path, write: bool = True) -> dict:
         merged[s["id"]] = {**s, "live": True, "archived_at": merged.get(s["id"], {}).get("archived_at")}
     sessions = sorted(merged.values(), key=lambda s: s.get("started_at") or 0, reverse=True)
     sessions = [s for s in sessions if s.get("turns")]
+    from .receipts import by_session
+
+    used = by_session(public_home)
+    for s in sessions:
+        s["receipt"] = used.get(s["id"], {"tools": {}, "looked_up": [], "projection": 0})
     n_q = sum(len(s["questions"]) for s in sessions)
     n_probe = sum(len(s["probes"]) for s in sessions)
     out = {

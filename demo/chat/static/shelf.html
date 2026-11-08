@@ -78,6 +78,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .gs .gm{font:400 11px/1 var(--mono);color:var(--muted);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase}
 .gs .gq{font:400 14px/1.5 var(--serif);margin:2px 0}
 .gs .gq.probe::before{content:"PROBE";font:400 10px/1 var(--mono);color:#fff;background:var(--blue);padding:2px 4px;margin-right:8px;letter-spacing:.08em}
+.gs .gr{font:400 11px/1.5 var(--mono);color:var(--blue);letter-spacing:.04em;margin-top:4px}
 .gs .ga{color:var(--muted);font-size:13px;margin:0 0 6px 16px;white-space:pre-wrap}
 .guests .empty{font:400 13px/1.5 var(--serif);color:var(--muted)}
 /* tally */
@@ -466,7 +467,9 @@ async function loadGuests(){const box=$('#g-rows');if(!box)return;try{const r=aw
   $('#g-count').textContent=`${c.sessions||0} SESSIONS · ${c.questions||0} QUESTIONS · ${c.probes||0} PROBES`;
   if(!(j.sessions||[]).length){box.innerHTML='<div class="empty">No guest has talked to Salt\'s assistant yet.</div>';return;}
   box.innerHTML=j.sessions.slice(0,40).map(s=>{const when=s.started_at?new Date(s.started_at*1000).toLocaleString():'';const turns=(s.turns||[]).map(t=>t.role==='user'?`<div class="gq ${(s.probes||[]).includes(t.text)?'probe':''}">${esc(t.text)}</div>`:`<div class="ga">${esc(String(t.text).slice(0,400))}</div>`).join('');
-    return `<div class="gs"><div class="gm">${esc(when)} · ${esc(s.source||'api')} · ${esc(s.id)}${s.live?'':' · archived'}</div>${turns}</div>`;}).join('');
+    const rc=s.receipt||{},tl=Object.entries(rc.tools||{}).map(([k,v])=>`${k}${v>1?' ×'+v:''}`).join(', ');
+    const used=`<div class="gr">USED · ${tl?'tools: '+esc(tl):'no tool calls, answered from the prompt (approved facts + method list)'}${(rc.looked_up||[]).length?' · looked up: '+esc(rc.looked_up.slice(0,6).join(' | ')):''}${rc.projection?' · projection of '+esc(new Date(rc.projection*1000).toLocaleString()):''}</div>`;
+    return `<div class="gs"><div class="gm">${esc(when)} · ${esc(s.source||'api')} · ${esc(s.id)}${s.live?'':' · archived'}</div>${turns}${used}</div>`;}).join('');
   }catch{box.innerHTML='<div class="empty">Guest conversations are visible after unlocking as Lena.</div>';}}
 async function loadHealth(){try{const r=await fetch('/api/health');if(!r.ok)return;const j=await r.json();const iso=j.isolation;if(!iso)return;const m=$('#m-guest');m.textContent=(m.textContent||'')+' · '+iso.line;m.title=iso.checks.map(c=>(c.ok?'ok   ':'FAIL ')+c.text).join('\n');}catch{}}
 loadGuests();loadHealth();

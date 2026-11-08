@@ -4,7 +4,8 @@
 
 [![tests](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml/badge.svg?branch=dotv)](https://github.com/dotv-7/salts-secrets/actions/workflows/salts-secrets-tests.yml)
 
-Your Hermes knows your passwords, your cat's name, your father's anniversary and the deploy key of
+Your Hermes got good: it knows your methods, your published work and how you think, so people want to
+talk to it. It also knows your passwords, your cat's name, your father's anniversary and the deploy key of
 your server, because you told it. The moment you hand that same Hermes to other people, through a
 Telegram bot, a Discord server or a web chat, every one of those facts is one question away.
 

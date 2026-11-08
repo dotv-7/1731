@@ -219,3 +219,18 @@ def test_failed_delete_moves_the_guest_and_a_retry_clears_it(tmp_path):
     assert guests.live_session_id(pub, "s1") != "s1" and guests.stale_ids(pub) == {"s1"}
     assert guests.purge(pub, hermes_bin=str(fixed), only_ids={"s1"}) == {"deleted": 1, "failed": 0}
     assert guests.stale_ids(pub) == set() and guests.live_session_id(pub, "s1") == "s1"
+
+
+def test_receipts_record_what_an_answer_drew_on(tmp_path, monkeypatch):
+    from salts_secrets import receipts
+    owner, pub = tmp_path / "owner", tmp_path / "public"
+    owner.mkdir()
+    _public_store(pub, [("s1", [("user", "bridge checks?"), ("assistant", "four rows")])])
+    monkeypatch.setattr("salts_secrets.home.current", lambda: pub)
+    found = json.dumps({"result": "### bridge-four-checks\nCount the signers.\n\n### Issue 3\nBasalt"})
+    receipts.on_post_tool_call(tool_name="public_notes_lookup", args={"query": "bridge"}, result=found, session_id="s1")
+    receipts.on_post_tool_call(tool_name="web_search", args={"query": "wormhole guardians"}, result="{}", session_id="s1")
+    receipts.on_post_tool_call(tool_name="web_search", args=None, result=None, session_id="s1")
+    s = guests.digest(owner, pub, write=False)["sessions"][0]
+    assert s["receipt"]["tools"] == {"public_notes_lookup": 1, "web_search": 2}
+    assert s["receipt"]["looked_up"] == ["bridge-four-checks", "Issue 3"]
