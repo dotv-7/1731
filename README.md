@@ -24,6 +24,8 @@ one gateway, one API key. Only the context is split, and it is split by **who is
 
 It is one Hermes plugin, `salts-secrets`, on top of an unmodified Hermes v0.23.0. No core file is patched.
 
+![Two profiles in one Hermes: the route hook sends your DM to your agent and everyone else to the guest agent, which only reads what you approved](docs/diagrams/overview.svg)
+
 ## 30-second tour
 
 A 90-second demo video (the eight questions below, both sessions side by side) will be published here soon.
@@ -82,8 +84,6 @@ the gateway named in `gateway_state.json`. Every failing line prints the command
 
 ## How it works
 
-![Two profiles in one Hermes: the route hook sends your DM to your agent and everyone else to the guest agent, which only reads what you approved](docs/diagrams/overview.svg)
-
 The plugin looks at the profile it is loaded in and plays one of two parts.
 
 **Owner profile** (`pre_gateway_dispatch`). Only your own DM reaches your agent. Every other inbound
@@ -121,6 +121,12 @@ open anything in your profile.
   classifier. Projected facts and documents carry their tier and whether they are as-is or rewritten.
   Add your own words (real name, family, places) in `<HERMES_HOME>/plugin-data/salts-secrets/privacy_rules.yaml`
   under the same `dictionary:` keys.
+- *Notes from chat*: tell your own agent "let guests know I'm on holiday in May", typed or as a voice
+  message (Hermes transcribes voice notes when `stt` is set up). It writes a guest-safe note and queues it
+  with `salt_propose_public`; it cannot publish. Send `/salt approve <id>` from your own DM to publish it
+  (`/salt` lists the queue, `/salt drop <id>` discards). A note the privacy rules put in C is refused
+  before it queues. Approved notes show up on the Context tab under "Notes for guests", logged with
+  `decided_via: chat`, and can be revoked like anything else.
 - *Permissions*: the toolsets guests may use, inside the ceiling.
 - *Guests*: every guest conversation, live and archived, with probes (passwords, PINs, real names,
   addresses) flagged. Never injected into any prompt.

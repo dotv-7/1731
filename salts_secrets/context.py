@@ -136,6 +136,21 @@ def _memory_items(home: Path) -> list[Item]:
     return items
 
 
+NOTES_FILE = "notes.json"
+
+
+def _note_items(home: Path) -> list[Item]:
+    """Notes the owner wrote for guests from chat (``/salt``); private until approved like anything else."""
+    path = data_dir(home) / NOTES_FILE
+    try:
+        notes = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [_item("note", "Notes for guests", f"plugin-data/salts-secrets/{NOTES_FILE}", n["id"],
+                  f"Note {n['id']}: {n['text'].splitlines()[0][:60]}", n["text"], path=str(path.resolve()))
+            for n in notes if isinstance(n, dict) and n.get("id") and str(n.get("text", "")).strip()]
+
+
 def split_markdown(text: str) -> list[tuple[str, str]]:
     """``[(heading, body)]`` split at #/##/### headings; text before the first heading is "(preamble)"."""
     sections: list[tuple[str, list[str]]] = [("(preamble)", [])]
@@ -566,7 +581,7 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
     roots = [Path(r).resolve() for r in workspace_roots if Path(r).is_dir()]
     seen: set[Path] = set()
     fresh: dict[tuple, tuple[tuple, list]] = {}
-    items = _memory_items(owner_home)
+    items = _memory_items(owner_home) + _note_items(owner_home)
     bundled = _bundled_skill_dirs(owner_home)
     if bundled:
         items.append(
@@ -634,7 +649,7 @@ def load_allowlist(owner_home: Path) -> dict[str, dict]:
 
 
 APPROVAL_LOG = "approvals.jsonl"
-VIAS = ("single", "bulk-A", "bulk-B", "bulk-C")
+VIAS = ("single", "bulk-A", "bulk-B", "bulk-C", "chat")
 
 
 def approve(
@@ -759,7 +774,7 @@ def build_projection(items: list[Item], allowlist: dict[str, dict], owner_name: 
                 "mode": "rewrite" if entry.get("public_text") else "as-is",
                 "decided_via": entry.get("decided_via", "single")}
 
-    facts = [it for it in public if it.kind in ("memory", "user")]
+    facts = [it for it in public if it.kind in ("memory", "user", "note")]
     return {
         "version": 2,
         "generated_at": int(time.time()),

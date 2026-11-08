@@ -12,6 +12,7 @@ provides_hooks:
   - pre_tool_call
 provides_tools:
   - public_notes_lookup
+  - salt_propose_public
 config_schema:
   role:
     type: str
