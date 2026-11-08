@@ -222,13 +222,13 @@ const SOURCES=[
   owner:'its picture of her · capped at 1,375 chars',guest:{state:'none',why:'user profile is switched off in the public profile; a ticked line would arrive as a fact'},
   desc:'Hermes\'s picture of its owner: who she is, how to address her, her rhythm, her preferences. Capped at 1,375 characters, injected every turn.'},
  {id:'public',name:'Published',step:'04',mode:'demand',modeText:'TITLES EVERY TURN',match:g=>g.endsWith('· public'),asis:true,
-  owner:'workspace/public · readable with read_file',guest:{state:'cross',how:'"Notes about Salt" lists every title each turn · bodies via dotv_public_lookup'},
-  desc:'Salt\'s Low Tide archive and posts, split by paragraph. This whole source is flipped to guests, who query it through dotv_public_lookup.'},
+  owner:'workspace/public · readable with read_file',guest:{state:'cross',how:'"Notes about Salt" lists every title each turn · bodies via public_notes_lookup'},
+  desc:'Salt\'s Low Tide archive and posts, split by paragraph. This whole source is flipped to guests, who query it through public_notes_lookup.'},
  {id:'tools',name:'Tools',step:'05',mode:'every',modeText:'SCHEMAS EVERY TURN',tools:true,
-  owner:'every toolset · terminal, files, browser, sessions',guest:{state:'tools',how:'six toolsets, none of them can reach her machine'},
+  owner:'every toolset · terminal, files, browser, sessions',guest:{state:'tools',how:'only the guest tier\'s toolsets, none of which can reach her machine'},
   desc:'What each session is allowed to call. The guest list is the permission board\'s guest tier; everything that can read a file, run a command or see her sessions is missing from it.'},
  {id:'skills',name:'Skills',step:'06',mode:'use',modeText:'ON USE',match:g=>g==='Skills',
-  owner:'her methods as skills · loaded when invoked',guest:{state:'cross',how:'public versions of her methods · the guest fetches them with dotv_public_lookup',why:'none of her methods has a public version yet; tick one and Hermes drafts it, her private operating notes stripped'},
+  owner:'her methods as skills · loaded when invoked',guest:{state:'cross',how:'public versions of her methods · the guest fetches them with public_notes_lookup',why:'none of her methods has a public version yet; tick one and Hermes drafts it, her private operating notes stripped'},
   desc:'Each skill is a reusable method: what to check, in what order, with what thresholds. Hers live under skills/lowtide. The private version carries her accounts, paths and unpublished thresholds; the public version keeps the method and drops the rest.'},
  {id:'workspace',name:'Workspace',step:'07',mode:'demand',modeText:'ON DEMAND',match:g=>g.startsWith('Workspace ·')&&!g.endsWith('· public'),chapter:g=>g.split(' · ').pop(),
   owner:'journal, budget, letters · read_file whenever it needs them',guest:{state:'none',why:'no read_file tool, so no path leads here'},
@@ -241,13 +241,13 @@ const SOURCES=[
   desc:'Every chat transcript in state.db; this is what session_search searches. Nothing here can be published; the guest profile has its own copy without the owner\'s sessions.'},
  {id:'cron',name:'Cron',step:'10',mode:'never',modeText:'RUNS ON ITS OWN',match:g=>g.startsWith('Cron ·'),locked:true,
   owner:'reminders that run as her, in their own sessions',guest:{state:'none',why:'no cronjob tool; nothing is scheduled for guests'},
-  desc:'36 reminders. Hermes already renamed them to a neutral "Reminder date time", because the original names carried diagnoses and doctors\' names. Not publishable.'},
+  desc:'Scheduled jobs. Each runs as her, in its own session, with her full context. Not publishable.'},
  {id:'plugins',name:'Plugins',step:'11',mode:'every',modeText:'PROVIDER INJECTS',match:g=>g.startsWith('External memory'),locked:true,
-  owner:'external memory providers · allow-listed plugins only',guest:{state:'own',how:'one plugin: dotv-public-context, which injects the notes above'},
+  owner:'external memory providers · allow-listed plugins only',guest:{state:'own',how:'one plugin: salts-secrets, which injects the notes above'},
   desc:'What external memory providers and plugins can inject into context. Only allow-listed plugins are installed; not publishable.'},
  {id:'runtime',name:'Runtime',step:'12',mode:'never',modeText:'NEVER IN CONTEXT',match:g=>g.startsWith('Data dir ·')&&g!=='Data dir · private',locked:true,
-  owner:'config, cache, backups · never enters the prompt',guest:{state:'none',why:'never enters any session'},
-  desc:'Config, cache, backups, tool directories: runtime files. They never enter context and are not publishable.'},
+  owner:'config, cache, logs, backups · not injected; logs are readable with read_file',guest:{state:'none',why:'no tool reaches the data directory'},
+  desc:'Config, cache, logs, backups, tool directories. Hermes never injects them, but logs can hold chat excerpts and the owner\'s file tools can read them. Not publishable.'},
 ];
 const DEMO_ITEMS=[['Memory · MEMORY.md','Private records live in private/personal-records.md'],['Memory · MEMORY.md','@saltwater_sats is her anonymous account'],['Memory · USER.md','Lena, 31, product designer in Lisbon'],['Memory · USER.md','Call her Lena. No emojis.'],['Persona · SOUL.md','SOUL.md'],['Workspace · workspace · journal','2026-11-05.md'],['Workspace · workspace · family','letter-to-clara.md'],['Workspace · workspace · public','issue-06 › Harbor'],['Data dir · private','personal-records.md › Home network'],['Skills','weekly-review'],['Cron · cron','Reminder — 20 Dec 2026 09:00'],['Sessions · state.db','2026-11-07 · Token holdings lookup'],['External memory / plugins','Plugin: dotv-public-context']];
 const DEMO_PERM={catalog:[{id:'web',tools:['web_search','web_extract']},{id:'vision',tools:['vision_analyze']},{id:'tts',tools:['text_to_speech']},{id:'clarify',tools:['clarify']},{id:'dotv_public',tools:['dotv_public_lookup']},{id:'memory',tools:['memory']},{id:'session_search',tools:['session_search']},{id:'file',tools:['read_file','write_file','patch','search_files']},{id:'terminal',tools:['terminal','process_manage']},{id:'browser',tools:['browser_exec','browser_cdp','browser_dialog','browser_vault']},{id:'cronjob',tools:['cronjob_manage']}],policy:{guest:['web','vision','tts','clarify','dotv_public']}};
@@ -395,9 +395,9 @@ async function renderGuest(){const g=$('#gview');g.innerHTML='<p class="note">Lo
   const facts=(pj.facts||[]).filter(f=>typeof f==='string'),docs=(pj.documents||[]).filter(d=>d&&typeof d==='object');
   const lines=['## Notes about Salt (everything you know; say it freely)'];
   if(facts.length)lines.push(...facts.map(f=>'- '+f.trim()));else lines.push('- (no notes yet: you know what Salt publishes, nothing more)');
-  if(docs.length){lines.push('\nLonger notes you can look up with dotv_public_lookup:');lines.push(...docs.map(d=>'- '+(d.title||'')));}
+  if(docs.length){lines.push('\nLonger notes you can look up with public_notes_lookup:');lines.push(...docs.map(d=>'- '+(d.title||'')));}
   const mine=cb.match?docs.filter(d=>cb.items.some(i=>(drafts[i.id]||'').trim()===(d.text||'').trim()||short(i.title)===esc(String(d.title||'').replace(/^.*› /,'')))):[];
-  g.innerHTML=`<p class="note">This is the raw text dotv-public-context puts into the guest's system prompt every turn, rebuilt from the last synced projection (${facts.length} facts, ${docs.length} documents). Ticks you have not saved yet are not in it. Document bodies are not in the prompt; the guest fetches them with dotv_public_lookup, and their raw text is listed below.</p><pre>${esc(lines.join('\n'))}</pre>`+
+  g.innerHTML=`<p class="note">This is the raw text salts-secrets puts into the guest's system prompt every turn, rebuilt from the last synced projection (${facts.length} facts, ${docs.length} documents). Ticks you have not saved yet are not in it. Document bodies are not in the prompt; the guest fetches them with dotv_public_lookup, and their raw text is listed below.</p><pre>${esc(lines.join('\n'))}</pre>`+
     (docs.length?`<h4>DOCUMENT BODIES THE GUEST CAN FETCH · ${mine.length?`${mine.length} FROM ${esc(cb.name).toUpperCase()} SHOWN`:'FIRST 20 SHOWN'}</h4>`+(mine.length?mine:docs.slice(0,20)).map(d=>`<pre class="doc">### ${esc(d.title||'')}\n${esc(d.text||'')}</pre>`).join(''):'');}
 // disclosure policy: the owner's own words about what may cross; the server feeds it to every draft
 $('#pol-open').onclick=async()=>{try{const j=await (await fetch('/api/board/policy')).json();$('#pol-text').value=j.text;$('#pol-path').textContent=j.path;}catch{$('#pol-text').value='(demo: not available)';}$('#pol').classList.add('show');};

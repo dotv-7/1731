@@ -199,3 +199,20 @@ def test_guest_rewrite_replaces_original_in_projection(homes):
     mem = owner / "memories" / "MEMORY.md"
     mem.write_text(mem.read_text(encoding="utf-8").replace("dotv.io", "dotv.top"), encoding="utf-8")
     assert core.sync_public(owner, public, ws)["facts"] == []
+
+
+def test_workspace_inside_home_is_listed_as_workspace(tmp_path):
+    owner = tmp_path / "owner"
+    ws = owner / "workspace"
+    (ws / "public").mkdir(parents=True)
+    (owner / "logs").mkdir()
+    (ws / "public/post.md").write_text("A published post", encoding="utf-8")
+    (ws / "AGENTS.md").write_text("Who I am", encoding="utf-8")
+    (owner / "logs/agent.log").write_text("user said hi", encoding="utf-8")
+    (owner / "config.yaml").write_text(f"terminal:\n  cwd: {ws}\n", encoding="utf-8")
+    items = core.scan(owner, [ws])
+    post, agents, log = by_title(items, "post.md"), by_title(items, "AGENTS.md"), by_title(items, "agent.log")
+    assert post.group == "Workspace · workspace · public" and post.source == "workspace/public/post.md"
+    assert agents.group == "Workspace · workspace · root" and "system prompt" in agents.note
+    assert log.group == "Data dir · logs" and not log.publishable
+    assert not any(i.group == "Data dir · workspace" for i in items)

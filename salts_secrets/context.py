@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from .home import data_dir
+from .tiers import CONTEXT_FILE_NAMES
 
 ENTRY_DELIMITER = "\n§\n"  # tools/memory_tool_store.py
 TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".mdc"}
@@ -23,7 +24,6 @@ HOME_EXCLUDE = {
     ".env",
     "auth.json",
     "config.yaml",
-    "logs",
     "cache",
     "plugins",
     "plugin-data",
@@ -466,6 +466,12 @@ def _home_item(home: Path, path: Path, rel: str) -> list[Item]:
                 path=str(path.resolve()),
             )
         ]
+    if rel.startswith("logs/"):
+        items = _generic_items(path, rel, _group_for(rel))
+        for it in items:
+            it.publishable = False
+            it.note = "logs can hold chat excerpts; the owner's file tools can read them"
+        return items
     group = "Skills" if rel.startswith("skills/") else _group_for(rel)
     return _generic_items(path, rel, group)
 
@@ -477,6 +483,11 @@ def _config(home: Path) -> dict:
         return yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) or {}
     except Exception:
         return {}
+
+
+def _cwd(home: Path) -> Optional[Path]:
+    cwd = (_config(home).get("terminal") or {}).get("cwd")
+    return Path(cwd).expanduser().resolve() if isinstance(cwd, str) and cwd.strip() else None
 
 
 def _runtime_items(home: Path) -> list[Item]:
@@ -552,6 +563,7 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
     global _MEMO
     owner_home = Path(owner_home)
     home_abs = owner_home.resolve()
+    roots = [Path(r).resolve() for r in workspace_roots if Path(r).is_dir()]
     seen: set[Path] = set()
     fresh: dict[tuple, tuple[tuple, list]] = {}
     items = _memory_items(owner_home)
@@ -575,17 +587,26 @@ def scan(owner_home: Path, workspace_roots: list[Path]) -> list[Item]:
         exclude = HOME_EXCLUDE | {
             f"skills/{d.parent.relative_to(skills).as_posix()}/DESCRIPTION.md" for d in bundled if d.parent != skills
         }
+        # Workspace roots inside the home are listed as workspace, not as data dir.
+        exclude |= {r.relative_to(home_abs).as_posix() for r in roots if home_abs in r.parents}
         for path, rel in _walk(owner_home, exclude, bundled, seen):
             items += _memo(fresh, ("home", str(home_abs), rel), path, lambda: _home_item(owner_home, path, rel))
-    for root in (Path(r) for r in workspace_roots):
-        if root.is_dir() and root.resolve() != home_abs:
-            for path, rel in _walk(root, set(), {home_abs}, seen):
-                items += _memo(
-                    fresh,
-                    ("ws", str(root.resolve()), rel),
-                    path,
-                    lambda: _generic_items(path, f"{root.name}/{rel}", _group_for(rel, f"Workspace · {root.name}")),
-                )
+    prompt_dirs = {r for r in roots} | ({_cwd(owner_home)} - {None})
+    for root in roots:
+        if root == home_abs:
+            continue
+        prefix = root.relative_to(home_abs).as_posix() if home_abs in root.parents else root.name
+        for path, rel in _walk(root, set(), {home_abs}, seen):
+            found = _memo(
+                fresh,
+                ("ws", str(root), rel),
+                path,
+                lambda: _generic_items(path, f"{prefix}/{rel}", _group_for(rel, f"Workspace · {root.name}")),
+            )
+            if path.name in CONTEXT_FILE_NAMES and path.parent.resolve() in prompt_dirs:
+                for it in found:
+                    it.note = "project context: Hermes puts this file in the system prompt when the session starts here"
+            items += found
     items += _runtime_items(owner_home)
     _MEMO = fresh
     return items
