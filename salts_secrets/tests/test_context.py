@@ -15,7 +15,7 @@ def homes(tmp_path):
     owner, public, ws = tmp_path / "owner", tmp_path / "public", tmp_path / "ws"
     (owner / "memories").mkdir(parents=True)
     ws.mkdir()
-    (owner / "memories/MEMORY.md").write_text(f"blog is dotv.io\n§\nsecret {CANARY}", encoding="utf-8")
+    (owner / "memories/MEMORY.md").write_text(f"blog is lowtide.news\n§\nsecret {CANARY}", encoding="utf-8")
     (owner / "memories/USER.md").write_text("name is .v", encoding="utf-8")
     (ws / "bio.md").write_text(f"# Bio\n## School\nCS master\n## Love\n{CANARY}\n", encoding="utf-8")
     return owner, public, [ws]
@@ -45,7 +45,7 @@ def test_only_approved_items_projected_and_originals_untouched(homes):
     core.save_allowlist(owner, items, [by_title(items, "blog").id, by_title(items, "School").id])
     proj = core.sync_public(owner, public, ws)
     text = (data_dir(public) / core.PROJECTION_FILE).read_text()
-    assert proj["facts"] == ["blog is dotv.io"] and len(proj["documents"]) == 1
+    assert proj["facts"] == ["blog is lowtide.news"] and len(proj["documents"]) == 1
     assert CANARY not in text
     assert (owner / "memories/MEMORY.md").read_text() == before
 
@@ -87,7 +87,7 @@ def test_plugin_renders_and_looks_up_projection(homes):
     core.sync_public(owner, public, ws)
     proj = plugin.load_projection(public)
     section = plugin.render_section(proj)
-    assert "blog is dotv.io" in section and CANARY not in section and len(section) <= plugin.SECTION_MAX
+    assert "blog is lowtide.news" in section and CANARY not in section and len(section) <= plugin.SECTION_MAX
     assert "CS master" in plugin.lookup(proj, "school")
     assert plugin.lookup(proj, "zzz") == "No public document matches that query."
     assert plugin.load_projection(owner) == {}
@@ -190,14 +190,14 @@ def test_guest_rewrite_replaces_original_in_projection(homes):
     core.save_allowlist(owner, items, [blog.id], {blog.id: "blog is public, ask me for the URL"})
     proj = core.sync_public(owner, public, ws)
     assert proj["facts"] == ["blog is public, ask me for the URL"]
-    assert "dotv.io" not in json.dumps(proj)
+    assert "lowtide.news" not in json.dumps(proj)
     # empty or identical rewrite -> original is published
     core.save_allowlist(owner, items, [blog.id], {blog.id: "   "})
-    assert core.sync_public(owner, public, ws)["facts"] == ["blog is dotv.io"]
+    assert core.sync_public(owner, public, ws)["facts"] == ["blog is lowtide.news"]
     # editing the source invalidates the approval together with its rewrite
     core.save_allowlist(owner, items, [blog.id], {blog.id: "rewritten"})
     mem = owner / "memories" / "MEMORY.md"
-    mem.write_text(mem.read_text(encoding="utf-8").replace("dotv.io", "dotv.top"), encoding="utf-8")
+    mem.write_text(mem.read_text(encoding="utf-8").replace("lowtide.news", "lowtide.blog"), encoding="utf-8")
     assert core.sync_public(owner, public, ws)["facts"] == []
 
 

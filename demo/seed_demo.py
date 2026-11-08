@@ -10,10 +10,10 @@ home, ws = root / "owner", root / "workspace"
 (home / "skills/writing/blog-helper").mkdir(parents=True, exist_ok=True)
 (ws / "自传").mkdir(parents=True, exist_ok=True)
 (home / "memories/MEMORY.md").write_text("\n§\n".join([
-    "博客：dotv.io，写 AI agent 和独立开发，最近一篇《把 Hermes 部署成个人分身》",
+    "博客：lowtide.news，写 AI agent 和独立开发，最近一篇《把 Hermes 部署成个人分身》",
     "硕士读的是计算机，方向是分布式系统",
     "（私密）上个月和家人吵架后心情很差，聊过很久",
-    "（私密）服务器 dotv-us 的备份放在 /dotv/backups"]), encoding="utf-8")
+    "（私密）服务器 vps-1 的备份放在 /srv/backups"]), encoding="utf-8")
 (home / "memories/USER.md").write_text("\n§\n".join([
     "用户叫 .v，常用中文交流", "（私密）住在北京朝阳区"]), encoding="utf-8")
 (home / "SOUL.md").write_text("You are Hermes, .v's personal agent.\n", encoding="utf-8")

@@ -33,30 +33,30 @@ from salts_secrets import tiers as perm
 from salts_secrets.home import data_dir
 
 STATIC = Path(__file__).parent / "static"
-COOKIE = "dotv"
+COOKIE = "salt"
 OWNER_TTL = 12 * 3600
 
 
 class Settings:
     def __init__(self, env: Optional[dict] = None):
         e = os.environ if env is None else env
-        self.hermes_url = e.get("DOTV_HERMES_URL", "http://127.0.0.1:8642").rstrip("/")
-        self.owner_key = e.get("DOTV_OWNER_KEY", "")
-        self.public_key = e.get("DOTV_PUBLIC_KEY", "")
-        self.public_profile = e.get("DOTV_PUBLIC_PROFILE", "public")
-        self.passphrase_hash = e.get("DOTV_OWNER_PASSPHRASE_HASH", "")
-        self.secret = (e.get("DOTV_SECRET") or secrets.token_hex(32)).encode()
-        self.owner_home = Path(e.get("DOTV_OWNER_HOME", str(Path.home() / ".hermes")))
-        self.public_home = Path(e.get("DOTV_PUBLIC_HOME", str(self.owner_home / "profiles" / self.public_profile)))
-        roots = e.get("DOTV_WORKSPACE_ROOTS", "")
+        self.hermes_url = e.get("SALT_HERMES_URL", "http://127.0.0.1:8642").rstrip("/")
+        self.owner_key = e.get("SALT_OWNER_KEY", "")
+        self.public_key = e.get("SALT_PUBLIC_KEY", "")
+        self.public_profile = e.get("SALT_PUBLIC_PROFILE", "public")
+        self.passphrase_hash = e.get("SALT_OWNER_PASSPHRASE_HASH", "")
+        self.secret = (e.get("SALT_SECRET") or secrets.token_hex(32)).encode()
+        self.owner_home = Path(e.get("SALT_OWNER_HOME", str(Path.home() / ".hermes")))
+        self.public_home = Path(e.get("SALT_PUBLIC_HOME", str(self.owner_home / "profiles" / self.public_profile)))
+        roots = e.get("SALT_WORKSPACE_ROOTS", "")
         self.workspace_roots = [Path(p) for p in roots.split(os.pathsep) if p]
-        self.cookie_secure = e.get("DOTV_COOKIE_SECURE", "auto")
-        self.tier_profiles = {"admin": e.get("DOTV_ADMIN_PROFILE", "dotv-admin"),
-                              "user": e.get("DOTV_USER_PROFILE", "dotv-user"), "guest": self.public_profile}
-        self.tier_keys = {"admin": e.get("DOTV_ADMIN_KEY", ""), "user": e.get("DOTV_USER_KEY", ""),
+        self.cookie_secure = e.get("SALT_COOKIE_SECURE", "auto")
+        self.tier_profiles = {"admin": e.get("SALT_ADMIN_PROFILE", "salt-admin"),
+                              "user": e.get("SALT_USER_PROFILE", "salt-user"), "guest": self.public_profile}
+        self.tier_keys = {"admin": e.get("SALT_ADMIN_KEY", ""), "user": e.get("SALT_USER_KEY", ""),
                           "guest": self.public_key, "owner": self.owner_key}
-        self.owner_name = e.get("DOTV_OWNER_NAME", "Lena")
-        self.public_name = e.get("DOTV_PUBLIC_NAME", "Salt")
+        self.owner_name = e.get("SALT_OWNER_NAME", "Lena")
+        self.public_name = e.get("SALT_PUBLIC_NAME", "Salt")
 
     def tier_homes(self) -> dict[str, Path]:
         homes = {t: self.owner_home / "profiles" / name for t, name in self.tier_profiles.items()}
@@ -278,7 +278,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         override = model_override(tier, str(body.get("model") or ""))
         sid_key = tier + "_sid"
         if not st.get(sid_key):
-            st[sid_key] = f"dotv-{tier[0]}-" + secrets.token_hex(16)
+            st[sid_key] = f"salt-{tier[0]}-" + secrets.token_hex(16)
         key = s.tier_keys.get(tier, "")
         if not key:
             raise HTTPException(503, f"Hermes key for tier '{tier}' is not configured")
@@ -402,8 +402,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return {"archived": archived, **guests.purge(s.public_home)}
 
     # Public versions are drafted by the owner's model from a disclosure policy the owner edits.
-    DRAFT_FILE = "dotv/public_drafts.json"
-    POLICY_FILE = "dotv/disclosure_policy.md"
+    DRAFT_FILE = "public_drafts.json"
+    POLICY_FILE = "disclosure_policy.md"
     DEFAULT_POLICY = """# What may be shared about Salt (read by the drafter, edited by the owner)
 
 ## Fine to share
@@ -423,22 +423,22 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     def _policy_text() -> str:
         try:
-            return (s.owner_home / POLICY_FILE).read_text(encoding="utf-8")
+            return (data_dir(s.owner_home) / POLICY_FILE).read_text(encoding="utf-8")
         except OSError:
             return DEFAULT_POLICY
 
     @app.get("/api/board/policy")
     def policy_get(request: Request):
         require_owner(request)
-        return {"text": _policy_text(), "path": str((s.owner_home / POLICY_FILE).resolve())}
+        return {"text": _policy_text(), "path": str((data_dir(s.owner_home) / POLICY_FILE).resolve())}
 
     @app.post("/api/board/policy")
     async def policy_set(request: Request):
         require_json(request)
         require_owner(request)
         text = str((await request.json()).get("text") or "").strip() + "\n"
-        (s.owner_home / "dotv").mkdir(exist_ok=True)
-        (s.owner_home / POLICY_FILE).write_text(text, encoding="utf-8")
+        data_dir(s.owner_home).mkdir(parents=True, exist_ok=True)
+        (data_dir(s.owner_home) / POLICY_FILE).write_text(text, encoding="utf-8")
         return {"ok": True}
 
     def _draft_system(kind: str) -> str:
@@ -459,7 +459,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     def _draft_store() -> dict:
         try:
-            return json.loads((s.owner_home / DRAFT_FILE).read_text(encoding="utf-8"))
+            return json.loads((data_dir(s.owner_home) / DRAFT_FILE).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
 
@@ -509,11 +509,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(502, "model returned an empty draft (reasoning used up the budget?); not cached")
         store[item_id] = {"fingerprint": it.fingerprint, "draft": draft, "tokens": tokens, "at": int(time.time())}
         try:
-            (s.owner_home / "dotv").mkdir(exist_ok=True)
-            tmp = s.owner_home / (DRAFT_FILE + ".tmp")
+            data_dir(s.owner_home).mkdir(parents=True, exist_ok=True)
+            tmp = data_dir(s.owner_home) / (DRAFT_FILE + ".tmp")
             tmp.write_text(json.dumps(store, ensure_ascii=False, indent=1), encoding="utf-8")
             tmp.chmod(0o600)
-            tmp.replace(s.owner_home / DRAFT_FILE)
+            tmp.replace(data_dir(s.owner_home) / DRAFT_FILE)
         except OSError:
             pass
         return {"draft": draft, "cached": False, "tokens": tokens}
@@ -626,5 +626,5 @@ if __name__ == "__main__":
         print(hash_passphrase(getpass.getpass("Owner passphrase: ")))
         sys.exit(0)
     import uvicorn
-    uvicorn.run(create_app(), host=os.environ.get("DOTV_HOST", "127.0.0.1"),
-                port=int(os.environ.get("DOTV_PORT", "8780")), proxy_headers=True)
+    uvicorn.run(create_app(), host=os.environ.get("SALT_HOST", "127.0.0.1"),
+                port=int(os.environ.get("SALT_PORT", "8780")), proxy_headers=True)
