@@ -268,3 +268,84 @@ def test_board_classify_and_save_with_decisions(client):
     assert len(out["rejected"]) == len(ids) and out["facts"] == 0  # nothing is A without a model
     out = client.post("/api/board/save", json={"public_ids": ids[:1], "decisions": {ids[0]: {"via": "single"}}}).json()
     assert out["facts"] == 1 and out["rejected"] == []
+
+
+VIEW = "look only"
+
+
+def _viewer_app(tmp_path):
+    (tmp_path / "owner/memories").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "owner/memories/MEMORY.md").write_text("a\n§\nb", encoding="utf-8")
+    s = server.Settings({
+        "SALT_OWNER_HOME": str(tmp_path / "owner"), "SALT_PUBLIC_HOME": str(tmp_path / "public"),
+        "SALT_OWNER_PASSPHRASE_HASH": server.hash_passphrase(PASS),
+        "SALT_VIEWER_PASSPHRASE_HASH": server.hash_passphrase(VIEW), "SALT_VIEWER_PASSPHRASE_SHOWN": VIEW,
+        "SALT_SECRET": "x" * 32, "SALT_OWNER_KEY": "ok", "SALT_PUBLIC_KEY": "pk"})
+    return server.create_app(s)
+
+
+def test_readonly_passphrase_reads_but_never_writes(tmp_path):
+    c = TestClient(_viewer_app(tmp_path))
+    me = c.post("/api/unlock", json={"passphrase": VIEW}).json()
+    assert me["role"] == "owner" and me["readonly"] and "models" not in me
+    assert c.get("/api/board/items").status_code == 200
+    assert c.get("/api/perm").status_code == 200 and c.get("/perm").status_code == 200
+    for path, body in [("/api/board/save", {"public_ids": []}), ("/api/board/classify", {"force": True}),
+                       ("/api/board/policy", {"text": "x"}), ("/api/board/draft", {"id": "x"}),
+                       ("/api/board/guests/clear", {}), ("/api/perm/save", {"tiers": {}}),
+                       ("/api/perm/access", {"action": "guest_access", "enabled": False})]:
+        r = c.post(path, json=body)
+        assert r.status_code == 403 and r.json()["detail"] == "read-only mode", path
+    owner = TestClient(c.app)
+    assert "readonly" not in owner.post("/api/unlock", json={"passphrase": PASS}).json()
+    assert c.post("/api/lock", json={}).json()["role"] == "guest"
+    assert c.get("/api/board/items").status_code == 403
+
+
+def test_readonly_chat_uses_tool_free_sessions(tmp_path, monkeypatch):
+    seen = []
+
+    class FakeStream:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def aiter_lines(self):
+            yield "data: [DONE]"
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        def stream(self, method, url, json=None, headers=None):
+            seen.append((url, headers["X-Hermes-Session-Id"], json))
+            return FakeStream()
+
+    monkeypatch.setattr(server.httpx, "AsyncClient", FakeClient)
+    c = TestClient(_viewer_app(tmp_path))
+    c.post("/api/unlock", json={"passphrase": VIEW})
+    assert c.post("/api/chat", json={"message": "x" * (server.VIEWER_CHARS + 1)}).status_code == 400
+    for _ in range(server.VIEWER_TURNS + 1):
+        c.post("/api/chat", json={"message": "hi", "model": "other"})
+    sids = [sid for _, sid, _ in seen]
+    assert all(sid.startswith(server.VIEWER_PREFIX) for sid in sids)
+    assert len(set(sids[:server.VIEWER_TURNS])) == 1 and sids[-1] != sids[0]
+    assert all("/p/" not in url and set(body) == {"model", "stream", "messages"} for url, _, body in seen)
+
+
+def test_doc_describes_this_install(tmp_path):
+    c = TestClient(_viewer_app(tmp_path))
+    assert c.get("/doc").status_code == 200
+    d = c.get("/api/doc").json()
+    assert d["viewer"] and d["viewer_hint"] == VIEW and d["facts"] == 0 and d["documents"] == []
+    assert "web_search" in d["tools"] and "terminal" not in d["tools"]

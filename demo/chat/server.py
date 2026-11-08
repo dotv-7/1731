@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from salts_secrets import _yaml as yaml
-from salts_secrets import classify
+from salts_secrets import classify, gate
 from salts_secrets import context as ctx
 from salts_secrets import guests
 from salts_secrets import tiers as perm
@@ -36,6 +36,9 @@ from salts_secrets.home import data_dir
 STATIC = Path(__file__).parent / "static"
 COOKIE = "salt"
 OWNER_TTL = 12 * 3600
+VIEWER_PREFIX = "salt-v-"  # salts_secrets.readonly blocks every tool in owner sessions with this prefix
+VIEWER_TURNS = 12  # then a fresh session, so compression never rotates a read-only session into a new id
+VIEWER_CHARS = 2000
 
 
 class Settings:
@@ -46,6 +49,8 @@ class Settings:
         self.public_key = e.get("SALT_PUBLIC_KEY", "")
         self.public_profile = e.get("SALT_PUBLIC_PROFILE", "public")
         self.passphrase_hash = e.get("SALT_OWNER_PASSPHRASE_HASH", "")
+        self.viewer_hash = e.get("SALT_VIEWER_PASSPHRASE_HASH", "")
+        self.viewer_hint = e.get("SALT_VIEWER_PASSPHRASE_SHOWN", "")
         self.secret = (e.get("SALT_SECRET") or secrets.token_hex(32)).encode()
         self.owner_home = Path(e.get("SALT_OWNER_HOME", str(Path.home() / ".hermes")))
         self.public_home = Path(e.get("SALT_PUBLIC_HOME", str(self.owner_home / "profiles" / self.public_profile)))
@@ -141,10 +146,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def is_owner(st: dict) -> bool:
         return st.get("owner_exp", 0) > time.time()
 
+    def is_viewer(st: dict) -> bool:
+        """Signed in with the read-only passphrase: sees what the owner sees, changes nothing."""
+        return not is_owner(st) and st.get("view_exp", 0) > time.time()
+
     def identity(request: Request, st: dict) -> tuple[str, str]:
         """(tier, member name), re-read every request so board changes apply at once. The owner passphrase
         beats the blocklist (same NAT); a blocked device or IP beats any cookie, including no cookie."""
-        if is_owner(st):
+        if is_owner(st) or is_viewer(st):
             return "owner", ""
         ip = client_ip(request)
         m = perm.member_by_id(s.owner_home, st["member"]) if st.get("member") else None
@@ -158,7 +167,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         tier, name = identity(request, st)
         body = {"role": tier, "name": name, "label": perm.TIER_LABEL[tier], "owner_until": st.get("owner_exp", 0),
                 "guest_access": perm.load(s.owner_home)["guest_access"]}
-        if tier == "owner":
+        if tier == "owner" and is_viewer(st):
+            body["readonly"] = True
+        elif tier == "owner":
             body["models"] = [{"id": m["id"], "label": m["model"]} for m in owner_models(s.owner_home)]
         return body
 
@@ -191,6 +202,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def require_owner(request: Request) -> dict:
         st = state(request)
         if not is_owner(st):
+            raise HTTPException(403, "read-only mode" if is_viewer(st) else "owner only")
+        return st
+
+    def require_reader(request: Request) -> dict:
+        st = state(request)
+        if not (is_owner(st) or is_viewer(st)):
             raise HTTPException(403, "owner only")
         return st
 
@@ -237,7 +254,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         st = state(request)
         if s.passphrase_hash and verify_passphrase(secret, s.passphrase_hash):
             window.clear()
-            st["owner_exp"] = int(now + OWNER_TTL)
+            st["owner_exp"], st["view_exp"] = int(now + OWNER_TTL), 0
+            return respond(request, st, me_body(request, st))
+        if s.viewer_hash and verify_passphrase(secret, s.viewer_hash):
+            window.clear()
+            st["owner_exp"], st["view_exp"], st["member"] = 0, int(now + OWNER_TTL), ""
             return respond(request, st, me_body(request, st))
         member = perm.find_member(s.owner_home, secret) if secret else None
         if not member:
@@ -253,7 +274,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         st = state(request)
         if identity(request, st)[0] == "blocked":
             return respond(request, st, me_body(request, st), 403)
-        st["owner_exp"], st["member"] = 0, ""
+        st["owner_exp"], st["view_exp"], st["member"] = 0, 0, ""
         return respond(request, st, me_body(request, st))
 
     @app.post("/api/new")
@@ -262,6 +283,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         st = state(request)
         st[identity(request, st)[0] + "_sid"] = ""
         return respond(request, st, {"ok": True})
+
+    viewer_turns: dict[str, int] = {}
 
     @app.post("/api/chat")
     async def chat(request: Request):
@@ -276,10 +299,17 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(403, "you are blocked")
         if tier == "guest" and not perm.load(s.owner_home)["guest_access"]:
             raise HTTPException(403, "guest chat is closed; ask the owner for an invite code")
-        override = model_override(tier, str(body.get("model") or ""))
-        sid_key = tier + "_sid"
+        readonly = is_viewer(st)
+        if readonly and len(message) > VIEWER_CHARS:
+            raise HTTPException(400, f"read-only mode: messages up to {VIEWER_CHARS} chars")
+        override = {} if readonly else model_override(tier, str(body.get("model") or ""))
+        sid_key = "viewer_sid" if readonly else tier + "_sid"
+        if readonly and viewer_turns.get(st.get(sid_key, ""), 0) >= VIEWER_TURNS:
+            st[sid_key] = ""
         if not st.get(sid_key):
-            st[sid_key] = f"salt-{tier[0]}-" + secrets.token_hex(16)
+            st[sid_key] = (VIEWER_PREFIX if readonly else f"salt-{tier[0]}-") + secrets.token_hex(16)
+        if readonly:
+            viewer_turns[st[sid_key]] = viewer_turns.get(st[sid_key], 0) + 1
         key = s.tier_keys.get(tier, "")
         if not key:
             if tier in ("admin", "user"):
@@ -340,7 +370,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/board/items")
     def board_items(request: Request):
         """Item list without bodies (sessions alone can be megabytes); bodies come from /api/board/text."""
-        require_owner(request)
+        require_reader(request)
         items = board_scan()
         allow = ctx.load_allowlist(s.owner_home)
         tiers = classify.cached(s.owner_home, items)
@@ -354,7 +384,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/board/text")
     def board_text(request: Request, id: str):
-        require_owner(request)
+        require_reader(request)
         it = board_cache.get(id) or {i.id: i for i in board_scan()}.get(id)
         if not it:
             raise HTTPException(404, "item changed or removed; reload the board")
@@ -362,7 +392,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/board/search")
     def board_search(request: Request, q: str):
-        require_owner(request)
+        require_reader(request)
         needle = q.strip().lower()
         items = list(board_cache.values()) or board_scan()
         return {"ids": [it.id for it in items if needle in f"{it.title}\n{it.source}\n{it.text}".lower()]}
@@ -394,15 +424,17 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def board_classify(request: Request):
         """Rules + the owner's model sort every publishable item into A/B/C. Nothing is published here."""
         require_json(request)
-        require_owner(request)
+        st = require_reader(request)
         force = bool((await request.json()).get("force"))
+        if force and not is_owner(st):
+            raise HTTPException(403, "read-only mode")
         ask = classify.openai_asker(classify.model_settings(s.owner_home))
         return await classify.classify(s.owner_home, board_scan(), ask, force)
 
     @app.get("/api/board/guests")
     def board_guests(request: Request):
         """What guests said: live public sessions plus the owner's archive. Owner only; never injected anywhere."""
-        require_owner(request)
+        require_reader(request)
         return guests.digest(s.owner_home, s.public_home)
 
     @app.post("/api/board/guests/clear")
@@ -440,7 +472,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/board/policy")
     def policy_get(request: Request):
-        require_owner(request)
+        require_reader(request)
         return {"text": _policy_text(), "path": str((data_dir(s.owner_home) / POLICY_FILE).resolve())}
 
     @app.post("/api/board/policy")
@@ -541,7 +573,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/board/preview")
     def board_preview(request: Request):
-        require_owner(request)
+        require_reader(request)
         try:
             return json.loads((data_dir(s.public_home) / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -549,7 +581,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/perm")
     def perm_page(request: Request):
-        if not is_owner(state(request)):
+        st = state(request)
+        if not (is_owner(st) or is_viewer(st)):
             return RedirectResponse("/")
         return render_page("perm.html", s)
 
@@ -577,7 +610,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/perm")
     def perm_get(request: Request):
-        require_owner(request)
+        require_reader(request)
         return perm_state()
 
     @app.post("/api/perm/save")
@@ -625,11 +658,40 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(400, "bad request")
         return perm_state()
 
+    def doc_facts() -> dict:
+        """What this install actually offers a stranger, read from its own config and projection."""
+        try:
+            proj = json.loads((data_dir(s.public_home) / ctx.PROJECTION_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            proj = {}
+        try:
+            cfg = yaml.safe_load((s.owner_home / "config.yaml").read_text(encoding="utf-8")) or {}
+        except (OSError, ValueError):
+            cfg = {}
+        entry = ((cfg.get("plugins") or {}).get("entries") or {}).get("salts-secrets") or {}
+        owners = (entry.get("settings") or {}).get("owners") or []
+        platforms = sorted({str(o).split(":", 1)[0].capitalize() for o in owners if ":" in str(o)})
+        return {"facts": len(proj.get("facts") or []),
+                "documents": [d.get("title", "") for d in proj.get("documents") or []],
+                "tools": sorted(gate.allowed_tools(s.public_home)), "platforms": platforms,
+                "guest_access": perm.load(s.owner_home)["guest_access"],
+                "isolation": perm.isolation_check(s.owner_home, s.public_home).get("line", ""),
+                "viewer": bool(s.viewer_hash), "viewer_hint": s.viewer_hint}
+
+    @app.get("/doc")
+    def doc_page():
+        return render_page("doc.html", s)
+
+    @app.get("/api/doc")
+    def doc_api():
+        return doc_facts()
+
     TRACE_DIR = STATIC / "trace"
 
     @app.get("/trace")
     def trace_index(request: Request):
-        if not is_owner(state(request)):
+        st = state(request)
+        if not (is_owner(st) or is_viewer(st)):
             return RedirectResponse("/")
         page = TRACE_DIR / "index.html"
         if not page.is_file():
@@ -638,7 +700,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/trace/{name:path}")
     def trace_file(request: Request, name: str):
-        require_owner(request)
+        require_reader(request)
         target = (TRACE_DIR / name).resolve()
         if not str(target).startswith(str(TRACE_DIR.resolve())) or not target.is_file():
             raise HTTPException(404, "no such trace file")

@@ -28,6 +28,21 @@ SALT_OWNER_HOME="$PWD/.demo/owner" SALT_OWNER_PASSPHRASE_HASH=... SALT_SECRET=<r
 `http://127.0.0.1:8642`, the Hermes API server (or `fake_hermes.py`).
 `SALT_OWNER_NAME` and `SALT_PUBLIC_NAME` (default `Lena` and `Salt`) set the names the pages show.
 
+### Read-only owner, dictation, Doc
+
+- `SALT_VIEWER_PASSPHRASE_HASH` (same `hash_passphrase` format) adds a second passphrase for the same
+  sign-in box. It opens the owner side read-only: chat with the owner's agent and browse Context,
+  Permissions and Trace, with a `READ ONLY` badge. Every write route answers 403 `read-only mode`, and the
+  chat runs under `salt-v-` session ids, which `salts_secrets/readonly.py` (owner profile, `pre_tool_call`)
+  refuses every tool for. Each read-only session is capped at 12 turns of 2,000 characters, then a fresh
+  one starts. `SALT_VIEWER_PASSPHRASE_SHOWN` prints that passphrase on `/doc` when you mean to publish it.
+- The guest-version boxes on `/shelf` have a MIC button: the browser's own speech recognition (Chrome,
+  Edge, Safari; Chrome sends audio to Google to transcribe) types into the box. Nothing is published
+  until you click Save & sync. Browsers without speech recognition get no button.
+- `/doc` (linked as DOC) is generated from this install: where guests can talk, how many facts and which
+  documents the guest room holds, the tools guests may use, and the isolation check line. No private
+  item, path or key is read for it.
+
 ## Traces
 
 `trace_render.py` replaces the owner home, the user's home directory and every loopback URL with

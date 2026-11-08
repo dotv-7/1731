@@ -54,9 +54,11 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
 .bar a{border:0;padding:0;background:none;color:var(--accent)}.bar a:hover{background:none;text-decoration:underline;text-underline-offset:4px}
 .bar button.primary{margin-left:6px}
 @media (max-width:640px){.bar{padding:0 16px}.bar .r{gap:14px}.bar .line{display:none}}
+.robar{position:sticky;top:0;z-index:20;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
+.ro #save,.ro details button{display:none!important}.ro input,.ro select{pointer-events:none;opacity:.6}
 </style></head><body>
 <div class="bar"><div class="l"><span class="lbl">LENA MOREAU</span><span class="line"></span><span class="lbl">PERMISSIONS</span></div>
-  <div class="r"><a class="lbl" href="/">CHAT</a><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/trace">TRACE</a><button id="save" class="primary" disabled>Save &amp; sync</button></div></div>
+  <div class="r"><a class="lbl" href="/">CHAT</a><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/trace">TRACE</a><a class="lbl" href="/doc">DOC</a><button id="save" class="primary" disabled>Save &amp; sync</button></div></div>
 <div class="wrap">
 <p class="dim" style="margin:16px 0 0">Who can do what. Who can know what is set on the CONTEXT page.</p>
 <div class="card"><b>Two tiers today</b>　<span class="tiers">
@@ -120,4 +122,5 @@ $('#madd').onclick=async()=>{const j=await api('/api/perm/members',{action:'add'
 $('#save').onclick=async()=>{const j=await api('/api/perm/save',{tiers:Object.fromEntries(CFG.map(t=>[t,[...policy[t]]]))});
   toast('Synced to: '+Object.keys(j.synced).map(t=>j.labels[t]).join(', ')+'. New sessions use it.');load(j);};
 load();
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);}).catch(()=>{});
 </script></body></html>
