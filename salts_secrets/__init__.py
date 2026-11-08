@@ -23,10 +23,11 @@ def register(ctx) -> None:
     role = ctx.get_config("role", default="") or ""
     public_profile = ctx.get_config("public_profile", default="public") or "public"
     if role == "public" or (role != "owner" and home.is_public(home.current(), public_profile)):
-        from . import gate, public_context
+        from . import gate, public_context, receipts
 
         gate.register(ctx)
         public_context.register(ctx)
+        receipts.register(ctx)
         log.info("salts-secrets: public role")
         return
     from . import cli, notes, readonly, route
