@@ -83,7 +83,7 @@ def fmt(n) -> str:
     return f"{n:,}" if isinstance(n, int) else "—"
 
 
-def seg(kind: str, title: str, body: str, tok=None, extra: str = "", anchor: str = "", bare: bool = False) -> str:
+def seg(kind: str, title: str, body: str, tok=None, extra: str = "", anchor: str = "") -> str:
     t = f'<span class="t">{esc(extra)}</span>' if extra else ""
     tokhtml = f'<span class="t">{fmt(tok)} tok</span>' if tok is not None else ""
     body = body if body else "(empty)"
@@ -96,8 +96,7 @@ def seg(kind: str, title: str, body: str, tok=None, extra: str = "", anchor: str
     else:
         inner = f"<pre>{esc(body)}</pre>"
     aid = f' id="{anchor}"' if anchor else ""
-    head = "" if bare else f'<div class="h"><span><i></i>{esc(title)} {t}</span>{tokhtml}</div>'
-    return f'<div class="seg {kind}"{aid}>{head}{inner}</div>'
+    return f'<div class="seg {kind}"{aid}><div class="h"><span><i></i>{esc(title)} {t}</span>{tokhtml}</div>{inner}</div>'
 
 
 def rows_to_turns(rows: list[dict], questions: list[str]) -> list[list[dict]]:
@@ -270,7 +269,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
 </section>
 <div class="heads"><div><div class="who">Lena's own session</div><div class="sub">owner key · {esc(L['endpoint'])} · HERMES_HOME {esc(L['home'])}</div></div>
 <div class="r"><div class="who">Salt's assistant</div><div class="sub">guest key · {esc(R['endpoint'])} · HERMES_HOME {esc(R['home'])}</div></div></div>
-<div class="pair" id="sys"><div class="cell">{seg("sys", "", L["system_prompt"], bare=True)}</div><div class="cell">{seg("sys", "", R["system_prompt"], bare=True)}</div></div>
+<div class="pair" id="sys"><div class="cell">{seg("sys", f"system prompt · {len(L['system_prompt']):,} chars", L["system_prompt"], None, "left · exactly as sent")}</div><div class="cell">{seg("sys", f"system prompt · {len(R['system_prompt']):,} chars", R["system_prompt"], None, "right · exactly as sent")}</div></div>
 <div class="band" id="tools"><span class="lbl">TOOL SCHEMAS · SENT WITH EVERY CALL</span><span class="q">exported from each profile exactly as the api_server platform builds them (hermes_cli.prompt_size._build_inspection_agent)</span></div>
 <div class="pair"><div class="cell">{tools_block(L["tools"], "left")}</div><div class="cell">{tools_block(R["tools"], "right")}</div></div>
 {"".join(turns_html)}
