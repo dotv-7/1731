@@ -56,7 +56,10 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
 @media (max-width:640px){.bar{padding:0 16px}.bar .r{gap:14px}.bar .line{display:none}}
 body.rotop nav.salt-nav{top:33px}
 .robar{position:sticky;top:0;z-index:45;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
-.ro #save,.ro details button{display:none!important}.ro input,.ro select{pointer-events:none;opacity:.6}
+.ro #save,.ro details button{display:none!important}.ro input,.ro select{opacity:.6;cursor:not-allowed}
+.robar.flash{animation:roflash .45s 2}@keyframes roflash{50%{background:#f59e0b}}
+.rotip{position:fixed;z-index:80;pointer-events:none;background:#b45309;color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;padding:7px 9px;opacity:0;transition:opacity .15s}.rotip.on{opacity:1}
+
 </style></head><body>
 <!--SALT-NAV--><button id="save" class="primary" disabled>Save &amp; sync</button><!--/SALT-NAV-->
 <div class="wrap">
@@ -125,5 +128,12 @@ $('#madd').onclick=async()=>{const j=await api('/api/perm/members',{action:'add'
 $('#save').onclick=async()=>{const j=await api('/api/perm/save',{tiers:Object.fromEntries(CFG.map(t=>[t,[...policy[t]]]))});
   toast('Synced to: '+Object.keys(j.synced).map(t=>j.labels[t]).join(', ')+'. New sessions use it.');load(j);};
 load();
+const RO_CTRL='input,select';
+// Read-only: a click on a control flashes the bar and says why nothing happens.
+function roHint(e){if(!document.body.classList.contains('ro')||!e.target.closest||!e.target.closest(RO_CTRL))return;e.preventDefault();
+  const b=document.querySelector('.robar');if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');}
+  let n=document.querySelector('.rotip');if(!n){n=document.createElement('div');n.className='rotip';n.textContent='READ ONLY · you can look, not change';document.body.append(n);}
+  n.style.left=Math.min(e.clientX+12,innerWidth-300)+'px';n.style.top=(e.clientY+14)+'px';n.classList.add('on');clearTimeout(roHint.t);roHint.t=setTimeout(()=>n.classList.remove('on'),1600);}
+addEventListener('mousedown',roHint,true);addEventListener('click',roHint,true);
 fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
 </script></body></html>

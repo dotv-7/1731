@@ -180,7 +180,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 body.rotop nav.salt-nav{top:33px}
 .robar{position:sticky;top:0;z-index:70;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
 .ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
-.ro textarea{pointer-events:none;opacity:.6}
+.ro #d-list input,.ro #d-list textarea{opacity:.6;cursor:not-allowed}
+.robar.flash{animation:roflash .45s 2}@keyframes roflash{50%{background:#f59e0b}}
+.rotip{position:fixed;z-index:80;pointer-events:none;background:#b45309;color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;padding:7px 9px;opacity:0;transition:opacity .15s}.rotip.on{opacity:1}
+
 .ro .detail{top:33px}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
 </style></head><body>
@@ -352,8 +355,10 @@ function rerow(id){const row=document.querySelector(`.ent[data-id="${CSS.escape(
 // Guest boxes grow with their text, like the raw original on the left: no scrollbar, no resize grip.
 function fit(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px';}
 function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);alignAll();}
-// The guest box starts on the same line as the raw original, whatever the title, path and tier lines above it take.
-function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document.querySelectorAll('#d-list .ent').forEach(e=>{const a=e.querySelector('pre.raw'),k=e.querySelector('.gst .k'),b=e.querySelector('.gst textarea');if(!a||!k||!b)return;a.style.marginTop=k.style.marginTop='';if(!wide)return;const d=a.getBoundingClientRect().top-b.getBoundingClientRect().top;if(d>0)k.style.marginTop=d+'px';else if(d<0)a.style.marginTop=(8-d)+'px';});}
+// The guest box (or its empty placeholder) starts on the same line as the raw original, whatever the title, path and tier lines above it take.
+function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document.querySelectorAll('#d-list .ent').forEach(e=>{const a=e.querySelector('pre.raw'),g=e.querySelector('.gst .ghost'),k=e.querySelector('.gst .k'),b=e.querySelector('.gst textarea');if(!a)return;
+  if(g){g.style.marginTop=g.style.height='';if(!wide)return;g.style.marginTop=(2+a.getBoundingClientRect().top-g.getBoundingClientRect().top)+'px';g.style.height=a.offsetHeight+'px';return;}
+  if(!k||!b)return;a.style.marginTop=k.style.marginTop='';if(!wide)return;const d=a.getBoundingClientRect().top-b.getBoundingClientRect().top;if(d>0)k.style.marginTop=d+'px';else if(d<0)a.style.marginTop=(8-d)+'px';});}
 addEventListener('resize',alignAll);
 function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status==='changed'&&!on;
   const st=lk?'locked':on?'public':chg?'changed':'private';
@@ -461,7 +466,14 @@ $('#d-list').addEventListener('click',e=>{const m=e.target.closest('.mic');if(!m
   rec.onend=()=>{rec=null;m.textContent='MIC';m.classList.remove('on');};rec.onerror=()=>rec&&rec.stop();rec.start();});
 load();
 $('#dWho').textContent=(($('#brandWho')||{}).textContent||'')+' —— TWO SESSIONS';
-fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; ticks are a preview, nothing is saved, drafted or published';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
+const RO_CTRL='#d-list input,#d-list textarea';
+// Read-only: a click on a control flashes the bar and says why nothing happens.
+function roHint(e){if(!document.body.classList.contains('ro')||!e.target.closest||!e.target.closest(RO_CTRL))return;e.preventDefault();
+  const b=document.querySelector('.robar');if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');}
+  let n=document.querySelector('.rotip');if(!n){n=document.createElement('div');n.className='rotip';n.textContent='READ ONLY · you can look, not change';document.body.append(n);}
+  n.style.left=Math.min(e.clientX+12,innerWidth-300)+'px';n.style.top=(e.clientY+14)+'px';n.classList.add('on');clearTimeout(roHint.t);roHint.t=setTimeout(()=>n.classList.remove('on'),1600);}
+addEventListener('mousedown',roHint,true);addEventListener('click',roHint,true);
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
 
 async function loadGuests(){try{const r=await fetch('/api/board/guests');if(!r.ok)return;const c=(await r.json()).counts||{};
   $('#g-count').textContent=`${c.sessions||0} SESSIONS · ${c.questions||0} QUESTIONS · ${c.probes||0} PROBES`;}catch{}}
