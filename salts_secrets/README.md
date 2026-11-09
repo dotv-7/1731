@@ -142,7 +142,8 @@ the routes still leave in your profile, once the gateway has admitted it, and is
 in a Discord server, where a route cannot tell your DM channel from a server channel; an admitted sender on a
 platform without routes) is answered by the public profile through the local API server under its own session
 (`guest-<platform>-<chat>`), and the gateway delivers that reply. Senders your allowlist or pairing rejects never
-reach the hook. If the public profile cannot answer, or not before `plugins.hook_callback_timeout` (default
+reach the hook. Webhook deliveries (your own signed webhook routes) are not chat and go to your agent, as
+without the plugin. If the public profile cannot answer, or not before `plugins.hook_callback_timeout` (default
 30 s) minus 3 s, the sender gets a short notice instead; the message never falls through to your agent.
 
 **Public profile, before the turn.** Bots are ignored and a guest whose session a failed revoke left behind is
