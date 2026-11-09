@@ -45,6 +45,30 @@ What sharing an agent that knows you puts at risk, and what changes here:
 
 The same goes for any expert whose Hermes got good: a researcher, a consultant, a developer.
 
+## Try it, or install it
+
+**Try it without installing.** [salt.dotv.io](https://salt.dotv.io) runs this plugin on a real Hermes, with
+Lena (fictional) as the owner.
+
+- As a guest: open it and chat. You reach Salt's assistant, the public profile.
+- Read-only owner view: click **SIGN IN** and enter `lena-readonly`. You see Lena's side of the same
+  questions, plus her Context, Permissions, Guests and Trace pages. Nothing can be changed, and every tool
+  is blocked in read-only chats.
+- Limits: each message is answered by a real model on our key, so every address (or device, behind a shared
+  proxy) gets 20 messages an hour (`SALT_TURNS_PER_HOUR`); a read-only chat starts a fresh session after
+  12 messages.
+
+**Install it into your own Hermes.** See [Install](#install). It adds a **Salt's Secrets** tab to the Hermes
+dashboard (Context, Permissions, Guests, Guide). The demo site and its Trace page are not part of the plugin.
+
+**Two repositories.**
+
+- [dotv-7/salts-secrets-plugin](https://github.com/dotv-7/salts-secrets-plugin) is what the Hermes plugin
+  catalog installs: `hermes plugins install salts-secrets` fetches its `salts_secrets/` at a pinned commit
+  (the gateway hooks, the `hermes salts-secrets` commands and the dashboard tab).
+- [dotv-7/salts-secrets](https://github.com/dotv-7/salts-secrets) is where it is developed: a Hermes fork
+  holding the plugin plus [`demo/`](demo/), the site behind salt.dotv.io, and the end-to-end tests.
+
 ## 30-second tour
 
 A 90-second demo video (the eight questions below, both sessions side by side) will be published here soon.
