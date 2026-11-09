@@ -54,7 +54,8 @@ code{background:var(--sel);color:var(--accent);padding:1px 5px}
 .bar a{border:0;padding:0;background:none;color:var(--accent)}.bar a:hover{background:none;text-decoration:underline;text-underline-offset:4px}
 .bar button.primary{margin-left:6px}
 @media (max-width:640px){.bar{padding:0 16px}.bar .r{gap:14px}.bar .line{display:none}}
-.robar{position:sticky;top:64px;z-index:35;border-top:6px solid var(--bg,var(--paper,#f2f2f2));background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
+body.rotop nav.salt-nav{top:33px}
+.robar{position:sticky;top:0;z-index:45;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
 .ro #save,.ro details button{display:none!important}.ro input,.ro select{pointer-events:none;opacity:.6}
 </style></head><body>
 <!--SALT-NAV--><button id="save" class="primary" disabled>Save &amp; sync</button><!--/SALT-NAV-->
@@ -124,5 +125,5 @@ $('#madd').onclick=async()=>{const j=await api('/api/perm/members',{action:'add'
 $('#save').onclick=async()=>{const j=await api('/api/perm/save',{tiers:Object.fromEntries(CFG.map(t=>[t,[...policy[t]]]))});
   toast('Synced to: '+Object.keys(j.synced).map(t=>j.labels[t]).join(', ')+'. New sessions use it.');load(j);};
 load();
-fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';(document.querySelector('.salt-nav')||document.body.firstChild).after(n);}).catch(()=>{});
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
 </script></body></html>

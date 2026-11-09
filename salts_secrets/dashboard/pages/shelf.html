@@ -177,7 +177,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier b{font:500 9.5px/1 var(--mono);letter-spacing:.1em;padding:3px 5px;border:1px solid;margin-right:4px;background:#fff}
 .tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
-.robar{position:sticky;top:64px;z-index:35;border-top:6px solid var(--bg,var(--paper,#f2f2f2));background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
+body.rotop nav.salt-nav{top:33px}
+.robar{position:sticky;top:0;z-index:45;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
 .ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
 .ro input[type=checkbox],.ro textarea{pointer-events:none;opacity:.6}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
@@ -206,7 +207,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 </div>
 
 <div class="detail" id="detail">
-  <div class="dtop"><button class="lbl box close" id="close">CLOSE</button><span class="lbl">LENA MOREAU —— TWO SESSIONS</span></div>
+  <div class="dtop"><button class="lbl box close" id="close">CLOSE</button><span class="lbl" id="dWho">TWO SESSIONS</span></div>
   <div class="dhead">
     <div><span class="lbl su" id="d-su"></span><div class="ti" id="d-ti"></div><div class="desc" id="d-desc"></div><div class="counts" id="d-counts"></div></div>
     <div><div class="acts"><button class="act" id="d-guest">View as guest</button><button class="act primary" id="d-save" disabled>Save &amp; sync</button></div><div class="cost" id="d-cost"></div></div>
@@ -458,7 +459,8 @@ $('#d-list').addEventListener('click',e=>{const m=e.target.closest('.mic');if(!m
     ta.value=ta.value.trim()?ta.value.trimEnd()+' '+t:t;ta.dispatchEvent(new Event('input',{bubbles:true}));}};
   rec.onend=()=>{rec=null;m.textContent='MIC';m.classList.remove('on');};rec.onerror=()=>rec&&rec.stop();rec.start();});
 load();
-fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';(document.querySelector('.salt-nav')||document.body.firstChild).after(n);}).catch(()=>{});
+$('#dWho').textContent=(($('#brandWho')||{}).textContent||'')+' —— TWO SESSIONS';
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
 
 async function loadGuests(){try{const r=await fetch('/api/board/guests');if(!r.ok)return;const c=(await r.json()).counts||{};
   $('#g-count').textContent=`${c.sessions||0} SESSIONS · ${c.questions||0} QUESTIONS · ${c.probes||0} PROBES`;}catch{}}
