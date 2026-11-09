@@ -256,13 +256,13 @@ document.addEventListener('click',function(e){var a=e.target.closest&&e.target.c
 var href=a.getAttribute('href');if(href.charAt(0)!=='/'||href.charAt(1)==='/')return;e.preventDefault();
 var p=PAGES[href.split('?')[0]];if(p&&P.__saltsSecretsNav)P.__saltsSecretsNav(p);},true);
 var cs=P.getComputedStyle(P.document.documentElement),v=function(n,d){return cs.getPropertyValue(n).trim()||d;};
-var bg=v('--color-background','#fff'),fg=v('--color-foreground','#111'),card=v('--color-card',bg),
+var bs=P.getComputedStyle(P.document.body),bg=v('--color-background',v('--background-base',bs.backgroundColor)),fg=v('--color-foreground',v('--color-primary',bs.color)),card=v('--color-card',bg),
 mut=v('--color-muted-foreground',fg),acc=v('--color-primary',fg),bd=v('--color-border','rgba(127,127,127,.3)'),
 sel=v('--color-accent',bd),err=v('--color-destructive','#c00'),ok=v('--color-success',acc),warn=v('--color-warning','#b45309'),
-sans=v('--font-sans','system-ui,sans-serif'),mono=v('--font-mono','ui-monospace,monospace');
+sans=bs.fontFamily,disp=v('--theme-font-display',sans),mono=v('--theme-font-mono','ui-monospace,monospace');
 var map={'--paper':bg,'--bg':bg,'--sheet':card,'--surface':card,'--code':card,'--ink':fg,'--text':fg,'--muted':mut,'--dim':mut,
 '--blue':acc,'--accent':acc,'--navy':fg,'--frame':bd,'--rule':acc,'--hair':bd,'--border':bd,'--sel':sel,'--ok':ok,'--err':err,
-'--warn':warn,'--sans':sans,'--serif':sans,'--disp':sans,'--mono':mono,'--nav-bg':bg,'--nav-fg':fg,'--nav-hair':bd,'--nav-font':mono};
+'--warn':warn,'--sans':sans,'--serif':sans,'--disp':disp,'--mono':mono,'--nav-bg':bg,'--nav-fg':fg,'--nav-hair':bd,'--nav-font':mono};
 var s=document.documentElement.style;for(var k in map)s.setProperty(k,map[k]);
 document.documentElement.classList.add('in-hermes');
 })();</script>
