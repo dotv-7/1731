@@ -28,9 +28,9 @@ ol,ul{padding-left:22px}li{margin:3px 0}
 <tr><td>External memory provider</td><td>whatever you configured</td><td>none</td></tr></table>
 
 <h2>2 · Set up</h2>
-<p>Needs the API server enabled and <code>plugins.isolation: in_process</code>. <code>--owner</code> is your own identity on each platform; the plugin never guesses it. Use a handle for <code>--owner-name</code>, not your real name: it is how the public profile refers to you.</p>
+<p><code>--owner</code> is your own identity on each platform; the plugin never guesses it. Use a handle for <code>--owner-name</code>, not your real name: it is how the public profile refers to you.</p>
 <pre data-k="setup"></pre>
-<p><code>setup</code> creates the public profile, installs this plugin there, writes the sender routes (your id to your profile, everyone else to the public one) and runs the check. It copies no model settings or keys; pick the model guests are answered with by running <code>hermes -p public model</code>. It is safe to run again.</p>
+<p><code>setup</code> creates the public profile, installs this plugin there, writes the sender routes (your id to your profile, everyone else to the public one) and runs the check; if anything is missing, such as <code>plugins.isolation: in_process</code>, the failing line says how to fix it. It copies no model settings or keys; pick the model guests are answered with by running <code>hermes -p public model</code>. It is safe to run again.</p>
 
 <h2>3 · Context: decide what guests may know</h2>
 <ol>
@@ -42,7 +42,7 @@ ol,ul{padding-left:22px}li{margin:3px 0}
 <p class="dim">Every decision is logged in <code>plugin-data/salts-secrets/approvals.jsonl</code>. Add your own sensitive words (real name, family, places) to <code>plugin-data/salts-secrets/privacy_rules.yaml</code>.</p>
 
 <h2>4 · Permissions, Guests</h2>
-<p><b>Permissions</b> sets the toolsets guests may use, inside a fixed ceiling (no files, terminal, memory or sessions), and turns guest access on or off. <b>Guests</b> lists every guest conversation, one row per session; open one to read it. Questions that probe for passwords, PINs, real names or addresses are flagged. Guest conversations are never injected into any prompt.</p>
+<p><b>Permissions</b> sets the toolsets guests may use and turns guest access on or off. <b>Guests</b> lists every guest conversation, one row per session; open one to read it. Questions that probe for passwords, PINs, real names or addresses are flagged. Guest conversations are never injected into any prompt.</p>
 
 <h2>5 · From chat</h2>
 <p>Tell your own agent "let guests know I'm on holiday in May". It writes a guest-safe note and queues it; it cannot publish by itself. From your own DM, <code>/salt</code> lists the queue, <code>/salt approve &lt;id&gt;</code> publishes, <code>/salt drop &lt;id&gt;</code> discards.</p>
@@ -54,10 +54,7 @@ ol,ul{padding-left:22px}li{margin:3px 0}
 <tr><td><code>hermes salts-secrets sync</code></td><td>publish what is approved, same as Save &amp; sync</td></tr>
 <tr><td><code>hermes salts-secrets guests</code></td><td>summarise guest conversations</td></tr></table>
 
-<h2>7 · What guests can reach right now</h2><div id="knows" class="dim">loading…</div>
-<p id="iso" class="dim"></p>
-
-<h2>8 · Limits</h2>
+<h2>7 · Limits</h2>
 <ul>
 <li>Native sender routes cover Telegram and Discord; other platforms go through a text-only second line.</li>
 <li>In group chats you count as a guest: only your own DM reaches your profile.</li>
@@ -74,10 +71,4 @@ hermes gateway restart
 hermes salts-secrets check`};
 document.querySelectorAll('pre[data-k]').forEach(e=>{e.textContent=T[e.dataset.k];const b=document.createElement('button');b.textContent='COPY';
   b.onclick=()=>navigator.clipboard.writeText(T[e.dataset.k]).then(()=>{b.textContent='COPIED';setTimeout(()=>b.textContent='COPY',1200);});e.appendChild(b);});
-fetch('/api/doc').then(r=>r.json()).then(d=>{
-  const docs=d.documents.filter(Boolean);
-  $('#knows').innerHTML=`<p>${d.facts} ${d.facts===1?'fact':'facts'} and ${docs.length} ${docs.length===1?'document':'documents'} approved for guests. Guest tools: ${d.tools.length?d.tools.map(t=>`<code>${esc(t)}</code>`).join(' '):'none'}. Guest access is ${d.guest_access?'on':'off'}${d.platforms.length?'; routed platforms: '+d.platforms.map(esc).join(', '):''}.</p>`+
-    (docs.length?'<details><summary>document titles</summary><ul>'+docs.map(t=>`<li>${esc(t)}</li>`).join('')+'</ul></details>':'');
-  $('#iso').textContent=d.isolation||'';
-}).catch(()=>{$('#knows').textContent='could not load the current state';});
 </script></body></html>
