@@ -173,6 +173,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .triage button.act.primary{background:var(--blue);color:#fff}.triage button:disabled{opacity:.4;cursor:default}
 .triage .warn{margin-top:8px;font:500 10px/1.4 var(--mono);letter-spacing:.06em;color:#b91c1c;text-transform:uppercase}
 .triage .tnote{margin-top:8px;font:400 12.5px/1.45 var(--serif);color:var(--muted)}
+.triage .legend{margin-top:12px;display:grid;gap:6px}.triage .legend .tier{margin:0;color:var(--ink)}.triage .legend .tier b{display:inline-block;min-width:92px;text-align:center}
 .tier{margin-top:6px;font:400 11.5px/1.45 var(--sans);color:var(--muted)}
 .tier b{font:500 9.5px/1 var(--mono);letter-spacing:.1em;padding:3px 5px;border:1px solid;margin-right:4px;background:#fff}
 .tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
@@ -360,6 +361,10 @@ function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document
   if(g){g.style.marginTop=g.style.height='';if(!wide)return;g.style.marginTop=(2+a.getBoundingClientRect().top-g.getBoundingClientRect().top)+'px';g.style.height=a.offsetHeight+'px';return;}
   if(!k||!b)return;a.style.marginTop=k.style.marginTop='';if(!wide)return;const d=a.getBoundingClientRect().top-b.getBoundingClientRect().top;if(d>0)k.style.marginTop=d+'px';else if(d<0)a.style.marginTop=(8-d)+'px';});}
 addEventListener('resize',alignAll);
+// Web fonts, raw text and tier lines arrive after the first pass and move the raw box; realign whenever an original changes size.
+let alignQueued=0;const alignSoon=()=>{if(!alignQueued)alignQueued=requestAnimationFrame(()=>{alignQueued=0;alignAll();});};
+if(document.fonts)document.fonts.ready.then(alignSoon);
+if(window.ResizeObserver){const ro=new ResizeObserver(alignSoon);new MutationObserver(()=>document.querySelectorAll('#d-list .ent .orig').forEach(n=>ro.observe(n))).observe($('#d-list'),{childList:true});}
 function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status==='changed'&&!on;
   const st=lk?'locked':on?'public':chg?'changed':'private';
   const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}<span class="st ${st}">${st}</span></div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div>${tierHTML(it)}<pre class="raw ${texts[it.id]===undefined?'wait':''}">${texts[it.id]===undefined?'loading raw…':markHTML(texts[it.id]===undefined?'':(texts[it.id]||'(empty)').length>FOLD&&!unfold.has(it.id)?(texts[it.id].slice(0,FOLD)+'\n…'):(texts[it.id]||'(empty)'))}</pre>${texts[it.id]&&texts[it.id].length>FOLD?`<button class="more">${unfold.has(it.id)?'Show less':`Show all · ${fmt(texts[it.id].length)} chars`}</button>`:''}${texts[it.id]!==undefined&&on?chips(texts[it.id],'nothing flagged in the original'):''}</div></div>`;
@@ -437,6 +442,7 @@ function tierCounts(){const n={A:0,B:0,C:0};for(const it of items){const c=cls[i
 function drawTriage(){const t=$('#triage');if(!t)return;const n=tierCounts(),done=Object.keys(cls).length,dirty=snapshot()!==initial||Object.keys(via).length>0;
   t.innerHTML=`<div class="tl"><span class="lbl">TRIAGE · RULES FIRST, THEN HERMES · NOTHING CROSSES WITHOUT YOUR CLICK</span><span class="lbl">${done?`${n.A} A · ${n.B} B · ${n.C} C`:'NOT CLASSIFIED YET'}</span></div>`+
   `<div class="tb"><button class="act" id="t-run">${done?'Classify again':'Classify'}</button><button class="act" data-bulk="A" ${n.A?'':'disabled'}>A · adopt all ${n.A} as-is</button><button class="act" data-bulk="B" ${n.B?'':'disabled'}>B · draft guest versions for all ${n.B}</button><button class="act" data-bulk="C" ${n.C?'':'disabled'}>C · keep all ${n.C} private</button><button class="act primary" id="t-save" ${dirty?'':'disabled'}>Save &amp; sync</button></div>`+
+  `<div class="legend"><div class="tier tA"><b>A · AS-IS</b>Nothing personal: text she already published, or a pure method (rules, checklists, thresholds). Can cross unchanged.</div><div class="tier tB"><b>B · REWRITE</b>A shareable core wrapped in personal detail: where she lives, her job, pets, routines, opinions about private people. Crosses only as a guest version written in general terms.</div><div class="tier tC"><b>C · PRIVATE</b>Credentials, accounts, wallets, addresses, phone or email, health, names of family, partners or doctors, anything she marked private. Never crosses.</div></div>`+
   (combo&&combo.hit?`<div class="warn">${esc(combo.message)} · ${combo.ids.length} entries marked B</div>`:'')+
   `<div class="tnote">A crosses unchanged, B crosses only as a guest version, C stays here. A bulk button only ever takes entries of its own tier; C never crosses in bulk. Every entry stays editable one by one, and every click is written to the approval log.</div>`;}
 async function runClassify(rulesOnly){const b=$('#t-run');if(b&&!rulesOnly){b.disabled=true;b.textContent='Classifying…';}const t0=Date.now();
