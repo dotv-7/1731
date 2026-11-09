@@ -3,6 +3,7 @@ drafts, the permissions view and the developer facts. Callers own auth; every fu
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -76,7 +77,12 @@ def _draft_system(kind: str, public_name: str, policy: str) -> str:
                  "paths, people, positions and unpublished thresholds. The result must be usable by a stranger who wants to "
                  "apply the method to their own case.\n\n")
     else:
-        shape = "The source is a note. Output one short paragraph of plain prose.\n\n"
+        shape = ("The source is one entry of the owner's own context: a memory line, a profile fact or a file. Rewrite "
+                 "that entry itself into its public version, in the source's voice, person, tense, form and order: a terse "
+                 "memory line stays a terse line in the same style, a list stays a list, a rule stays a rule. It remains "
+                 "the assistant's own note about its owner, not a report on it: never write 'The note', 'This entry', "
+                 "'The source', 'The user' or say what the text is about. Shorten only by removing or generalising what "
+                 "the policy forbids.\n\n")
     return base + shape + "OWNER'S DISCLOSURE POLICY:\n" + policy
 
 
@@ -91,11 +97,12 @@ async def draft(owner_home: Path, item: ctx.Item, public_name: str, force: bool 
                 default_policy: str = DEFAULT_POLICY) -> dict:
     """The owner's model drafts the public version of *item*, cached per item until its text changes."""
     store = _draft_store(owner_home)
-    hit = store.get(item.id)
-    if hit and hit.get("fingerprint") == item.fingerprint and not force:
-        return {"draft": hit["draft"], "cached": True, "tokens": hit.get("tokens", 0)}
-    user = f"Source: {item.group} › {item.title}\n\n{'Skill' if item.kind == 'skill' else 'Note'}:\n{item.text[:12000]}"
+    user = f"Source: {item.group} › {item.title}\n\n{item.text[:12000]}"
     system = _draft_system(item.kind, public_name, policy_text(owner_home, default_policy))
+    asked = hashlib.sha256((system + user).encode()).hexdigest()[:16]
+    hit = store.get(item.id)
+    if hit and hit.get("asked") == asked and not force:
+        return {"draft": hit["draft"], "cached": True, "tokens": hit.get("tokens", 0)}
     try:
         result = await classify.host_llm().acomplete(
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -106,7 +113,7 @@ async def draft(owner_home: Path, item: ctx.Item, public_name: str, force: bool 
     text, tokens = (result.text or "").strip(), int(result.usage.total_tokens or 0)
     if not text:
         raise DraftError("model returned an empty draft (reasoning used up the budget?); not cached")
-    store[item.id] = {"fingerprint": item.fingerprint, "draft": text, "tokens": tokens, "at": int(time.time())}
+    store[item.id] = {"asked": asked, "draft": text, "tokens": tokens, "at": int(time.time())}
     try:
         data_dir(owner_home).mkdir(parents=True, exist_ok=True)
         tmp = data_dir(owner_home) / (DRAFT_FILE + ".tmp")
