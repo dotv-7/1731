@@ -178,9 +178,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
 body.rotop nav.salt-nav{top:33px}
-.robar{position:sticky;top:0;z-index:45;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
+.robar{position:sticky;top:0;z-index:70;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
 .ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
-.ro input[type=checkbox],.ro textarea{pointer-events:none;opacity:.6}
+.ro textarea{pointer-events:none;opacity:.6}
+.ro .detail{top:33px}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
 </style></head><body>
 <div class="grain"></div>
@@ -341,7 +342,7 @@ const spansOs=spansOf;
 function chips(t,empty){const f=flagsOf(t);const ks=Object.keys(f);if(!ks.length)return `<div class="flags"><span class="ok">${empty||'nothing flagged'}</span></div>`;return `<div class="flags">${ks.map(k=>`<span>${k} ×${f[k]}</span>`).join('')}</div>`;}
 const isSame=id=>{const o=(texts[id]||'').trim(),v=(drafts[id]!==undefined?drafts[id]:(texts[id]||'')).trim();return v===o||!v;};
 // Layer two: Hermes' own model drafts the guest version, once per original (cached by fingerprint server-side).
-async function draftOne(id,force){if(busy.has(id)||demo)return;busy.add(id);rerow(id);
+async function draftOne(id,force){if(busy.has(id)||demo||document.body.classList.contains('ro'))return;busy.add(id);rerow(id);
   try{const r=await fetch('/api/board/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,force:!!force})});if(!r.ok)throw new Error((await r.json()).detail||r.status);const j=await r.json();
     if(!j.cached){draftN++;draftTok+=j.tokens||0;}
     if(j.draft==='NOTHING_SAFE_TO_SHARE'){drafts[id]='';nothingSafe.add(id);}else{drafts[id]=j.draft;nothingSafe.delete(id);}asIs[id]=false;}
@@ -460,7 +461,7 @@ $('#d-list').addEventListener('click',e=>{const m=e.target.closest('.mic');if(!m
   rec.onend=()=>{rec=null;m.textContent='MIC';m.classList.remove('on');};rec.onerror=()=>rec&&rec.stop();rec.start();});
 load();
 $('#dWho').textContent=(($('#brandWho')||{}).textContent||'')+' —— TWO SESSIONS';
-fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; ticks are a preview, nothing is saved, drafted or published';document.body.prepend(n);document.body.classList.add('rotop');}).catch(()=>{});
 
 async function loadGuests(){try{const r=await fetch('/api/board/guests');if(!r.ok)return;const c=(await r.json()).counts||{};
   $('#g-count').textContent=`${c.sessions||0} SESSIONS · ${c.questions||0} QUESTIONS · ${c.probes||0} PROBES`;}catch{}}
