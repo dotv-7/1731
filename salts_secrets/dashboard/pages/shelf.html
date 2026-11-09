@@ -177,7 +177,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier b{font:500 9.5px/1 var(--mono);letter-spacing:.1em;padding:3px 5px;border:1px solid;margin-right:4px;background:#fff}
 .tier.tA b{color:#047857}.tier.tB b{color:#b45309}.tier.tC b{color:#b91c1c}
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
-.robar{position:sticky;top:0;z-index:20;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
+.robar{position:sticky;top:64px;z-index:35;border-top:6px solid var(--bg,var(--paper,#f2f2f2));background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:8px 14px;text-align:center}
 .ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
 .ro input[type=checkbox],.ro textarea{pointer-events:none;opacity:.6}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
@@ -458,7 +458,7 @@ $('#d-list').addEventListener('click',e=>{const m=e.target.closest('.mic');if(!m
     ta.value=ta.value.trim()?ta.value.trimEnd()+' '+t:t;ta.dispatchEvent(new Event('input',{bubbles:true}));}};
   rec.onend=()=>{rec=null;m.textContent='MIC';m.classList.remove('on');};rec.onerror=()=>rec&&rec.stop();rec.start();});
 load();
-fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';document.body.prepend(n);}).catch(()=>{});
+fetch('/api/me').then(r=>r.json()).then(j=>{if(!j.readonly)return;document.body.classList.add('ro');const n=document.createElement('div');n.className='robar';n.textContent='READ ONLY · you see what Lena sees; saving, drafting and publishing are off';(document.querySelector('.salt-nav')||document.body.firstChild).after(n);}).catch(()=>{});
 
 async function loadGuests(){try{const r=await fetch('/api/board/guests');if(!r.ok)return;const c=(await r.json()).counts||{};
   $('#g-count').textContent=`${c.sessions||0} SESSIONS · ${c.questions||0} QUESTIONS · ${c.probes||0} PROBES`;}catch{}}
