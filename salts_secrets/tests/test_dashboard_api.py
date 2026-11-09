@@ -125,6 +125,8 @@ def test_tab_pages_are_the_board_without_chat_trace_or_web_fonts(client):
         "CONTEXT", "PERMISSIONS", "GUESTS", "DOC"]
     assert ">CHAT</a>" not in nav and ">TRACE</a>" not in nav
     assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html
+    assert "__SALT_ASSETS__/dist/fonts/fonts.css" in html
+    assert (API.parent / "dist/fonts/fonts.css").is_file()
     assert "Ada" in html and "Lena" not in html
     assert http.get("/api/plugins/salts-secrets/page/trace").status_code == 404
 

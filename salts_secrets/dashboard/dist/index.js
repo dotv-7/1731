@@ -1,5 +1,5 @@
 // Salt's Secrets dashboard tab: the owner board (Context, Permissions, Guests, Doc) rendered locally from this
-// plugin's own API. Each page runs in a same-origin frame so its layout and scripts stay intact; its inline
+// plugin's own API, in the board's own colours and bundled fonts. Each page runs in a same-origin frame so its layout and scripts stay intact; its inline
 // scripts become blob: scripts because the browser-hosted dashboard forbids inline script.
 (function () {
   const SDK = window.__HERMES_PLUGIN_SDK__;
@@ -7,6 +7,7 @@
   const { useState, useEffect, useRef } = SDK.hooks;
   const h = React.createElement;
   const API = "/api/plugins/salts-secrets";
+  const ASSETS = (window.__HERMES_BASE_PATH__ || "") + "/dashboard-plugins/salts-secrets";
 
   function withBlobScripts(html, urls) {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -48,7 +49,7 @@
       let live = true;
       setError("");
       SDK.fetchJSON(API + "/page/" + page)
-        .then((r) => live && setDoc(withBlobScripts(r.html, urls)))
+        .then((r) => live && setDoc(withBlobScripts(r.html.split("__SALT_ASSETS__").join(ASSETS), urls)))
         .catch((e) => live && setError(String((e && e.message) || e)));
       return () => {
         live = false;

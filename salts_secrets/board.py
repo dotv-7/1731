@@ -227,6 +227,8 @@ NAV_TITLE = {"chat": "CHAT", "shelf": "CONTEXT", "perm": "PERMISSIONS", "guests"
 DASHBOARD_PAGES = ("shelf", "perm", "guests", "doc")  # the chat and the trace stay on the demo site
 OWNER_ONLY = ("shelf", "perm", "guests", "trace")
 NAV_CSS = """<style>
+html,body{overscroll-behavior:none}
+body::before{z-index:60}
 nav.salt-nav{position:sticky;top:0;z-index:40;height:64px;margin:0;padding:0 calc(53px - (100vw - 100%)) 0 36px;display:flex;align-items:center;
 justify-content:space-between;gap:24px;background:var(--nav-bg,#f2f2f2);color:var(--nav-fg,#0000f2);
 border-bottom:1px solid var(--nav-hair,rgba(0,0,242,.18));box-sizing:border-box;flex-wrap:nowrap}
@@ -244,7 +246,7 @@ nav.salt-nav.hide-own .r a.own{visibility:hidden}
 _NAV_BLOCK = re.compile(r"<!--SALT-NAV-->(.*?)<!--/SALT-NAV-->", re.DOTALL)
 _WEB_FONTS = re.compile(r"<link[^>]+fonts\.(?:googleapis|gstatic)\.com[^>]*>")
 # Inside the Hermes dashboard: API calls go to this plugin's routes with the dashboard session token, links
-# switch the tab's page, and the page takes the dashboard theme's colours and fonts.
+# switch the tab's page, and the fonts come from the plugin's own bundle instead of Google.
 DASHBOARD_SHIM = """<script>(function(){
 var P=window.parent;if(P===window||!P.__HERMES_PLUGIN_SDK__)return;
 var T=P.__HERMES_SESSION_TOKEN__,B=(P.__HERMES_BASE_PATH__||'')+'/api/plugins/salts-secrets',F=window.fetch.bind(window);
@@ -255,18 +257,8 @@ var PAGES={'/shelf':'shelf','/perm':'perm','/guests':'guests','/doc':'doc'};
 document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;
 var href=a.getAttribute('href');if(href.charAt(0)!=='/'||href.charAt(1)==='/')return;e.preventDefault();
 var p=PAGES[href.split('?')[0]];if(p&&P.__saltsSecretsNav)P.__saltsSecretsNav(p);},true);
-var cs=P.getComputedStyle(P.document.documentElement),v=function(n,d){return cs.getPropertyValue(n).trim()||d;};
-var bs=P.getComputedStyle(P.document.body),bg=v('--color-background',v('--background-base',bs.backgroundColor)),fg=v('--color-foreground',v('--color-primary',bs.color)),card=v('--color-card',bg),
-mut=v('--color-muted-foreground',fg),acc=v('--color-primary',fg),bd=v('--color-border','rgba(127,127,127,.3)'),
-sel=v('--color-accent',bd),err=v('--color-destructive','#c00'),ok=v('--color-success',acc),warn=v('--color-warning','#b45309'),
-sans=bs.fontFamily,disp=v('--theme-font-display',sans),mono=v('--theme-font-mono','ui-monospace,monospace');
-var map={'--paper':bg,'--bg':bg,'--sheet':card,'--surface':card,'--code':card,'--ink':fg,'--text':fg,'--muted':mut,'--dim':mut,
-'--blue':acc,'--accent':acc,'--navy':fg,'--frame':bd,'--rule':acc,'--hair':bd,'--border':bd,'--sel':sel,'--ok':ok,'--err':err,
-'--warn':warn,'--sans':sans,'--serif':sans,'--disp':disp,'--mono':mono,'--nav-bg':bg,'--nav-fg':fg,'--nav-hair':bd,'--nav-font':mono};
-var s=document.documentElement.style;for(var k in map)s.setProperty(k,map[k]);
-document.documentElement.classList.add('in-hermes');
 })();</script>
-<style>.in-hermes body::before{display:none}.in-hermes body{background:var(--bg)}</style>"""
+<link rel="stylesheet" href="__SALT_ASSETS__/dist/fonts/fonts.css">"""
 
 
 def nav_html(page: str, owner_name: str, tools: str = "", dashboard: bool = False, hide_owner: bool = False) -> str:
