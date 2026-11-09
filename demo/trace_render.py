@@ -72,8 +72,7 @@ a{color:inherit;text-decoration:none}
 @media (max-width:1000px){.wrap{grid-template-columns:1fr}.side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--hair)}.pair,.heads,.diff{grid-template-columns:1fr}.heads .r{text-align:left}}
 """
 
-TOP = """<div class="top"><div class="l"><span class="lbl">LENA MOREAU</span><span class="line"></span><span class="lbl">TRACE</span></div>
-<div class="r"><a class="lbl" href="/">CHAT</a><a class="lbl" href="/shelf">CONTEXT</a><a class="lbl" href="/perm">PERMISSIONS</a><a class="lbl" href="/guests">GUESTS</a><span class="lbl" id="count">{count}</span></div></div>"""
+TOP = "<!--SALT-NAV--><!--/SALT-NAV-->"  # the demo server puts the shared top bar here
 
 
 def headings(text: str) -> list[str]:
@@ -231,7 +230,7 @@ def render(bundle: dict, out_dir: Path) -> Path:
     def cell(step):
         if not step:
             return '<span class="none">—</span>'
-        kind, title, body, tok, extra, aid = step
+        kind, title, _body, tok, _extra, aid = step
         return f'<a class="seg {kind}" href="#{aid}" title="{esc(title)}"><b>{esc(title)}</b><span>{fmt(tok) if tok else ""}</span></a>'
     side = ['<div class="row head"><span class="lbl">step</span><span class="lbl">Lena</span><span class="lbl">Salt\'s assistant</span></div>',
             f'<div class="row"><span class="n">sys</span><a class="seg sys" href="#sys"><b>system</b><span>{len(L["system_prompt"]):,} ch</span></a><a class="seg sys" href="#sys"><b>system</b><span>{len(R["system_prompt"]):,} ch</span></a></div>',
