@@ -43,6 +43,8 @@ def render_page(name: str, owner_name: str, public_name: str, dashboard: bool = 
     """A board page with its top bar and the demo names (Lena, Salt) replaced by the configured ones."""
     if name not in PAGE_NAMES:
         raise KeyError(name)
+    if dashboard and name == "doc":  # the installed plugin explains itself; the demo site keeps its API doc
+        return with_nav((PAGES / "guide.html").read_text(encoding="utf-8"), name, owner_name, dashboard)
     html = with_nav((PAGES / f"{name}.html").read_text(encoding="utf-8"), name, owner_name, dashboard)
     html = re.sub(r"\bLena\b", owner_name, html)
     return re.sub(r"\bSalt\b", public_name, html)
@@ -278,7 +280,8 @@ def nav_html(page: str, owner_name: str, tools: str = "", dashboard: bool = Fals
         who = "SALT'S ASSISTANT"  # the chat page sets the owner's name once it knows who signed in
     return (f'{NAV_CSS}<nav class="salt-nav top bar{" hide-own" if hide_owner else ""}"><div class="l">'
             f'<span class="lbl" id="brandWho">{who}</span>'
-            f'<span class="line"></span><span class="lbl">{NAV_TITLE[page]}</span>{tools}</div>'
+            f'<span class="line"></span><span class="lbl">{"GUIDE" if dashboard and page == "doc" else NAV_TITLE[page]}</span>'
+            f'{tools}</div>'
             f'<div class="r">{links}</div></nav>')
 
 

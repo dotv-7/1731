@@ -131,6 +131,13 @@ def test_tab_pages_are_the_board_without_chat_trace_or_web_fonts(client):
     assert http.get("/api/plugins/salts-secrets/page/trace").status_code == 404
 
 
+def test_dashboard_doc_is_the_plugin_guide_not_the_demo_api(client):
+    http, _, _ = client
+    html = http.get("/api/plugins/salts-secrets/page/doc").json()["html"]
+    assert "hermes salts-secrets setup" in html and ">GUIDE</span>" in html
+    assert "/api/chat" not in html and "Lena" not in html
+
+
 def test_doc_facts_describe_this_install(client):
     http, _, _ = client
     body = http.get("/api/plugins/salts-secrets/doc").json()
