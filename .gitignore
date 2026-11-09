@@ -332,3 +332,6 @@ native/fts5_cjk/*.so
 /pm/.lock.json.lock
 
 apps/desktop/.dist-build*
+
+# owner-private notes, kept outside the public repo
+DOTV_MASTER.md
