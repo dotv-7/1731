@@ -114,7 +114,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .ent .st{display:inline-block;font:500 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px solid currentColor;padding:2px 5px 1px;margin-left:8px;vertical-align:1px}
 .ent .st.public{color:var(--blue)}.ent .st.locked{color:#b91c1c}.ent .st.changed{color:#b45309}
 .ent pre.raw{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:400 12.5px/1.5 var(--mono);color:var(--ink);background:#fff;border:1px solid var(--hair);padding:10px;overflow:hidden}
-.ent pre.raw.fold,.ent .gst textarea.fold{max-height:240px;overflow:hidden}
+.ent pre.raw.fold,.ent .gst textarea.fold{max-height:240px;overflow:hidden}.ent pre.raw.fold.fit,.ent .gst textarea.fold.fit{max-height:none}
 .ent .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.ent .tags .st,.ent .tags .tier{margin:0}
 .ent .tags .tag{font:500 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;border:1px solid currentColor;padding:2px 5px 1px}
 .ent pre.raw.wait{color:var(--muted);font-style:italic}
@@ -184,7 +184,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
 body.rotop nav.salt-nav{top:33px}
 .robar{position:sticky;top:0;z-index:70;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
-.ro #d-save,.ro #t-save,.ro #t-undo,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
+.ro #d-save,.ro #d-undo,.ro #t-save,.ro #t-undo,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
 .ro #d-list input,.ro #d-list textarea{opacity:.6;cursor:not-allowed}
 .robar.flash{animation:roflash .45s 2}@keyframes roflash{50%{background:#f59e0b}}
 .rotip{position:fixed;z-index:80;pointer-events:none;background:#b45309;color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;padding:7px 9px;opacity:0;transition:opacity .15s}.rotip.on{opacity:1}
@@ -220,7 +220,7 @@ body.rotop nav.salt-nav{top:33px}
   <div class="dtop"><button class="lbl box close" id="close">CLOSE</button><span class="lbl" id="dWho">TWO SESSIONS</span></div>
   <div class="dhead">
     <div><span class="lbl su" id="d-su"></span><div class="ti" id="d-ti"></div><div class="desc" id="d-desc"></div><div class="counts" id="d-counts"></div></div>
-    <div><div class="acts"><button class="act" id="d-guest">View as guest</button><button class="act primary" id="d-save" disabled>Save &amp; sync</button></div><div class="cost" id="d-cost"></div></div>
+    <div><div class="acts"><button class="act" id="d-guest">View as guest</button><button class="act" id="d-undo" disabled title="drop the changes you have not saved">Discard changes</button><button class="act primary" id="d-save" disabled>Save &amp; sync</button></div><div class="cost" id="d-cost"></div></div>
   </div>
   <div class="cols"><span class="lbl">LENA'S HERMES · ORIGINAL</span><span class="lbl m"></span><span class="lbl r">SALT'S ASSISTANT · GUEST VERSION</span></div>
   <div class="list" id="d-list"></div>
@@ -342,7 +342,7 @@ function refreshCounts(){if(!cb)return;drawTriage();const np=sPub(cb).length,lk=
   const empty=cb.items.filter(i=>pub.has(i.id)&&!asIs[i.id]&&texts[i.id]!==undefined&&!(drafts[i.id]!==undefined?drafts[i.id]:(texts[i.id]||'')).trim()).length;
   if(blocked)$('#d-counts').innerHTML+=`<span style="color:#b91c1c"><b style="color:#b91c1c">${blocked}</b> ticked but ${empty===blocked?'empty':empty?'empty or identical to the original':'still identical to the original'}, not allowed to cross</span>`;
   $('#d-cost').textContent=draftN?`DRAFTS THIS SESSION: ${draftN} · ${fmt(draftTok)} TOKENS`:'';
-  $('#d-save').disabled=snapshot()===initial||blocked>0;}
+  $('#d-save').disabled=snapshot()===initial||blocked>0;$('#d-undo').disabled=snapshot()===initial;}
 // Layer one: deterministic scan. Anything matching is marked red on the left and counted on the right; it costs nothing.
 const FLAGS=[['path',/(?:~|\/Users|\/home|\/opt|\/etc|\/var|\/private)\/[^\s"'`)>\]]+/g],['email',/[\w.+-]+@[\w-]+\.[\w.-]+/g],['phone',/(?<![\d-])(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}(?![\d-])/g],['wallet/card',/\b(?:0x[a-fA-F0-9]{20,}|bc1[a-z0-9]{20,}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4})\b/g],['secret',/\b(?:sk-[A-Za-z0-9]{8,}|passwords?|passphrases?|seed phrase|mnemonic|recovery (?:email|phrase|code)|2FA|backup codes?)\b/gi],['date',/\b(?:\d{4}-\d{2}-\d{2}|\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?: \d{4})?|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}(?:,? \d{4})?)\b/g],['money',/(?:€|\$|£|USD|EUR)\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:euros?|dollars?|USD|EUR)\b/gi],['wifi',/\b(?:wi-?fi|ssid)\b/gi],['health',/\b(?:therap|doctor|dr\.|clinic|diagnos|medicat|anxiety|depress|hospital)\w*/gi],['employer',/\b(?:Northwind|Kraken|fintech)\b/g]];
 function spansOf(t){const out=[];for(const [n,re] of FLAGS){const r=new RegExp(re.source,re.flags);let m;while((m=r.exec(t||''))){if(m[0])out.push([m.index,m.index+m[0].length,n]);else r.lastIndex++;}}return out.sort((a,b)=>a[0]-b[0]);}
@@ -363,7 +363,7 @@ function rerow(id){const row=document.querySelector(`.ent[data-id="${CSS.escape(
 function fit(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px';}
 function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);markFold();alignAll();}
 // A box gets its Show all / Show less only when its text is taller than the fold.
-function markFold(){document.querySelectorAll('#d-list .ent .more').forEach(m=>{const b=m.previousElementSibling;m.hidden=!(b&&b.scrollHeight>FOLD_PX+24);});}
+function markFold(){document.querySelectorAll('#d-list .ent .more').forEach(m=>{const b=m.previousElementSibling;const over=!!b&&b.scrollHeight>FOLD_PX+24;m.hidden=!over;if(b)b.classList.toggle('fit',!over);});}
 // The guest box (or its empty placeholder) starts on the same line as the raw original, whatever the title, path and tier lines above it take.
 function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document.querySelectorAll('#d-list .ent').forEach(e=>{const a=e.querySelector('pre.raw'),g=e.querySelector('.gst .ghost'),k=e.querySelector('.gst .k'),b=e.querySelector('.gst textarea');if(!a)return;
   if(g){g.style.marginTop=g.style.height='';if(!wide)return;g.style.marginTop=(2+a.getBoundingClientRect().top-g.getBoundingClientRect().top)+'px';g.style.height=a.offsetHeight+'px';return;}
@@ -429,7 +429,7 @@ async function saveAll(){if(demo)return toast('Demo data, nothing saved');const 
   if(!r.ok)return toast('Save failed');const j=await r.json();combo=j.combination||null;
   toast(`Synced: ${j.facts} facts, ${j.documents} documents now reach the guest`+((j.rejected||[]).length?` · ${j.rejected.length} refused (bulk click outside its tier, or marked do not publish)`:'')+(combo&&combo.hit?' · combination warning':'')+(j.failed?` · REVOKE INCOMPLETE: ${j.failed} guest session(s) not deleted; those guests now get fresh sessions; save again to retry`:''));
   const id=cb&&cb.id;await load();if(open&&id){cb=SOURCES.find(s=>s.id===id);renderList();if($('#detail').classList.contains('asguest'))renderGuest();}}
-$('#d-save').onclick=saveAll;
+$('#d-save').onclick=saveAll;$('#d-undo').onclick=()=>discard();
 // ---------- "view as guest": the raw section the plugin injects, rebuilt from the synced projection
 $('#d-guest').onclick=()=>{const det=$('#detail');const on=det.classList.toggle('asguest');$('#d-guest').classList.toggle('on',on);if(on)renderGuest();};
 async function renderGuest(){const g=$('#gview');g.innerHTML='<p class="note">Loading the synced projection…</p>';
