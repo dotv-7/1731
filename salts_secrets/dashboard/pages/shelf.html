@@ -98,7 +98,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .detail button.act{height:40px;padding:0 16px;border:1px solid var(--blue);background:#e6e6f4;color:var(--blue);font:500 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;border-radius:0}
 .detail button.act.on,.detail button.act.primary{background:var(--blue);color:#fff}
 .detail button.act:disabled{opacity:.4;cursor:default}
-.detail .cols{flex:none;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);gap:0 16px;padding:10px 36px 6px;color:var(--blue);background:var(--sheet)}
+.detail .cols{flex:none;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);gap:0 16px;padding:10px 36px 6px;color:var(--blue);background:var(--sheet);border-bottom:1px solid var(--blue)}
 .detail .cols .r{text-align:right}
 .detail .list{flex:1;min-height:0;overflow:auto;padding:0 36px 60px;user-select:text}
 .dl{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);gap:0 16px;align-items:stretch}
@@ -114,9 +114,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .ent .st{display:inline-block;font:500 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px solid currentColor;padding:2px 5px 1px;margin-left:8px;vertical-align:1px}
 .ent .st.public{color:var(--blue)}.ent .st.locked{color:#b91c1c}.ent .st.changed{color:#b45309}
 .ent pre.raw{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:400 12.5px/1.5 var(--mono);color:var(--ink);background:#fff;border:1px solid var(--hair);padding:10px;overflow:hidden}
-.ent pre.raw.full{max-height:none}
+.ent pre.raw.fold,.ent .gst textarea.fold{max-height:240px;overflow:hidden}
+.ent .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.ent .tags .st,.ent .tags .tier{margin:0}
+.ent .tags .tag{font:500 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;border:1px solid currentColor;padding:2px 5px 1px;cursor:help}
 .ent pre.raw.wait{color:var(--muted);font-style:italic}
-.ent .more{font:500 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-top:6px}
+.ent .more{display:block;width:100%;margin-top:6px;padding:7px 0;border:1px solid var(--blue);background:#fff;text-align:center;font:500 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--blue)}
 .ent .arr{display:flex;align-items:center;justify-content:center;font:400 20px/1 var(--mono);color:var(--blue)}
 .ent .arr.off{color:var(--hair)}
 .ent .gst{position:relative}
@@ -186,6 +188,7 @@ body.rotop nav.salt-nav{top:33px}
 .rotip{position:fixed;z-index:80;pointer-events:none;background:#b45309;color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;padding:7px 9px;opacity:0;transition:opacity .15s}.rotip.on{opacity:1}
 
 .ro .detail{top:33px}
+.ent .gst .k button.reset.on{background:var(--blue);color:#fff}
 .ent .gst .mic.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
 </style></head><body>
 <div class="grain"></div>
@@ -217,7 +220,7 @@ body.rotop nav.salt-nav{top:33px}
     <div><span class="lbl su" id="d-su"></span><div class="ti" id="d-ti"></div><div class="desc" id="d-desc"></div><div class="counts" id="d-counts"></div></div>
     <div><div class="acts"><button class="act" id="d-guest">View as guest</button><button class="act primary" id="d-save" disabled>Save &amp; sync</button></div><div class="cost" id="d-cost"></div></div>
   </div>
-  <div class="cols"><span class="lbl">LENA'S SESSION · RAW ORIGINAL · ABSOLUTE PATH</span><span class="lbl m"></span><span class="lbl r">SALT'S ASSISTANT · RAW GUEST VERSION</span></div>
+  <div class="cols"><span class="lbl">LENA'S HERMES · ORIGINAL</span><span class="lbl m"></span><span class="lbl r">SALT'S ASSISTANT · GUEST VERSION</span></div>
   <div class="list" id="d-list"></div>
   <div class="gview" id="gview"></div>
 </div>
@@ -367,10 +370,14 @@ if(document.fonts)document.fonts.ready.then(alignSoon);
 if(window.ResizeObserver){const ro=new ResizeObserver(alignSoon);new MutationObserver(()=>document.querySelectorAll('#d-list .ent .orig').forEach(n=>ro.observe(n))).observe($('#d-list'),{childList:true});}
 function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status==='changed'&&!on;
   const st=lk?'locked':on?'public':chg?'changed':'private';
-  const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}<span class="st ${st}">${st}</span></div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div>${tierHTML(it)}<pre class="raw ${texts[it.id]===undefined?'wait':''}">${texts[it.id]===undefined?'loading raw…':markHTML(texts[it.id]===undefined?'':(texts[it.id]||'(empty)').length>FOLD&&!unfold.has(it.id)?(texts[it.id].slice(0,FOLD)+'\n…'):(texts[it.id]||'(empty)'))}</pre>${texts[it.id]&&texts[it.id].length>FOLD?`<button class="more">${unfold.has(it.id)?'Show less':`Show all · ${fmt(texts[it.id].length)} chars`}</button>`:''}${texts[it.id]!==undefined&&on?chips(texts[it.id],'nothing flagged in the original'):''}</div></div>`;
+  const raw=texts[it.id],gv=drafts[it.id]!==undefined?drafts[it.id]:(raw||'');
+  // Long entries fold both boxes to the same height; one Show all / Show less under each box toggles both.
+  const long=raw!==undefined&&(raw.length>FOLD||(on&&gv.length>FOLD)),fold=long&&!unfold.has(it.id);
+  const more=long?`<button class="more" type="button">${fold?'Show all':'Show less'}</button>`:'';
+  const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}</div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><div class="tags"><span class="st ${st}">${st}</span>${tierHTML(it)}</div><pre class="raw ${raw===undefined?'wait':''} ${fold?'fold':''}">${raw===undefined?'loading raw…':markHTML(raw||'(empty)')}</pre>${more}</div></div>`;
   let right;
   if(on){const v=drafts[it.id]!==undefined?drafts[it.id]:(texts[it.id]||'');const edited=v.trim()!==(texts[it.id]||'').trim();const same=texts[it.id]!==undefined&&isSame(it.id)&&!asIs[it.id];const b=busy.has(it.id);const ns=nothingSafe.has(it.id)&&!v.trim()&&!b;
-    right=`<div class="gst"><div class="k"><span>GUEST VERSION · RAW · ${cb.fact?'INJECTED AS A FACT':cb.id==='skills'?'PUBLIC METHOD · LISTED IN THE GUEST PROMPT, FOLLOWED ON USE':'SENT AS A DOCUMENT'}</span><span><label title="let the original cross unchanged"><input type="checkbox" class="asis" ${asIs[it.id]?'checked':''}> AS-IS</label>${SR?'<button class="mic" type="button" title="Dictate into the guest version (browser speech recognition)">MIC</button>':''}<button class="draft" type="button" ${b?'disabled':''}>${b?'Drafting…':'Draft with Hermes'}</button><button class="reset" type="button">Original</button></span></div><textarea spellcheck="false" class="${edited?'edited':''} ${same?'same':''}" ${texts[it.id]===undefined?'':'data-filled="1"'} ${b?'disabled':''} placeholder="${ns?'Write the guest version yourself, or untick the entry.':'Guest version'}">${esc(b?'Hermes is drafting a guest version…':v)}</textarea>${texts[it.id]!==undefined&&!b?chips(v,asIs[it.id]?'crossing as-is, nothing flagged':'nothing flagged in the guest version'):''}${ns?`<div class="warn">HERMES DRAFTED NOTHING · IT JUDGED EVERY PART OF THIS NOTE PRIVATE (PATHS, EMPLOYER, DATES, ACCOUNTS) · WRITE A GUEST VERSION YOURSELF, OR UNTICK · NOTHING CROSSES WHILE THIS IS EMPTY</div>`:same?`<div class="warn">${!v.trim()?'EMPTY · NOTHING WOULD CROSS':'SAME AS THE ORIGINAL'} · DRAFT IT, EDIT IT, OR TICK AS-IS</div>`:''}</div>`;}
+    right=`<div class="gst"><div class="k"><span></span><span><button class="draft" type="button" ${b?'disabled':''} title="Hermes writes a guest version without the private details">${b?'Drafting…':'Draft with Hermes'}</button><button class="reset ${asIs[it.id]?'on':''}" type="button" title="publish the original unchanged">Original</button></span></div><textarea spellcheck="false" class="${edited?'edited':''} ${same?'same':''} ${fold?'fold':''}" ${texts[it.id]===undefined?'':'data-filled="1"'} ${b?'disabled':''} placeholder="${ns?'Write the guest version yourself, or untick the entry.':'Guest version'}">${esc(b?'Hermes is drafting a guest version…':v)}</textarea>${more}${texts[it.id]!==undefined&&!b&&Object.keys(flagsOf(v)).length?chips(v):''}${ns?`<div class="warn">NOTHING SAFE TO SHARE · WRITE ONE OR UNTICK</div>`:same?`<div class="warn">${!v.trim()?'EMPTY':'UNCHANGED'} · CLICK DRAFT OR ORIGINAL</div>`:''}</div>`;}
   else if(chg)right=`<div class="gst"><div class="ghost"><span class="st changed">ORIGINAL CHANGED · DROPPED BACK TO PRIVATE</span><span class="why">The original was edited after you published it, so the guest lost it. Tick again to republish; the last guest version is below.</span>${drafts[it.id]?`<pre>${esc(drafts[it.id])}</pre>`:''}</div></div>`;
   else if(lk)right=`<div class="gst"><div class="ghost"><span class="st locked">LOCKED</span><span class="why">This kind of content never crosses, whoever ticks it.</span></div></div>`;
   else right=`<div class="gst"><div class="ghost"><span class="st">NOT IN THIS SESSION</span><span class="why">${esc(cb.guest.why||'untick on the left, and it is simply not there')}</span></div></div>`;
@@ -407,10 +414,10 @@ $('#d-list').addEventListener('change',async e=>{const row=e.target.closest('.en
 $('#d-list').addEventListener('click',e=>{
   const m=e.target.closest('.more');if(m){const id=m.closest('.ent').dataset.id;if(unfold.has(id))unfold.delete(id);else unfold.add(id);rerow(id);return;}
   const db=e.target.closest('.draft');if(db){draftOne(db.closest('.ent').dataset.id,true);return;}
-  const rs=e.target.closest('.reset');if(rs){const row=rs.closest('.ent'),id=row.dataset.id,ta=row.querySelector('textarea');ta.value=texts[id]||'';fit(ta);delete drafts[id];ta.classList.remove('edited');refreshCounts();return;}
+  const rs=e.target.closest('.reset');if(rs){const id=rs.closest('.ent').dataset.id;delete drafts[id];asIs[id]=true;via[id]='single';rerow(id);refreshCounts();return;}
   const lp=e.target.closest('.loadraw');if(lp){const ids=[...document.querySelectorAll('.ent')].map(r=>r.dataset.id);loadTexts(ids);lp.disabled=true;lp.textContent='Loading…';return;}
   const mp=e.target.closest('.morepage');if(mp){const k=mp.dataset.ch;pages[k]=(pages[k]||PAGE)+PAGE;renderList();}});
-$('#d-list').addEventListener('input',e=>{const ta=e.target.closest('textarea');if(!ta)return;fit(ta);const id=ta.closest('.ent').dataset.id;drafts[id]=ta.value;ta.classList.toggle('edited',ta.value.trim()!==(texts[id]||'').trim());ta.classList.toggle('same',isSame(id)&&!asIs[id]);const g=ta.closest('.gst');const old=g.querySelector('.flags');if(old)old.outerHTML=chips(ta.value,'nothing flagged in the guest version');const w=g.querySelector('.warn');if(w&&!(isSame(id)&&!asIs[id]))w.remove();refreshCounts();});
+$('#d-list').addEventListener('input',e=>{const ta=e.target.closest('textarea');if(!ta)return;fit(ta);const id=ta.closest('.ent').dataset.id;drafts[id]=ta.value;if(asIs[id]){asIs[id]=false;ta.closest('.gst').querySelector('.reset')?.classList.remove('on');}ta.classList.toggle('edited',ta.value.trim()!==(texts[id]||'').trim());ta.classList.toggle('same',isSame(id)&&!asIs[id]);const g=ta.closest('.gst');const old=g.querySelector('.flags');if(old)old.outerHTML=chips(ta.value,'nothing flagged in the guest version');const w=g.querySelector('.warn');if(w&&!(isSame(id)&&!asIs[id]))w.remove();refreshCounts();});
 async function saveAll(){if(demo)return toast('Demo data, nothing saved');const public_texts={};for(const id of pub){if(asIs[id])continue;const dft=(drafts[id]||'').trim();if(dft&&dft!==(texts[id]||'').trim())public_texts[id]=dft;}
   const ids=[...pub].filter(id=>!(via[id]==='bulk-B'&&!public_texts[id]));
   const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:ids,public_texts,decisions:Object.fromEntries(Object.entries(via).map(([k,v])=>[k,{via:v}]))})});
@@ -437,7 +444,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#pol').classList
 // ---------- triage: rules, then Hermes, sort every entry into A/B/C; the owner still clicks every entry over
 const TIER_TXT={A:'A · AS-IS',B:'B · REWRITE',C:'C · PRIVATE'};
 function tierHTML(it){const c=cls[it.id];if(!c)return '';const rh=c.rules_hit||[];const v=via[it.id]||it.decided_via;
-  return `<div class="tier t${c.tier}" title="${esc(rh.map(r=>r+': '+((rulesInfo[r]||{}).description||'')).join('\n'))}"><b>${TIER_TXT[c.tier]}</b>${esc(c.reason)}${rh.length?` <span class="rh">${rh.map(esc).join(' · ')}</span>`:''}${v?`<span class="via">· ${esc(v)}</span>`:''}</div>`;}
+  return `<span class="tier t${c.tier}" title="${esc((c.reason||'')+(v?' · '+v:''))}"><b>${TIER_TXT[c.tier]}</b></span>`+rh.map(r=>`<span class="tag" title="${esc((rulesInfo[r]||{}).description||r)}">${esc(r.replace(/_/g,' '))}</span>`).join('');}
 function tierCounts(){const n={A:0,B:0,C:0};for(const it of items){const c=cls[it.id];if(c)n[c.tier]++;}return n;}
 function drawTriage(){const t=$('#triage');if(!t)return;const n=tierCounts(),done=Object.keys(cls).length,dirty=snapshot()!==initial||Object.keys(via).length>0;
   t.innerHTML=`<div class="tl"><span class="lbl">TRIAGE · RULES FIRST, THEN HERMES · NOTHING CROSSES WITHOUT YOUR CLICK</span><span class="lbl">${done?`${n.A} A · ${n.B} B · ${n.C} C`:'NOT CLASSIFIED YET'}</span></div>`+
