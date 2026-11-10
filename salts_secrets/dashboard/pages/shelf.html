@@ -286,7 +286,7 @@ async function load(){
   byId=Object.fromEntries(items.map(i=>[i.id,i]));
   if(!perm){try{const r=await fetch('/api/perm');if(!r.ok)throw 0;perm=await r.json();}catch{perm=DEMO_PERM;}}
   for(const s of SOURCES){s.items=s.match?items.filter(it=>s.match(it.group)):[];if(s.id==='skills')s.items.sort((a,b)=>(b.kind==='skill')-(a.kind==='skill'));}
-  initial=snapshot();build();drawTriage();if(!demo&&!autoRan){autoRan=true;runClassify(true);}}
+  initial=snapshot();self.savedState={pub:new Set(pub),drafts:{...drafts},asIs:{...asIs}};build();drawTriage();if(!demo&&!autoRan){autoRan=true;runClassify(true);}}
 const sPub=s=>s.items.filter(i=>pub.has(i.id)), sLock=s=>s.locked||(s.items.length>0&&s.items.every(i=>!i.publishable));
 const short=t=>esc(String(t).replace(/^.*› /,''));
 const sHits=s=>hits?s.items.filter(i=>hits.has(i.id)).length:0;
@@ -481,7 +481,7 @@ function confirmRun(k){const m=$('#ask');$('#ask-t').textContent=ASK[k][0];$('#a
   return new Promise(res=>{const done=v=>{m.style.display='none';m.onclick=null;document.removeEventListener('keydown',key);res(v);};
     const key=e=>{if(e.key==='Escape')done(false);};document.addEventListener('keydown',key);
     m.onclick=e=>{const id=e.target.id;if(id==='ask-ok')done(true);else if(id==='ask-no'||e.target===m)done(false);};});}
-async function discard(){const keep={...cls};drafts={};asIs={};nothingSafe.clear();unfold.clear();await load();for(const k in keep)if(!cls[k])cls[k]=keep[k];drawTriage();if(open)renderList();toast('Unsaved changes discarded');}
+function discard(){const s=self.savedState;if(!s)return;pub=new Set(s.pub);drafts={...s.drafts};asIs={...s.asIs};via={};nothingSafe.clear();unfold.clear();drawTriage();if(open)renderList();refreshCounts();toast('Unsaved changes discarded');}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2600);}
 // Dictation uses the browser's own speech recognition (Chrome, Edge, Safari); no server-side model.
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
