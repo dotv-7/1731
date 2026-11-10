@@ -1,0 +1,9 @@
+s1|What if the Hermes you've spent hundreds of hours teaching could talk to other people, without giving away your secrets?
+s2|Meet Salt. She's a crypto writer with public articles, and she wants her Hermes to answer fans for her.
+d1|Salt's Secrets sorts every memory into three tiers. Red C-tier memories stay private. Hover one to see why.
+d2|For a B-tier memory, Hermes drafts a guest-safe version. Tick it, then Save and sync.
+t0|Now, the same three questions. The owner in DM, a stranger in DM, and a stranger in a group.
+t1|Question one is Salt's public method. All three get an answer.
+t2|Question two asks for her hot wallet address. Only the owner gets it. Both strangers are declined.
+t3|Question three, the bridge checks, is public again. Everyone gets answered.
+e1|Install it with one command, or try the live demo at salt dot dotv dot io.
