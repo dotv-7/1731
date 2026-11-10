@@ -116,6 +116,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .ent pre.raw{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:400 12.5px/1.5 var(--mono);color:var(--ink);background:#fff;border:1px solid var(--hair);padding:10px;overflow:hidden}
 .ent pre.raw.fold,.ent .gst textarea.fold{max-height:240px;overflow:hidden}.ent pre.raw.fold.fit,.ent .gst textarea.fold.fit{max-height:none}
 .ent .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.ent .tags .st,.ent .tags .tier{margin:0}
+.ent .tags .st,.ent .tags .tag,.ent .tags .tier b{box-sizing:border-box;height:18px;display:inline-flex;align-items:center;padding:0 6px;margin:0;font:500 9px/1 var(--mono);letter-spacing:.1em;vertical-align:0}.ent .tags .tier{display:inline-flex}
 .ent .tags .tag{font:500 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;border:1px solid currentColor;padding:2px 5px 1px}
 .ent pre.raw.wait{color:var(--muted);font-style:italic}
 .ent .more[hidden]{display:none}.ent .gst .more{border-color:var(--blue)}
@@ -212,8 +213,7 @@ body.rotop nav.salt-nav{top:33px}
   <div class="triage" id="triage"></div>
   <div class="g" id="rows"></div>
   <div class="tally" id="tally"></div>
-  <div class="guests" id="guests"><div class="gh"><a class="lbl" href="/guests">WHAT GUESTS ASKED →</a><span class="lbl" id="g-count"></span></div></div>
-  <div class="foot"><span class="lbl">PRIVATE BY DEFAULT · ONLY TICKED ENTRIES CROSS</span><span class="lbl">CLICK A BLOCK TO OPEN IT · ESC CLOSE</span></div>
+  <div class="guests" id="guests" hidden><div class="gh"><a class="lbl" href="/guests">WHAT GUESTS ASKED →</a><span class="lbl" id="g-count"></span></div></div>
 </div>
 
 <div class="detail" id="detail">
@@ -382,7 +382,7 @@ function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status===
   const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}</div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><div class="tags"><span class="st ${st}">${st}</span>${tierHTML(it)}</div><pre class="raw ${raw===undefined?'wait':''} ${fold?'fold':''}">${raw===undefined?'loading raw…':markHTML(raw||'(empty)')}</pre>${more}</div></div>`;
   let right;
   if(on){const v=drafts[it.id]!==undefined?drafts[it.id]:(texts[it.id]||'');const edited=v.trim()!==(texts[it.id]||'').trim();const same=texts[it.id]!==undefined&&isSame(it.id)&&!asIs[it.id];const b=busy.has(it.id);const ns=nothingSafe.has(it.id)&&!v.trim()&&!b;
-    right=`<div class="gst"><div class="k"><span></span><span><button class="draft" type="button" ${b?'disabled':''} title="Hermes writes a guest version without the private details">${b?'Drafting…':'Draft with Hermes'}</button><button class="reset ${asIs[it.id]?'on':''}" type="button" title="publish the original unchanged">Original</button></span></div><textarea spellcheck="false" class="${edited?'edited':''} ${same?'same':''} ${fold?'fold':''}" ${texts[it.id]===undefined?'':'data-filled="1"'} ${b?'disabled':''} placeholder="${ns?'Write the guest version yourself, or untick the entry.':'Guest version'}">${esc(b?'Hermes is drafting a guest version…':v)}</textarea>${more}${texts[it.id]!==undefined&&!b&&Object.keys(flagsOf(v)).length?chips(v):''}${ns?`<div class="warn">NOTHING SAFE TO SHARE · WRITE ONE OR UNTICK</div>`:same?`<div class="warn">${!v.trim()?'EMPTY':'UNCHANGED'} · CLICK DRAFT OR ORIGINAL</div>`:''}</div>`;}
+    right=`<div class="gst"><div class="k"><span></span><span><button class="draft" type="button" ${b?'disabled':''} title="Hermes writes a guest version without the private details">${b?'Drafting…':'Draft with Hermes'}</button><button class="reset ${asIs[it.id]?'on':''}" type="button" title="publish the original unchanged">Original</button></span></div><textarea spellcheck="false" class="${edited?'edited':''} ${same?'same':''} ${fold?'fold':''}" ${texts[it.id]===undefined?'':'data-filled="1"'} ${b?'disabled':''} placeholder="${ns?'Write the guest version yourself, or untick the entry.':'Guest version'}">${esc(b?'Hermes is drafting a guest version…':v)}</textarea>${more}${ns?`<div class="warn">NOTHING SAFE TO SHARE · WRITE ONE OR UNTICK</div>`:same?`<div class="warn">${!v.trim()?'EMPTY':'UNCHANGED'} · CLICK DRAFT OR ORIGINAL</div>`:''}</div>`;}
   else if(chg)right=`<div class="gst"><div class="ghost"><span class="st changed">ORIGINAL CHANGED · DROPPED BACK TO PRIVATE</span><span class="why">The original was edited after you published it, so the guest lost it. Tick again to republish; the last guest version is below.</span>${drafts[it.id]?`<pre>${esc(drafts[it.id])}</pre>`:''}</div></div>`;
   else if(lk)right=`<div class="gst"><div class="ghost"><span class="st locked">LOCKED</span><span class="why">This kind of content never crosses, whoever ticks it.</span></div></div>`;
   else right=`<div class="gst"><div class="ghost"><span class="st">NOT IN THIS SESSION</span><span class="why">${esc(cb.guest.why||'untick on the left, and it is simply not there')}</span></div></div>`;
