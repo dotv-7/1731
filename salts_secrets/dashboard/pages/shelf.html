@@ -152,6 +152,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .ent .gst textarea.same{box-shadow:inset 0 0 0 2px #ff8c8c}
 .ent .gst .warn{font:500 9.5px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;margin-top:6px}
 .detail .cost{font:400 10.5px/1.4 var(--mono);color:var(--muted);letter-spacing:.04em;text-align:right;margin-top:8px}
+#ask .panel{width:min(460px,100%);height:auto;max-height:none}#ask .note{margin:12px 0 18px;font:400 14px/1.55 var(--serif,Georgia,serif);color:var(--ink)}#ask .acts{display:flex;gap:8px;justify-content:flex-end}
 .pol{position:fixed;inset:0;background:rgba(0,0,120,.35);z-index:65;display:none;align-items:center;justify-content:center;padding:20px}
 .pol.show{display:flex}
 .pol .panel{background:var(--sheet);border:1px solid var(--blue);width:min(94vw,860px);max-height:90vh;display:flex;flex-direction:column;gap:12px;padding:20px;box-shadow:0 30px 80px -30px rgba(0,0,120,.6)}
@@ -224,6 +225,7 @@ body.rotop nav.salt-nav{top:33px}
   <div class="list" id="d-list"></div>
   <div class="gview" id="gview"></div>
 </div>
+<div class="pol" id="ask"><div class="panel"><div class="k"><span class="lbl" id="ask-t"></span></div><p class="note" id="ask-b"></p><div class="acts"><button class="act" id="ask-no">Cancel</button><button class="act" id="ask-later">Later</button><button class="act primary" id="ask-ok">OK</button></div></div></div>
 <div class="pol" id="pol"><div class="panel"><div class="k"><span class="lbl">WHAT MAY BE SHARED · THE DRAFTER READS THIS EVERY TIME</span><button class="lbl box" id="pol-close">CLOSE</button></div><p class="note">Plain markdown. Two lists: what is fine to share about Salt, and what must never cross. Every draft Hermes writes for a guest follows this file; edit it and the next draft changes. Stored at <span id="pol-path"></span>.</p><textarea id="pol-text" spellcheck="false"></textarea><div class="acts"><button class="act primary" id="pol-save">Save policy</button></div></div></div>
 <div id="toast"></div>
 <script>
@@ -459,15 +461,22 @@ async function runClassify(rulesOnly){const b=$('#t-run');if(b&&!rulesOnly){b.di
   catch(err){toast('Classify failed: '+err.message);}
   drawTriage();if(open)renderList();}
 document.addEventListener('click',async e=>{const t=e.target;
-  if(t.id==='t-run'){if(demo)return toast('Demo data');runClassify();return;}
+  if(t.id==='t-run'){if(demo)return toast('Demo data');if(!await confirmRun('classify'))return;runClassify();return;}
   if(t.id==='t-save'){saveAll();return;}
   const b=t.dataset&&t.dataset.bulk;if(!b||demo||document.body.classList.contains('ro'))return;
   const ids=items.filter(it=>it.publishable&&cls[it.id]&&cls[it.id].tier===b).map(it=>it.id);
+  if(b==='B'&&!await confirmRun('draft'))return;
   if(b==='A'){for(const id of ids){pub.add(id);asIs[id]=true;delete drafts[id];via[id]='bulk-A';}}
   else if(b==='C'){for(const id of ids){pub.delete(id);via[id]='bulk-C';}}
   else{for(const id of ids){pub.add(id);asIs[id]=false;via[id]='bulk-B';}t.disabled=true;const q=[...ids];let n=0;
     await Promise.all(Array(4).fill(0).map(async()=>{while(q.length){const id=q.shift();await draftOne(id);n++;t.textContent=`Drafting ${n}/${ids.length}…`;if(nothingSafe.has(id)||!(drafts[id]||'').trim())pub.delete(id);}}));}
   build();drawTriage();if(open)renderList();});
+const ASK={classify:['CLASSIFY','Sorts every entry in this book into A (share as it is), B (share a rewritten version) or C (keep private). Nothing is published. It asks your Hermes model, so it can take a little while and cost a little.'],
+  draft:['DRAFT GUEST VERSIONS','Hermes writes a guest version of every B entry, with the private details taken out. You read and edit each one before Save & sync. It asks your Hermes model once per entry, so it can take a few minutes and cost a little.']};
+function confirmRun(k){const m=$('#ask');$('#ask-t').textContent=ASK[k][0];$('#ask-b').textContent=ASK[k][1];m.style.display='flex';$('#ask-ok').focus();
+  return new Promise(res=>{const done=v=>{m.style.display='none';m.onclick=null;document.removeEventListener('keydown',key);res(v);};
+    const key=e=>{if(e.key==='Escape')done(false);};document.addEventListener('keydown',key);
+    m.onclick=e=>{const id=e.target.id;if(id==='ask-ok')done(true);else if(id==='ask-no'||e.target===m)done(false);else if(id==='ask-later'){done(false);toast('Run it any time from the same button');}};});}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2600);}
 // Dictation uses the browser's own speech recognition (Chrome, Edge, Safari); no server-side model.
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
