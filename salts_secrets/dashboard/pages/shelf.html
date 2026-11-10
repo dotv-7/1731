@@ -78,7 +78,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 /* tally */
 .tally{margin-top:26px;border-top:1px solid var(--blue);padding-top:16px;display:grid;grid-template-columns:minmax(0,1fr) 230px minmax(0,1fr);gap:22px;align-items:start}
 .tally .big{font:400 clamp(44px,5vw,78px)/1 var(--disp);color:var(--blue);text-transform:uppercase}
-.tally .big small{font:400 11px/1 var(--mono);letter-spacing:.1em;display:block;margin-top:8px;color:var(--muted);text-transform:uppercase}
+.tally .big small{font:400 11px/1 var(--mono);letter-spacing:.1em;display:block;margin-top:16px;color:var(--muted);text-transform:uppercase}
 .tally .r{text-align:right}
 .tally .mid{text-align:center;font:400 13px/1.5 var(--serif);color:var(--ink);padding-top:6px}
 .foot{display:flex;justify-content:space-between;color:var(--blue);padding:40px 0 0}
@@ -116,9 +116,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .ent pre.raw{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:400 12.5px/1.5 var(--mono);color:var(--ink);background:#fff;border:1px solid var(--hair);padding:10px;overflow:hidden}
 .ent pre.raw.fold,.ent .gst textarea.fold{max-height:240px;overflow:hidden}
 .ent .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.ent .tags .st,.ent .tags .tier{margin:0}
-.ent .tags .tag{font:500 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;border:1px solid currentColor;padding:2px 5px 1px;cursor:help}
+.ent .tags .tag{font:500 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b91c1c;border:1px solid currentColor;padding:2px 5px 1px}
 .ent pre.raw.wait{color:var(--muted);font-style:italic}
-.ent .more{display:block;width:100%;margin-top:6px;padding:7px 0;border:1px solid var(--blue);background:#fff;text-align:center;font:500 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--blue)}
+.ent .more[hidden]{display:none}.ent .gst .more{border-color:var(--blue)}
+.ent .more{display:block;width:100%;margin:0;padding:7px 0;border:1px solid var(--hair);border-top:0;background:#fff;text-align:center;font:500 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--blue)}
 .ent .arr{display:flex;align-items:center;justify-content:center;font:400 20px/1 var(--mono);color:var(--blue)}
 .ent .arr.off{color:var(--hair)}
 .ent .gst{position:relative}
@@ -183,7 +184,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .tier .rh{font:400 10px/1.4 var(--mono);color:#b91c1c}.tier .via{font:400 10px/1 var(--mono);color:var(--blue);margin-left:4px}
 body.rotop nav.salt-nav{top:33px}
 .robar{position:sticky;top:0;z-index:70;margin:0;background:#b45309;color:#fff;font:600 11px/1 var(--mono);letter-spacing:.1em;padding:14px 14px 8px;text-align:center}
-.ro #d-save,.ro #t-save,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
+.ro #d-save,.ro #t-save,.ro #t-undo,.ro #pol-save,.ro .draft,.ro .mic,.ro [data-bulk]{display:none!important}
 .ro #d-list input,.ro #d-list textarea{opacity:.6;cursor:not-allowed}
 .robar.flash{animation:roflash .45s 2}@keyframes roflash{50%{background:#f59e0b}}
 .rotip{position:fixed;z-index:80;pointer-events:none;background:#b45309;color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;padding:7px 9px;opacity:0;transition:opacity .15s}.rotip.on{opacity:1}
@@ -225,7 +226,7 @@ body.rotop nav.salt-nav{top:33px}
   <div class="list" id="d-list"></div>
   <div class="gview" id="gview"></div>
 </div>
-<div class="pol" id="ask"><div class="panel"><div class="k"><span class="lbl" id="ask-t"></span></div><p class="note" id="ask-b"></p><div class="acts"><button class="act" id="ask-no">Cancel</button><button class="act" id="ask-later">Later</button><button class="act primary" id="ask-ok">OK</button></div></div></div>
+<div class="pol" id="ask"><div class="panel"><div class="k"><span class="lbl" id="ask-t"></span></div><p class="note" id="ask-b"></p><div class="acts"><button class="act" id="ask-no">Cancel</button><button class="act primary" id="ask-ok">OK</button></div></div></div>
 <div class="pol" id="pol"><div class="panel"><div class="k"><span class="lbl">WHAT MAY BE SHARED · THE DRAFTER READS THIS EVERY TIME</span><button class="lbl box" id="pol-close">CLOSE</button></div><p class="note">Plain markdown. Two lists: what is fine to share about Salt, and what must never cross. Every draft Hermes writes for a guest follows this file; edit it and the next draft changes. Stored at <span id="pol-path"></span>.</p><textarea id="pol-text" spellcheck="false"></textarea><div class="acts"><button class="act primary" id="pol-save">Save policy</button></div></div></div>
 <div id="toast"></div>
 <script>
@@ -273,7 +274,7 @@ const SOURCES=[
 ];
 const DEMO_ITEMS=[['Memory · MEMORY.md','Private records live in private/personal-records.md'],['Memory · MEMORY.md','@saltwater_sats is her anonymous account'],['Memory · USER.md','Lena, 31, product designer in Lisbon'],['Memory · USER.md','Call her Lena. No emojis.'],['Persona · SOUL.md','SOUL.md'],['Workspace · workspace · journal','2026-11-05.md'],['Workspace · workspace · family','letter-to-clara.md'],['Workspace · workspace · public','issue-06 › Harbor'],['Data dir · private','personal-records.md › Home network'],['Skills','weekly-review'],['Cron · cron','Reminder — 20 Dec 2026 09:00'],['Sessions · state.db','2026-11-07 · Token holdings lookup'],['External memory / plugins','Plugin: salts-secrets']];
 const DEMO_PERM={catalog:[{id:'web',tools:['web_search','web_extract']},{id:'vision',tools:['vision_analyze']},{id:'tts',tools:['text_to_speech']},{id:'clarify',tools:['clarify']},{id:'public_notes',tools:['public_notes_lookup']},{id:'memory',tools:['memory']},{id:'session_search',tools:['session_search']},{id:'file',tools:['read_file','write_file','patch','search_files']},{id:'terminal',tools:['terminal','process_manage']},{id:'browser',tools:['browser_exec','browser_cdp','browser_dialog','browser_vault']},{id:'cronjob',tools:['cronjob_manage']}],policy:{guest:['web','vision','tts','clarify','public_notes']}};
-const PAGE=50, AUTO_TEXT=60, FOLD=1200; const unfold=new Set();
+const PAGE=50, AUTO_TEXT=60, FOLD_PX=240; const unfold=new Set();
 let items=[],byId={},texts={},drafts={},pub=new Set(),demo=false,perm=null,meta={},hits=null,initial='',asIs={},busy=new Set(),draftN=0,draftTok=0,nothingSafe=new Set(),cls={},via={},combo=null,rulesInfo={},autoRan=false;
 const snapshot=()=>[...pub].sort().map(id=>id+'='+(asIs[id]?'*':(drafts[id]||''))).join('\n');
 async function load(){
@@ -314,7 +315,7 @@ function build(){
   if(meta.public_home)$('#m-guest').textContent='public profile · '+meta.public_home;
   $('#rows').innerHTML=SOURCES.map(s=>`<div class="row ${hits&&s.match&&!sHits(s)?'dim':''}">${ownerCell(s)}<div class="rail"><span class="step">${s.step}</span><span class="name">${esc(s.name)}</span><span class="lbl box mode ${s.mode}">${s.modeText}</span>${s.match?`<span class="cnt">${fmt(s.items.length)} ${s.items.length===1?'ENTRY':'ENTRIES'}</span>`:''}</div>${guestCell(s)}</div>`).join('');
   const facts=items.filter(i=>pub.has(i.id)&&/Memory · (MEMORY|USER)\.md/.test(i.group)).length,docs=crossed-facts;
-  $('#tally').innerHTML=`<div><div class="big">${fmt(total)}<small>entries in Lena's session</small></div></div><div class="mid">Of everything on the left, ${fmt(crossed)} ${crossed===1?'entry':'entries'} cross: ${fmt(facts)} as facts, ${fmt(docs)} as documents. The rest has no path into the session on the right.</div><div class="r"><div class="big">${fmt(crossed)}<small>entries reach Salt's assistant</small></div></div>`;}
+  $('#tally').innerHTML=`<div><div class="big">${fmt(total)}<small>entries in Lena's session</small></div></div><div class="mid"></div><div class="r"><div class="big">${fmt(crossed)}<small>entries reach Salt's assistant</small></div></div>`;}
 // ---------- search (server-side, over titles + bodies)
 let qTimer=null;
 $('#q').addEventListener('input',()=>{clearTimeout(qTimer);qTimer=setTimeout(search,250);});
@@ -360,7 +361,9 @@ async function draftOne(id,force){if(busy.has(id)||demo||document.body.classList
 function rerow(id){const row=document.querySelector(`.ent[data-id="${CSS.escape(id)}"]`);if(row&&byId[id]){row.outerHTML=entHTML(byId[id]);fitAll();}}
 // Guest boxes grow with their text, like the raw original on the left: no scrollbar, no resize grip.
 function fit(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px';}
-function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);alignAll();}
+function fitAll(){document.querySelectorAll('#d-list textarea').forEach(fit);markFold();alignAll();}
+// A box gets its Show all / Show less only when its text is taller than the fold.
+function markFold(){document.querySelectorAll('#d-list .ent .more').forEach(m=>{const b=m.previousElementSibling;m.hidden=!(b&&b.scrollHeight>FOLD_PX+24);});}
 // The guest box (or its empty placeholder) starts on the same line as the raw original, whatever the title, path and tier lines above it take.
 function alignAll(){const wide=!matchMedia('(max-width:900px)').matches;document.querySelectorAll('#d-list .ent').forEach(e=>{const a=e.querySelector('pre.raw'),g=e.querySelector('.gst .ghost'),k=e.querySelector('.gst .k'),b=e.querySelector('.gst textarea');if(!a)return;
   if(g){g.style.marginTop=g.style.height='';if(!wide)return;g.style.marginTop=(2+a.getBoundingClientRect().top-g.getBoundingClientRect().top)+'px';g.style.height=a.offsetHeight+'px';return;}
@@ -374,8 +377,8 @@ function entHTML(it){const on=pub.has(it.id),lk=!it.publishable,chg=it.status===
   const st=lk?'locked':on?'public':chg?'changed':'private';
   const raw=texts[it.id],gv=drafts[it.id]!==undefined?drafts[it.id]:(raw||'');
   // Long entries fold both boxes to the same height; one Show all / Show less under each box toggles both.
-  const long=raw!==undefined&&(raw.length>FOLD||(on&&gv.length>FOLD)),fold=long&&!unfold.has(it.id);
-  const more=long?`<button class="more" type="button">${fold?'Show all':'Show less'}</button>`:'';
+  const fold=!unfold.has(it.id);
+  const more=raw===undefined?'':`<button class="more" type="button" hidden>${fold?'Show all':'Show less'}</button>`;
   const left=`<div class="orig"><input type="checkbox" ${on?'checked':''} ${lk?'disabled':''} title="${lk?'this kind of content cannot be published':on?'untick to pull it back':'tick to give it to the guest'}"><div><div class="t">${short(it.title)}</div><div class="path">${esc(it.path||it.source)}${it.note?' · '+esc(it.note):''}</div><div class="tags"><span class="st ${st}">${st}</span>${tierHTML(it)}</div><pre class="raw ${raw===undefined?'wait':''} ${fold?'fold':''}">${raw===undefined?'loading raw…':markHTML(raw||'(empty)')}</pre>${more}</div></div>`;
   let right;
   if(on){const v=drafts[it.id]!==undefined?drafts[it.id]:(texts[it.id]||'');const edited=v.trim()!==(texts[it.id]||'').trim();const same=texts[it.id]!==undefined&&isSame(it.id)&&!asIs[it.id];const b=busy.has(it.id);const ns=nothingSafe.has(it.id)&&!v.trim()&&!b;
@@ -419,7 +422,7 @@ $('#d-list').addEventListener('click',e=>{
   const rs=e.target.closest('.reset');if(rs){const id=rs.closest('.ent').dataset.id;delete drafts[id];asIs[id]=true;via[id]='single';rerow(id);refreshCounts();return;}
   const lp=e.target.closest('.loadraw');if(lp){const ids=[...document.querySelectorAll('.ent')].map(r=>r.dataset.id);loadTexts(ids);lp.disabled=true;lp.textContent='Loading…';return;}
   const mp=e.target.closest('.morepage');if(mp){const k=mp.dataset.ch;pages[k]=(pages[k]||PAGE)+PAGE;renderList();}});
-$('#d-list').addEventListener('input',e=>{const ta=e.target.closest('textarea');if(!ta)return;fit(ta);const id=ta.closest('.ent').dataset.id;drafts[id]=ta.value;if(asIs[id]){asIs[id]=false;ta.closest('.gst').querySelector('.reset')?.classList.remove('on');}ta.classList.toggle('edited',ta.value.trim()!==(texts[id]||'').trim());ta.classList.toggle('same',isSame(id)&&!asIs[id]);const g=ta.closest('.gst');const old=g.querySelector('.flags');if(old)old.outerHTML=chips(ta.value,'nothing flagged in the guest version');const w=g.querySelector('.warn');if(w&&!(isSame(id)&&!asIs[id]))w.remove();refreshCounts();});
+$('#d-list').addEventListener('input',e=>{const ta=e.target.closest('textarea');if(!ta)return;fit(ta);markFold();const id=ta.closest('.ent').dataset.id;drafts[id]=ta.value;if(asIs[id]){asIs[id]=false;ta.closest('.gst').querySelector('.reset')?.classList.remove('on');}ta.classList.toggle('edited',ta.value.trim()!==(texts[id]||'').trim());ta.classList.toggle('same',isSame(id)&&!asIs[id]);const g=ta.closest('.gst');const old=g.querySelector('.flags');if(old)old.outerHTML=chips(ta.value,'nothing flagged in the guest version');const w=g.querySelector('.warn');if(w&&!(isSame(id)&&!asIs[id]))w.remove();refreshCounts();});
 async function saveAll(){if(demo)return toast('Demo data, nothing saved');const public_texts={};for(const id of pub){if(asIs[id])continue;const dft=(drafts[id]||'').trim();if(dft&&dft!==(texts[id]||'').trim())public_texts[id]=dft;}
   const ids=[...pub].filter(id=>!(via[id]==='bulk-B'&&!public_texts[id]));
   const r=await fetch('/api/board/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_ids:ids,public_texts,decisions:Object.fromEntries(Object.entries(via).map(([k,v])=>[k,{via:v}]))})});
@@ -450,7 +453,7 @@ function tierHTML(it){const c=cls[it.id];if(!c)return '';const rh=c.rules_hit||[
 function tierCounts(){const n={A:0,B:0,C:0};for(const it of items){const c=cls[it.id];if(c)n[c.tier]++;}return n;}
 function drawTriage(){const t=$('#triage');if(!t)return;const n=tierCounts(),done=Object.keys(cls).length,dirty=snapshot()!==initial||Object.keys(via).length>0;
   t.innerHTML=`<div class="tl"><span class="lbl">TRIAGE · RULES FIRST, THEN HERMES · NOTHING CROSSES WITHOUT YOUR CLICK</span><span class="lbl">${done?`${n.A} A · ${n.B} B · ${n.C} C`:'NOT CLASSIFIED YET'}</span></div>`+
-  `<div class="tb"><button class="act" id="t-run">${done?'Classify again':'Classify'}</button><button class="act" data-bulk="A" ${n.A?'':'disabled'}>A · adopt all ${n.A} as-is</button><button class="act" data-bulk="B" ${n.B?'':'disabled'}>B · draft guest versions for all ${n.B}</button><button class="act" data-bulk="C" ${n.C?'':'disabled'}>C · keep all ${n.C} private</button><button class="act primary" id="t-save" ${dirty?'':'disabled'}>Save &amp; sync</button></div>`+
+  `<div class="tb"><button class="act" id="t-run">${done?'Classify again':'Classify'}</button><button class="act" data-bulk="A" ${n.A?'':'disabled'}>A · adopt all ${n.A} as-is</button><button class="act" data-bulk="B" ${n.B?'':'disabled'}>B · draft guest versions for all ${n.B}</button><button class="act" data-bulk="C" ${n.C?'':'disabled'}>C · keep all ${n.C} private</button><button class="act" id="t-undo" ${dirty?'':'disabled'} title="drop the changes you have not saved">Discard changes</button><button class="act primary" id="t-save" ${dirty?'':'disabled'}>Save &amp; sync</button></div>`+
   `<div class="legend"><div class="tier tA"><b>A · AS-IS</b>Nothing personal: text she already published, or a pure method (rules, checklists, thresholds). Can cross unchanged.</div><div class="tier tB"><b>B · REWRITE</b>A shareable core wrapped in personal detail: where she lives, her job, pets, routines, opinions about private people. Crosses only as a guest version written in general terms.</div><div class="tier tC"><b>C · PRIVATE</b>Credentials, accounts, wallets, addresses, phone or email, health, names of family, partners or doctors, anything she marked private. Never crosses.</div></div>`+
   (combo&&combo.hit?`<div class="warn">${esc(combo.message)} · ${combo.ids.length} entries marked B</div>`:'')+
   `<div class="tnote">A crosses unchanged, B crosses only as a guest version, C stays here. A bulk button only ever takes entries of its own tier; C never crosses in bulk. Every entry stays editable one by one, and every click is written to the approval log.</div>`;}
@@ -463,6 +466,7 @@ async function runClassify(rulesOnly){const b=$('#t-run');if(b&&!rulesOnly){b.di
 document.addEventListener('click',async e=>{const t=e.target;
   if(t.id==='t-run'){if(demo)return toast('Demo data');if(!await confirmRun('classify'))return;runClassify();return;}
   if(t.id==='t-save'){saveAll();return;}
+  if(t.id==='t-undo'){discard();return;}
   const b=t.dataset&&t.dataset.bulk;if(!b||demo||document.body.classList.contains('ro'))return;
   const ids=items.filter(it=>it.publishable&&cls[it.id]&&cls[it.id].tier===b).map(it=>it.id);
   if(b==='B'&&!await confirmRun('draft'))return;
@@ -476,7 +480,8 @@ const ASK={classify:['CLASSIFY','Sorts every entry in this book into A (share as
 function confirmRun(k){const m=$('#ask');$('#ask-t').textContent=ASK[k][0];$('#ask-b').textContent=ASK[k][1];m.style.display='flex';$('#ask-ok').focus();
   return new Promise(res=>{const done=v=>{m.style.display='none';m.onclick=null;document.removeEventListener('keydown',key);res(v);};
     const key=e=>{if(e.key==='Escape')done(false);};document.addEventListener('keydown',key);
-    m.onclick=e=>{const id=e.target.id;if(id==='ask-ok')done(true);else if(id==='ask-no'||e.target===m)done(false);else if(id==='ask-later'){done(false);toast('Run it any time from the same button');}};});}
+    m.onclick=e=>{const id=e.target.id;if(id==='ask-ok')done(true);else if(id==='ask-no'||e.target===m)done(false);};});}
+async function discard(){const keep={...cls};drafts={};asIs={};nothingSafe.clear();unfold.clear();await load();for(const k in keep)if(!cls[k])cls[k]=keep[k];drawTriage();if(open)renderList();toast('Unsaved changes discarded');}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2600);}
 // Dictation uses the browser's own speech recognition (Chrome, Edge, Safari); no server-side model.
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
